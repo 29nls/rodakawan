@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { ColorSwatches } from '@/components/foundation/ColorSwatches';
@@ -13,7 +14,9 @@ import { Screen } from '@/components/ui/Screen';
 import { ScreenHeader } from '@/components/ui/ScreenHeader';
 import { SectionHeader } from '@/components/ui/SectionHeader';
 import { spacing } from '@/constants/theme';
+import { useAuthSession } from '@/features/auth/session';
 import { useAppStatus } from '@/hooks/useAppStatus';
+import { installWebCrypto } from '@/lib/crypto/webcrypto';
 import { PUBLIC_ENV_KEYS } from '@/lib/env';
 
 type ChecklistStatus = 'selesai' | 'tindakan';
@@ -24,7 +27,7 @@ type ChecklistItem = {
   status: ChecklistStatus;
 };
 
-const checklist: readonly ChecklistItem[] = [
+const foundationChecklist: readonly ChecklistItem[] = [
   {
     label: 'Expo + Expo Router + TypeScript strict',
     detail: 'Rute di src/app dengan tab navigasi dasar dan route 404.',
@@ -77,6 +80,41 @@ const checklist: readonly ChecklistItem[] = [
   },
 ];
 
+/** Status Milestone 1 berdasarkan hasil pemeriksaan yang benar-benar dijalankan. */
+const authChecklist: readonly ChecklistItem[] = [
+  {
+    label: 'Supabase client + penyimpanan sesi',
+    detail:
+      'Satu client terpusat, session di expo-sqlite localStorage, refresh token mengikuti AppState.',
+    status: 'selesai',
+  },
+  {
+    label: 'Alur masuk, daftar, lupa sandi, atur sandi baru',
+    detail: 'Validasi, loading, dan pesan error Bahasa Indonesia; teruji unit tanpa backend.',
+    status: 'selesai',
+  },
+  {
+    label: 'Navigasi terlindungi berbasis sesi',
+    detail: 'Stack.Protected + gerbang loading; RLS tetap otoritas data.',
+    status: 'selesai',
+  },
+  {
+    label: 'Profil: baca, lengkapi, dan ubah',
+    detail: 'Username unik, indikator loading/sukses/gagal, penanganan profil yang belum ada.',
+    status: 'selesai',
+  },
+  {
+    label: 'Migration 0002 + uji RLS profil',
+    detail: 'Jalankan di project development; dua akun diuji lewat SQL (supabase/tests).',
+    status: 'tindakan',
+  },
+  {
+    label: 'Uji nyata: dua akun di perangkat',
+    detail: 'Perlu project Supabase, kredensial .env.local, dan perangkat fisik.',
+    status: 'tindakan',
+  },
+];
+
 const commands: readonly { label: string; command: string }[] = [
   { label: 'Jalankan aplikasi', command: 'npx expo start' },
   { label: 'Pemeriksaan tipe', command: 'npm run typecheck' },
@@ -91,8 +129,38 @@ const checklistTones: Record<ChecklistStatus, BadgeTone> = {
   tindakan: 'warning',
 };
 
+function ChecklistSection({ items, title }: { items: readonly ChecklistItem[]; title: string }) {
+  return (
+    <View style={styles.section}>
+      <SectionHeader
+        subtitle="Item bertanda tindakan memerlukan akun atau perangkat Anda."
+        title={title}
+      />
+      <Card padding="none">
+        {items.map((item, index) => (
+          <View key={item.label}>
+            {index > 0 ? <Divider /> : null}
+            <View style={styles.checklistRow}>
+              <AppText variant="label">{item.label}</AppText>
+              <AppText variant="caption" tone="muted">
+                {item.detail}
+              </AppText>
+              <Badge
+                label={item.status === 'selesai' ? 'Selesai di repo' : 'Perlu tindakan'}
+                tone={checklistTones[item.status]}
+              />
+            </View>
+          </View>
+        ))}
+      </Card>
+    </View>
+  );
+}
+
 export default function SystemScreen() {
   const { appInfo, backend, env } = useAppStatus();
+  const { status: sessionStatus } = useAuthSession();
+  const cryptoSupport = useMemo(() => installWebCrypto(), []);
   const privilegedWarning = backend.privilegedKeyWarning;
   const missingEnvKeys = PUBLIC_ENV_KEYS.filter((key) => env[key] === undefined);
 
@@ -102,8 +170,8 @@ export default function SystemScreen() {
       header={
         <ScreenHeader
           showBack
-          overline="Milestone 0"
-          subtitle="Token desain, komponen, konfigurasi, dan checklist fondasi."
+          overline="Diagnostik"
+          subtitle="Token desain, runtime, konfigurasi, dan checklist milestone."
           title="Fondasi & sistem"
         />
       }
@@ -208,29 +276,53 @@ export default function SystemScreen() {
         <ComponentShowcase />
       </Card>
 
-      <View style={styles.section}>
+      <Card>
         <SectionHeader
-          subtitle="Item bertanda tindakan memerlukan akun atau perangkat Anda."
-          title="Checklist Milestone 0"
+          subtitle="Polyfill dipasang oleh aplikasi; tanpa ini Supabase akan memakai metode PKCE yang lebih lemah."
+          title="Kripto runtime & sesi"
         />
-        <Card padding="none">
-          {checklist.map((item, index) => (
-            <View key={item.label}>
-              {index > 0 ? <Divider /> : null}
-              <View style={styles.checklistRow}>
-                <AppText variant="label">{item.label}</AppText>
-                <AppText variant="caption" tone="muted">
-                  {item.detail}
-                </AppText>
-                <Badge
-                  label={item.status === 'selesai' ? 'Selesai di repo' : 'Perlu tindakan'}
-                  tone={checklistTones[item.status]}
-                />
-              </View>
-            </View>
-          ))}
-        </Card>
-      </View>
+        <Divider />
+        <InfoRow
+          badge={{
+            label: sessionStatus === 'loading' ? 'Memeriksa' : 'Selesai',
+            tone: sessionStatus === 'loading' ? 'neutral' : 'success',
+          }}
+          detail="Status pemeriksaan sesi saat aplikasi mulai."
+          label="Pemulihan sesi"
+        />
+        <InfoRow
+          badge={{
+            label: cryptoSupport.textEncoder ? 'Ada' : 'Tidak ada',
+            tone: cryptoSupport.textEncoder ? 'success' : 'warning',
+          }}
+          label="TextEncoder"
+        />
+        <InfoRow
+          badge={{
+            label: cryptoSupport.randomValues ? 'Ada' : 'Tidak ada',
+            tone: cryptoSupport.randomValues ? 'success' : 'warning',
+          }}
+          label="crypto.getRandomValues"
+        />
+        <InfoRow
+          badge={{
+            label: cryptoSupport.sha256 ? 'Ada' : 'Tidak ada',
+            tone: cryptoSupport.sha256 ? 'success' : 'warning',
+          }}
+          label="crypto.subtle.digest (SHA-256)"
+        />
+        <InfoRow
+          badge={{
+            label: cryptoSupport.pkceSha256Ready ? 'Siap (S256)' : 'Terbatas (plain)',
+            tone: cryptoSupport.pkceSha256Ready ? 'success' : 'warning',
+          }}
+          detail="Metode challenge PKCE yang benar-benar dipakai di perangkat ini."
+          label="PKCE"
+        />
+      </Card>
+
+      <ChecklistSection items={authChecklist} title="Checklist Milestone 1" />
+      <ChecklistSection items={foundationChecklist} title="Checklist Milestone 0" />
 
       <Card>
         <SectionHeader

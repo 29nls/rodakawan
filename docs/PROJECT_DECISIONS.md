@@ -26,6 +26,20 @@ Gunakan log ini untuk merekam keputusan yang mempengaruhi data, dependency nativ
 | ADR-015 | Nama paket Android `com.rodakawan.app` | Sementara | Wajib diganti sebelum rilis Play Store bila identitas final berbeda; penggantian setelah dirilis Google Play berarti identitas aplikasi baru. |
 | ADR-016 | Aset ikon/splash dibuat dari kode (`scripts/generate-assets.mjs`) | Sementara | Memudahkan regenerasi saat identitas visual (ADR-001) final; tidak ada dependency gambar tambahan. |
 
+## Keputusan Milestone 1 (auth, profil, privasi dasar)
+
+| ID | Keputusan | Status | Alasan / catatan |
+|---|---|---|---|
+| ADR-017 | `@supabase/supabase-js` 2.x dipakai apa adanya (bukan `@supabase/ssr`) dengan **satu** client di `src/lib/supabase/client.ts` | Disetujui | Target hanya Android/iOS (native), bukan web. Client dibuat lazy agar impor tidak crash saat env belum diisi, dan hanya ada satu instance supaya listener auth tidak ganda. |
+| ADR-018 | Session disimpan dengan `expo-sqlite/localStorage/install` + `AsyncStorage`, opsi `persistSession`, `autoRefreshToken`, `detectSessionInUrl: false` | Disetujui | Pola resmi Supabase untuk React Native. `detectSessionInUrl` dimatikan karena aplikasi native tidak menerima session dari URL halaman; callback email ditangani manual lewat deep link (ADR-021). |
+| ADR-019 | Proteksi rute memakai `<Redirect>` di dalam `src/app/(auth)/_layout.tsx` dan `src/app/(tabs)/_layout.tsx`, bukan `useEffect`/`router.replace` | Disetujui | Menghindari redirect loop dan frame layar privat yang sempat terlihat saat session dipulihkan. Ini hanya kenyamanan navigasi; otorisasi data tetap RLS. |
+| ADR-020 | Profil dibuat oleh trigger database `handle_new_user` (`SECURITY DEFINER`, `search_path` dipin, hak minimum) pada migration `0002_auth_profile_bootstrap.sql` | Disetujui | Identitas berasal dari `NEW.id` di `auth.users`, bukan dari payload klien. Tidak ada endpoint aplikasi yang boleh membuat/mengganti baris profil. Unique index username tetap menjadi otoritas keunikan. |
+| ADR-021 | Username yang bentrok saat registrasi memakai username sementara berawalan `rider_`, bukan menggagalkan pendaftaran | Disetujui | Supabase Auth tidak bisa mengembalikan error unik dari database publik. Aplikasi menandai `profile.username_is_placeholder` dan menampilkan banner di tab Profil supaya pengguna menggantinya. |
+| ADR-022 | Alur email (konfirmasi, reset password) memakai deep link `rodakawan://auth/callback` dan layar `/reset-password` dengan `linkParams.ts` untuk mem-parse token PKCE/`access_token` | Disetujui | Diperlukan untuk Android tanpa server web. Token dari URL tidak pernah ditulis ke log. |
+| ADR-023 | **Belum ada** upload avatar; tidak ada tombol/fungsi upload palsu | Disetujui | Bucket Storage dan policy belum ada (Milestone 2). Struktur profil sudah siap menampung `avatar_url` tanpa perubahan schema. |
+| ADR-024 | Test fitur auth/profil memakai fake client (`src/test-support/fakeSupabase.ts`) yang menggantikan `src/lib/supabase/client.ts` lewat `moduleNameMapper` | Disetujui | Test tetap deterministik dan tidak menyentuh jaringan. Fake hanya meniru permukaan yang dipakai aplikasi; RLS tetap diuji terpisah lewat SQL. |
+| ADR-025 | Plugin `expo-sqlite` dibuat no-op khusus Jest (`src/test-support/sqliteLocalStorageShim.js`) | Disetujui | `expo-sqlite` memanggil native module saat impor sehingga Jest gagal sebelum test berjalan. Konfigurasi runtime aplikasi tidak berubah. |
+
 ## Template keputusan baru
 
 - **ID:** ADR-XXX

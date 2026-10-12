@@ -14,25 +14,38 @@
 
 **Hasil:** repo siap di-build dan dokumentasi menjadi source of truth.
 
-- [ ] Inisialisasi Expo app dengan TypeScript dan Expo Router.
-- [ ] Format/lint/typecheck scripts.
-- [ ] Environment config dan `.env.example` tanpa secret.
-- [ ] Setup Supabase development project.
-- [ ] Setup EAS build dan APK development/preview.
-- [ ] Error boundary/loading/empty-state primitives.
-- [ ] README project berisi cara menjalankan dan aturan branch.
+- [x] Inisialisasi Expo app dengan TypeScript dan Expo Router.
+- [x] Format/lint/typecheck scripts.
+- [x] Environment config dan `.env.example` tanpa secret.
+- [ ] Setup Supabase development project. *(butuh akun pemilik; lihat `docs/SETUP_GUIDE.md`)*
+- [ ] Setup EAS build dan APK development/preview. *(butuh akun Expo; bundel Android sudah diverifikasi lokal lewat `npm run export:android`)*
+- [x] Error boundary/loading/empty-state primitives.
+- [x] README project berisi cara menjalankan dan aturan branch.
 
-**Exit criteria:** aplikasi terbuka di perangkat; CI lokal typecheck bersih; preview build bisa dipasang.
+**Exit criteria:** aplikasi terbuka di perangkat (terverifikasi bundel + Metro, belum diuji di perangkat fisik); CI lokal typecheck bersih; preview build bisa dipasang (belum — menunggu akun Expo).
 
 ## Milestone 1 — Auth, profil, privasi dasar
 
-- [ ] Sign in/sign up/reset sesuai provider yang dipilih.
-- [ ] Buat/edit profil dan username unik.
-- [ ] Pengaturan sesi/logout.
-- [ ] Profil privat tidak mengungkap data internal.
-- [ ] RLS tests untuk profile.
+Status: **implementasi dan pengujian lokal selesai; verifikasi terhadap backend Supabase nyata belum dilakukan** (belum ada project/credential).
 
-**Exit criteria:** dua user dapat masuk di perangkat/sesi berbeda; user A tidak dapat mengedit profil user B.
+Kode dan skrip (implementasi):
+
+- [x] Sign in/sign up/reset diimplementasikan dengan Supabase Auth (alur email + password).
+- [x] Buat/edit profil dan username unik diimplementasikan (+ validasi dan penanganan benturan).
+- [x] Pengaturan sesi/logout diimplementasikan (persistensi `expo-sqlite`, auto-refresh, PKCE).
+- [x] Policy RLS profil migration 0001 dipertahankan tanpa pelonggaran.
+- [x] Migration `0002_auth_profile_bootstrap.sql` (bootstrap trigger + constraint) ditulis.
+- [x] Skrip uji RLS dua akun ditulis: `supabase/tests/rls_profiles_test.sql`.
+
+Belum terverifikasi (jangan ditandai selesai):
+
+- [ ] Profil privat tidak mengungkap data internal **dibuktikan di database** (jalankan skrip RLS).
+- [ ] Registrasi + konfirmasi email diuji ke project Supabase development.
+- [ ] Login, reset password, dan session persistence diuji di perangkat fisik.
+- [ ] Migration 0001 + 0002 benar-benar diterapkan ke project development.
+- [ ] Uji RLS otomatis lewat CLI (`npm run db:test` belum tersedia).
+
+**Exit criteria:** dua user dapat masuk di perangkat/sesi berbeda; user A tidak dapat mengedit profil user B. — *belum diverifikasi end-to-end pada backend nyata; unit/komponen test dan skrip RLS sudah tersedia.*
 
 ## Milestone 2 — Garasi dan klub
 

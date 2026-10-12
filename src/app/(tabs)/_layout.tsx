@@ -12,7 +12,8 @@ type TabDefinition = {
 };
 
 const tabs: readonly TabDefinition[] = [
-  { name: 'index', title: 'Ringkasan', icon: 'home-outline', iconFocused: 'home' },
+  // Urutan tiap entri menentukan urutan tab; `ringkasan` adalah tab pertama.
+  { name: 'ringkasan', title: 'Ringkasan', icon: 'home-outline', iconFocused: 'home' },
   { name: 'rides', title: 'Perjalanan', icon: 'navigate-outline', iconFocused: 'navigate' },
   { name: 'community', title: 'Komunitas', icon: 'people-outline', iconFocused: 'people' },
   { name: 'hazards', title: 'Peringatan', icon: 'warning-outline', iconFocused: 'warning' },

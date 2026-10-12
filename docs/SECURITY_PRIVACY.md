@@ -55,6 +55,17 @@ Jangan mengadopsi retensi tabel ini secara otomatis; tetapkan dasar, kebutuhan, 
 - Hindari menyebarkan metadata EXIF foto yang berisi lokasi jika tidak diperlukan; hapus metadata pada pipeline upload bila cocok.
 - Sediakan kontrol siapa yang dapat melihat kendaraan/foto.
 
+### 4.1 Implementasi profil Milestone 1
+
+- **Pembuatan profil** dilakukan oleh trigger database `public.bootstrap_profile()` pada `after insert auth.users` (migration `0002_auth_profile_bootstrap.sql`), bukan oleh klien. Fungsi berjalan `security definer` dengan `set search_path = ''` (semua referensi skema eksplisit), haknya dicabut dari `public`, dan identitas baris diambil dari `NEW.id` — bukan dari payload yang bisa dikirim pengguna.
+- **Metadata pendaftaran hanya nilai awal.** `raw_user_meta_data` dipakai untuk mengisi username awal, tidak pernah untuk otorisasi. Username dari metadata dinormalkan (huruf kecil, hanya `[a-z0-9_]`) dan divalidasi `^[a-z0-9_]{3,30}$`; bila tidak valid atau bentrok, profil tetap dibuat dengan username sementara `rider_<acak>` dan aplikasi menandai bahwa username harus diganti.
+- **Keunikan username** adalah tanggung jawab database: unique index + CHECK `profiles_username_format`. Klien hanya memberi pesan yang bisa dipahami; klien bukan penentu keunikan.
+- **`updated_at` diisi server** oleh trigger `profiles_touch_updated_at`, supaya klien tidak bisa memalsukan waktu perubahan.
+- **RLS tidak dilonggarkan.** `public.profiles` tetap memakai policy migration 0001: `SELECT` untuk pemilik, profil yang tidak privat, atau pengikut; `INSERT`/`UPDATE` hanya untuk baris dengan `id = auth.uid()`; tidak ada policy `DELETE` (penghapusan akun ada di Milestone 5). Tidak ada akses untuk peran `anon`.
+- **Aplikasi tidak pernah menyimpan atau menampilkan kredensial.** Hanya publishable/anon key yang dipakai; service-role key tidak boleh ada di repo maupun bundle. Pesan error dari backend dipetakan ke kalimat Bahasa Indonesia tanpa menyalin detail internal, dan tidak ada log yang memuat token atau isi kata sandi.
+- **Belum ada upload avatar** (butuh bucket Storage + policy, Milestone 2), dan belum ada fungsi upload palsu.
+- **Belum diverifikasi terhadap backend nyata.** Migration 0002 dan uji `supabase/tests/rls_profiles_test.sql` sudah ditulis dan direview, tetapi **belum pernah dijalankan** pada database karena project Supabase belum tersedia. Jangan menganggap RLS sudah terbukti sebelum skrip itu lulus di project development.
+
 ## 5. Keamanan token dan storage
 
 - Access token ditangani SDK auth; gunakan storage aman yang direkomendasikan untuk secure session pada platform.
@@ -99,6 +110,13 @@ Jangan mengadopsi retensi tabel ini secara otomatis; tetapkan dasar, kebutuhan, 
 Matrix ini harus disesuaikan dengan kebijakan final, lalu diimplementasikan menjadi automated DB/RLS tests untuk allowed dan denied cases.
 
 ## 9. Security release checklist
+
+Status per Milestone 1 (diperbarui pada milestone ini):
+
+- RLS aktif pada tabel/API yang terekspos: **skrip tersedia, belum dijalankan** di database nyata.
+- Negative test lintas pengguna: **skrip tersedia** (`supabase/tests/rls_profiles_test.sql`), belum dijalankan.
+- Tidak ada service role/private key di bundle: **diverifikasi lokal** untuk bundle Android (`npm run export:android`, exit 0, tidak ada JWT/`supabase.co` yang ter-inline) dan pada tree repo. Verifikasi ini harus diulang setiap kali kredensial nyata dipakai, karena inlining `EXPO_PUBLIC_*` berubah saat `.env.local` terisi.
+- Belum diverifikasi karena memang belum dibangun: Realtime private channel, storage policies, rate limit, flow hapus akun, kebijakan privasi.
 
 - [ ] RLS aktif pada semua tabel/API yang terekspos.
 - [ ] Negative tests untuk akses non-member dan revoked member lulus.

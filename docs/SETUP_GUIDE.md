@@ -29,12 +29,50 @@ Untuk prototipe yang kompatibel, instal Expo Go di ponsel lalu scan QR code yang
 
 Pastikan repository menggunakan satu package manager dan commit lockfile. Tambahkan script lint/typecheck/test bertahap, bukan memasang semua library sekaligus. Sebelum memasang dependency native, baca dokumentasi kompatibilitasnya dengan Expo SDK aktif.
 
-## 4. Hubungkan Supabase
+## 4. Hubungkan Supabase (langkah konkret Milestone 1)
 
-1. Buat project development terpisah dari production.
-2. Jalankan migration di `supabase/migrations/0001_initial_schema.sql` pada project development setelah review; jangan langsung menjalankannya pada database produksi.
-3. Audit semua policy dan buat migrations lanjutan untuk Edge Functions, storage bucket, dan private Realtime channel.
-4. Siapkan environment lokal, misalnya `.env.local`:
+Bagian ini adalah urutan yang sudah disesuaikan dengan kode di repo. Belum ada project Supabase yang terhubung saat dokumen ini diperbarui, jadi langkah di bawah **belum pernah dijalankan** dan harus Anda lakukan sendiri.
+
+### 4.1 Buat project development
+
+1. Masuk ke https://supabase.com/dashboard lalu buat project baru khusus pengembangan (jangan pakai project produksi).
+2. Simpan database password di password manager; password itu tidak dipakai aplikasi mobile.
+3. Catat region project agar latensi dari Indonesia wajar (mis. Singapore).
+
+### 4.2 Ambil URL dan publishable key
+
+1. Buka **Project Settings → API**.
+2. Salin **Project URL** dan **publishable key** (project baru) atau **anon public** key (project lama).
+3. Jangan pernah menyalin **service_role** key ke aplikasi; key itu hanya untuk backend/Edge Functions.
+
+### 4.3 Jalankan migration
+
+Di **SQL Editor**, jalankan berurutan dan periksa pesan error tiap langkah:
+
+1. Tempel isi [`supabase/migrations/0001_initial_schema.sql`](../supabase/migrations/0001_initial_schema.sql) → **Run**.
+2. Tempel isi [`supabase/migrations/0002_auth_profile_bootstrap.sql`](../supabase/migrations/0002_auth_profile_bootstrap.sql) → **Run**. Migration ini idempotent (`create or replace`, `drop trigger if exists`) sehingga aman dijalankan ulang, dan tidak menghapus data.
+3. Verifikasi cepat: **Table Editor → profiles** harus ada, dan **Database → Triggers** pada skema `auth` menampilkan `on_auth_user_created`.
+
+Migration 0001 **tidak diubah** pada Milestone 1. Semua penyesuaian ada di 0002 supaya project yang sudah terlanjur memakai 0001 tidak perlu di-reset.
+
+### 4.4 Atur URL konfirmasi email
+
+Tanpa langkah ini, email konfirmasi/reset akan membuka halaman web dan aplikasi tidak pernah menerima kodenya.
+
+1. **Authentication → URL Configuration**.
+2. **Redirect URLs** — tambahkan:
+   - `rodakawan://auth/callback` (development build & APK; `scheme` di `app.json`).
+   - `exp://**` atau URL `exp://<host>:<port>/--/auth/callback` yang ditampilkan Metro bila menguji lewat Expo Go.
+3. **Site URL** boleh tetap nilai default; aplikasi native tidak memakainya.
+4. **Authentication → Providers → Email**: putuskan apakah **Confirm email** menyala.
+   - Menyala: setelah daftar, aplikasi menampilkan instruksi "cek email" dan pengguna harus mengklik tautan.
+   - Mati: sesi langsung tersedia dan aplikasi membawa pengguna masuk tanpa menunggu konfirmasi.
+   Kedua pengaturan didukung kode; yang penting konfigurasinya diketahui saat pengujian manual.
+
+### 4.5 Isi environment lokal
+
+1. Salin `.env.example` menjadi `.env.local` di root repo.
+2. Isi nilainya:
 
 ```dotenv
 EXPO_PUBLIC_SUPABASE_URL=https://YOUR_PROJECT.supabase.co
@@ -42,8 +80,31 @@ EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY=YOUR_PUBLIC_CLIENT_KEY
 EXPO_PUBLIC_MAP_STYLE_URL=https://YOUR_TILE_PROVIDER/STYLE.json
 ```
 
-5. `.env.local` harus masuk `.gitignore`. Nilai `EXPO_PUBLIC_*` dimasukkan ke app bundle; isinya tidak boleh berupa secrets.
-6. Jangan pernah menggunakan Supabase secret/service-role key pada aplikasi mobile. Key tersebut hanya untuk backend/Edge Functions.
+3. `.env.local` sudah masuk `.gitignore`. Setiap variabel berprefix `EXPO_PUBLIC_` ikut masuk ke bundle aplikasi, jadi isinya tidak boleh berupa secret.
+4. Restart Metro setelah mengubah `.env.local` (nilai di-inline saat build).
+
+### 4.6 Jalankan uji RLS profil
+
+Uji ini membuktikan user A tidak dapat membaca/mengubah profil privat user B, memakai dua akun uji di dalam satu transaksi yang berakhir `ROLLBACK`.
+
+- **Cara cepat:** tempel seluruh isi [`supabase/tests/rls_profiles_test.sql`](../supabase/tests/rls_profiles_test.sql) ke SQL Editor → **Run**. Hasil lulus ditandai notice `UJI RLS PROFIL LULUS`. Jika ada `UJI GAGAL`, pesan menyebutkan asersi mana yang gagal.
+- **Catatan:** perintah `set local role ...` hanya berlaku di dalam transaksi; pastikan seluruh berkas dijalankan sebagai satu blok, bukan baris per baris.
+- Skrip tidak menyisakan pengguna uji karena diakhiri `rollback`.
+
+### 4.7 Uji manual alur autentikasi
+
+1. `npx expo start` lalu buka aplikasi di perangkat.
+2. Daftar akun baru → ikuti alur konfirmasi sesuai pengaturan 4.4 → masuk.
+3. Tab **Profil** → ubah nama tampilan/username/kota/bio → simpan → muat ulang aplikasi untuk memastikan perubahan tersimpan.
+4. Daftarkan username yang sudah dipakai; aplikasi harus menampilkan pesan yang jelas, bukan crash.
+5. Logout → pastikan layar privat tidak bisa dibuka kembali.
+6. **Lupa password** → selesaikan tautan reset dari email.
+
+### 4.8 Hal yang belum ada di Milestone 1
+
+- Bucket Storage dan policy avatar (Milestone 2). Karena itu tidak ada tombol upload foto profil.
+- Edge Function, private Realtime channel, push notification, dan peta.
+- Perintah `supabase` CLI, `npm run db:test`, atau CI database: migration dijalankan manual lewat SQL Editor.
 
 ## 5. Buat cloud development build
 

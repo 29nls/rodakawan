@@ -24,7 +24,24 @@
 | AUTH-01 | Daftar dan login valid | User terautentikasi dan profil dibuat/dapat dilengkapi. |
 | AUTH-02 | Password/token salah | Pesan aman dan jelas; tidak menampilkan detail internal. |
 | AUTH-03 | Logout lalu buka kembali | Session tertutup sesuai desain; private screen tidak terbuka. |
+| AUTH-04 | Daftar dengan email sudah terpakai | Pesan jelas di Bahasa Indonesia; tidak menyebut akun lain ada/hilang secara berlebihan. |
+| AUTH-05 | Daftar dengan username sudah terpakai | Pendaftaran tetap berhasil; profil memakai username sementara `rider_…` dan aplikasi meminta penggantian. |
+| AUTH-06 | Email konfirmasi diperlukan | Aplikasi menyatakan akun menunggu konfirmasi; tidak mengklaim sudah masuk. |
+| AUTH-07 | Tautan konfirmasi dibuka | Postur awal session diperbarui; pengguna diarahkan ke area aplikasi tanpa redirect loop. |
+| AUTH-08 | Tautan kedaluwarsa / sudah dipakai | Pesan jelas dan saran meminta tautan baru; tidak crash. |
+| AUTH-09 | Minta reset password | Pesan sukses tidak membocorkan apakah email terdaftar. |
+| AUTH-10 | Ganti password dari tautan pemulihan | Password lama tidak berlaku; kata sandi baru dapat dipakai login. |
+| AUTH-11 | Kata sandi lemah / konfirmasi tidak sama | Ditolak di aplikasi dengan pesan spesifik sebelum request dikirim. |
+| AUTH-12 | Jaringan gagal saat masuk | Pesan jaringan jelas; tidak mengklaim berhasil; tombol bisa dicoba lagi. |
+| AUTH-13 | Env Supabase belum diisi | Banner "konfigurasi belum tersedia"; tidak ada request jaringan; aplikasi tidak crash dan tidak menampilkan nilai key. |
+| AUTH-14 | Buka rute privat tanpa session | Dialihkan ke alur masuk; layar privat tidak pernah dirender. |
 | PROF-01 | User A mengubah profile User B lewat API | Ditolak oleh policy/server. |
+| PROF-02 | User A membaca profil privat User B | Tidak ada baris yang terlihat (bukan pesan error yang membocorkan keberadaan). |
+| PROF-03 | Peran anon membaca `public.profiles` | Nol baris. |
+| PROF-04 | Username duplikat lewat API | Ditolak unique constraint; aplikasi menampilkan pesan yang bisa dipahami. |
+| PROF-05 | Username dengan format tidak valid | Ditolak validasi aplikasi dan CHECK constraint database. |
+| PROF-06 | Profil belum ada (mis. dibuat sebelum migration 0002) | Aplikasi menampilkan state eksplisit, bukan layar kosong, dan tetap dapat membuat profil. |
+| PROF-07 | Sesi kedaluwarsa saat menyimpan profil | Diarahkan keluar dengan pesan jelas; tidak menyimpan sebagai pengguna lain. |
 | GAR-01 | User lain membuka garage publik | Hanya field yang diizinkan terlihat. |
 | GAR-02 | User lain membaca plat pribadi | Ditolak tanpa kebocoran payload. |
 | CLUB-01 | Buat klub | Creator menjadi owner; data valid. |
@@ -105,6 +122,26 @@ Jangan rilis jika ditemukan salah satu:
 - Permission request menyesatkan pengguna atau kontrol stop-sharing tidak berfungsi.
 - Peringatan bahaya kedaluwarsa masih tampil sebagai aktif tanpa indikator.
 
-## 9. Sign-off
+## 9. Status otomatisasi Milestone 1
+
+Yang **sudah otomatis** (`npm test`, jaringan dimatikan; client Supabase diganti fake di `src/test-support/fakeSupabase.ts`):
+
+| Berkas | Cakupan |
+|---|---|
+| `src/features/auth/__tests__/validation.test.ts` | Email, kata sandi, konfirmasi kata sandi, kebijakan password. |
+| `src/features/profile/__tests__/validation.test.ts` | Username (format, panjang, normalisasi), display name, bio, kota. |
+| `src/features/auth/__tests__/errors.test.ts` | Pemetaan error Supabase → pesan Bahasa Indonesia, termasuk jaringan dan konfigurasi belum ada. |
+| `src/features/auth/__tests__/linkParams.test.ts` | Parser tautan email: `code` di query, `access_token` di fragment, tautan rusak/kedaluwarsa. |
+| `src/features/auth/__tests__/api.test.ts` | Registrasi, login, logout, reset, resend; termasuk penolakan saat konfigurasi kosong. |
+| `src/features/profile/__tests__/api.test.ts` | Baca dan ubah profil; kasus profil belum ada dan sesi tidak valid. |
+| `src/features/auth/__tests__/session.test.tsx` | State `loading`/`ready`, perubahan session, pembersihan saat logout. |
+| `src/__tests__/navigation.test.tsx` | Rute asli: gerbang awal, alur auth, area privat, dan tidak ada redirect loop. |
+| `src/components/ui/__tests__/*` | Perilaku dasar komponen yang dipakai form (tombol, field). |
+
+Yang **hanya bisa diuji manual** untuk sekarang (butuh project Supabase / perangkat): AUTH-01, AUTH-04 s.d. AUTH-10, PROF-01 s.d. PROF-03, PROF-06, PROF-07, dan seluruh `supabase/tests/rls_profiles_test.sql`.
+
+Aturan pelaporan: jangan mencatat AUTH/PROF sebagai lulus pada tabel di atas bila hanya test lokal yang dijalankan. Tandai "lulus (unit)" atau "belum dijalankan".
+
+## 10. Sign-off
 
 Catat versi APK, commit SHA, device model/Android version, jaringan, tester, hasil test, screenshot/video bug bila aman, severity, dan status regresi. Jangan menyertakan data lokasi personal pada bukti uji.
