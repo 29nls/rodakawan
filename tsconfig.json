@@ -1,0 +1,16 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitOverride": true,
+    "forceConsistentCasingInFileNames": true,
+    "paths": {
+      "@/*": ["./src/*"]
+    },
+    // Hanya tipe Jest yang disertakan; tipe Node tidak dipakai di runtime React Native.
+    "types": ["jest"]
+  },
+  "include": ["**/*.ts", "**/*.tsx", ".expo/types/**/*.ts", "expo-env.d.ts"],
+  "exclude": ["node_modules", "dist", ".expo"]
+}

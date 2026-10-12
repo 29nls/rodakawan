@@ -1,0 +1,14 @@
+node_modules/
+.expo/
+dist/
+android/
+ios/
+package-lock.json
+
+# Dokumentasi produk adalah sumber kebenaran; jangan diformat ulang otomatis.
+docs/
+exports/
+supabase/
+README.md
+
+assets/*.png

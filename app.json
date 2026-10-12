@@ -1,0 +1,42 @@
+{
+  "expo": {
+    "name": "RodaKawan",
+    "slug": "rodakawan",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "rodakawan",
+    "userInterfaceStyle": "dark",
+    "platforms": ["android", "ios"],
+    "icon": "./assets/icon.png",
+    "backgroundColor": "#0B0D10",
+    "android": {
+      "package": "com.rodakawan.app",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0B0D10"
+      }
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#0B0D10",
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 176,
+          "resizeMode": "contain",
+          "dark": {
+            "backgroundColor": "#0B0D10",
+            "image": "./assets/splash-icon.png"
+          }
+        }
+      ],
+      "expo-status-bar",
+      "expo-font"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

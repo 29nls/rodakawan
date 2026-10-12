@@ -1,0 +1,272 @@
+import { StyleSheet, View } from 'react-native';
+
+import { ColorSwatches } from '@/components/foundation/ColorSwatches';
+import { ComponentShowcase } from '@/components/foundation/ComponentShowcase';
+import { RadiusScale, SpacingScale } from '@/components/foundation/ScalePreview';
+import { TypeSpecimen } from '@/components/foundation/TypeSpecimen';
+import { AppText } from '@/components/ui/AppText';
+import { Badge, type BadgeTone } from '@/components/ui/Badge';
+import { Card } from '@/components/ui/Card';
+import { Divider } from '@/components/ui/Divider';
+import { InfoRow } from '@/components/ui/InfoRow';
+import { Screen } from '@/components/ui/Screen';
+import { ScreenHeader } from '@/components/ui/ScreenHeader';
+import { SectionHeader } from '@/components/ui/SectionHeader';
+import { spacing } from '@/constants/theme';
+import { useAppStatus } from '@/hooks/useAppStatus';
+import { PUBLIC_ENV_KEYS } from '@/lib/env';
+
+type ChecklistStatus = 'selesai' | 'tindakan';
+
+type ChecklistItem = {
+  label: string;
+  detail: string;
+  status: ChecklistStatus;
+};
+
+const checklist: readonly ChecklistItem[] = [
+  {
+    label: 'Expo + Expo Router + TypeScript strict',
+    detail: 'Rute di src/app dengan tab navigasi dasar dan route 404.',
+    status: 'selesai',
+  },
+  {
+    label: 'Design system',
+    detail: 'Token warna, tipografi, spacing, dan radius di src/constants/theme.ts.',
+    status: 'selesai',
+  },
+  {
+    label: 'Komponen UI dasar',
+    detail: 'Tombol, kartu, badge, baris info, daftar butir, dan primitif state.',
+    status: 'selesai',
+  },
+  {
+    label: 'Script lint, format, typecheck, test',
+    detail: 'Tersedia di package.json dan dijalankan sebelum milestone selesai.',
+    status: 'selesai',
+  },
+  {
+    label: 'Konfigurasi environment tanpa secret',
+    detail: '.env.example hanya memuat variabel EXPO_PUBLIC_*; tidak ada kredensial nyata.',
+    status: 'selesai',
+  },
+  {
+    label: 'Error boundary dan state primitives',
+    detail: 'Route error boundary, loading, empty, error, dan state belum tersedia.',
+    status: 'selesai',
+  },
+  {
+    label: 'Project development Supabase',
+    detail: 'Perlu akun Anda. Migrasi 0001_initial_schema.sql dijalankan setelah review.',
+    status: 'tindakan',
+  },
+  {
+    label: 'Akun Expo dan eas init',
+    detail: 'Diperlukan untuk cloud build; eas init menulis projectId ke app.json.',
+    status: 'tindakan',
+  },
+  {
+    label: 'Build APK development atau preview',
+    detail: 'eas build -p android --profile preview; memakai kredit/limit akun Expo.',
+    status: 'tindakan',
+  },
+  {
+    label: 'Uji di perangkat Android fisik',
+    detail: 'Pasang APK atau buka lewat Expo Go, lalu jalankan smoke test dasar.',
+    status: 'tindakan',
+  },
+];
+
+const commands: readonly { label: string; command: string }[] = [
+  { label: 'Jalankan aplikasi', command: 'npx expo start' },
+  { label: 'Pemeriksaan tipe', command: 'npm run typecheck' },
+  { label: 'Lint', command: 'npm run lint' },
+  { label: 'Test unit', command: 'npm test' },
+  { label: 'Kesehatan project', command: 'npm run doctor' },
+  { label: 'APK internal', command: 'npx eas-cli@latest build -p android --profile preview' },
+];
+
+const checklistTones: Record<ChecklistStatus, BadgeTone> = {
+  selesai: 'success',
+  tindakan: 'warning',
+};
+
+export default function SystemScreen() {
+  const { appInfo, backend, env } = useAppStatus();
+  const privilegedWarning = backend.privilegedKeyWarning;
+  const missingEnvKeys = PUBLIC_ENV_KEYS.filter((key) => env[key] === undefined);
+
+  return (
+    <Screen
+      edges={['top', 'left', 'right', 'bottom']}
+      header={
+        <ScreenHeader
+          showBack
+          overline="Milestone 0"
+          subtitle="Token desain, komponen, konfigurasi, dan checklist fondasi."
+          title="Fondasi & sistem"
+        />
+      }
+      scroll
+    >
+      <Card>
+        <SectionHeader
+          subtitle="Rincian build ini; berguna saat menguji di perangkat."
+          title="Identitas build"
+        />
+        <Divider />
+        <InfoRow detail={appInfo.buildLabel} label="Versi" value={appInfo.version} />
+        <InfoRow label="Expo SDK" value={appInfo.expoSdkVersion ?? 'Belum terbaca'} />
+        <InfoRow label="Slug" value={appInfo.slug} />
+        <InfoRow label="Skema URL" value={appInfo.scheme ?? 'Belum diset'} />
+        <InfoRow label="Paket Android" value={appInfo.androidPackage ?? 'Belum diset'} />
+        <InfoRow
+          badge={{
+            label: appInfo.easProjectId ? 'Terdaftar' : 'Belum terdaftar',
+            tone: appInfo.easProjectId ? 'success' : 'neutral',
+          }}
+          label="EAS project"
+        />
+        {appInfo.devServerUrl ? (
+          <InfoRow
+            detail="Alamat bundler Metro yang melayani perangkat ini."
+            label="Metro host"
+            value={appInfo.devServerUrl}
+          />
+        ) : null}
+      </Card>
+
+      <Card>
+        <SectionHeader
+          subtitle="Hanya variabel berprefix EXPO_PUBLIC_ yang tersedia di aplikasi."
+          title="Konfigurasi lingkungan"
+        />
+        <Divider />
+        <InfoRow
+          badge={{ label: backend.label, tone: backend.tone }}
+          detail={backend.detail}
+          label="Status backend"
+        />
+        {PUBLIC_ENV_KEYS.map((key) => (
+          <InfoRow
+            badge={{
+              label: env[key] ? 'Terisi' : 'Belum diisi',
+              tone: env[key] ? 'success' : 'neutral',
+            }}
+            key={key}
+            label={key}
+          />
+        ))}
+        {missingEnvKeys.length > 0 ? (
+          <AppText variant="caption" tone="muted">
+            Nilai tidak ditampilkan di layar ini agar tidak bocor lewat screenshot. Isi variabel di
+            file .env.local berdasarkan .env.example.
+          </AppText>
+        ) : null}
+      </Card>
+
+      {privilegedWarning ? (
+        <Card variant="accent">
+          <AppText tone="accent" variant="bodyStrong">
+            Peringatan keamanan
+          </AppText>
+          <AppText variant="callout" tone="secondary">
+            {privilegedWarning}
+          </AppText>
+        </Card>
+      ) : null}
+
+      <Card>
+        <SectionHeader
+          subtitle="Palet charcoal + amber. Rasio kontras dihitung terhadap latar charcoal."
+          title="Warna"
+        />
+        <Divider />
+        <ColorSwatches />
+      </Card>
+
+      <Card>
+        <SectionHeader subtitle="Semua ukuran berbasis skala 4dp." title="Tipografi" />
+        <Divider />
+        <TypeSpecimen />
+      </Card>
+
+      <Card>
+        <SectionHeader title="Ruang & radius" />
+        <Divider />
+        <SpacingScale />
+        <Divider />
+        <RadiusScale />
+      </Card>
+
+      <Card>
+        <SectionHeader
+          subtitle="Semua kontrol punya target sentuh minimal 48dp."
+          title="Komponen dasar"
+        />
+        <Divider />
+        <ComponentShowcase />
+      </Card>
+
+      <View style={styles.section}>
+        <SectionHeader
+          subtitle="Item bertanda tindakan memerlukan akun atau perangkat Anda."
+          title="Checklist Milestone 0"
+        />
+        <Card padding="none">
+          {checklist.map((item, index) => (
+            <View key={item.label}>
+              {index > 0 ? <Divider /> : null}
+              <View style={styles.checklistRow}>
+                <AppText variant="label">{item.label}</AppText>
+                <AppText variant="caption" tone="muted">
+                  {item.detail}
+                </AppText>
+                <Badge
+                  label={item.status === 'selesai' ? 'Selesai di repo' : 'Perlu tindakan'}
+                  tone={checklistTones[item.status]}
+                />
+              </View>
+            </View>
+          ))}
+        </Card>
+      </View>
+
+      <Card>
+        <SectionHeader
+          subtitle="Jalankan dari PowerShell di folder proyek."
+          title="Perintah penting"
+        />
+        <Divider />
+        {commands.map((item) => (
+          <View key={item.command} style={styles.commandRow}>
+            <AppText variant="caption" tone="muted">
+              {item.label}
+            </AppText>
+            <AppText variant="callout" tone="accent">
+              {item.command}
+            </AppText>
+          </View>
+        ))}
+      </Card>
+
+      <AppText align="center" variant="caption" tone="muted">
+        Layar ini hanya menampilkan nilai dari build yang berjalan; tidak ada data contoh.
+      </AppText>
+    </Screen>
+  );
+}
+
+const styles = StyleSheet.create({
+  section: {
+    gap: spacing.md,
+  },
+  checklistRow: {
+    alignItems: 'flex-start',
+    gap: spacing.xs,
+    padding: spacing.lg,
+  },
+  commandRow: {
+    gap: spacing.xs / 2,
+  },
+});

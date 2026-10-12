@@ -40,6 +40,91 @@ RodaKawan adalah aplikasi pendamping berkendara untuk komunitas motor, klub sepe
 5. Jalankan acceptance test dalam `docs/QA_TEST_PLAN.md` dan uji RLS sebelum menambah pengguna sungguhan.
 6. Jangan pernah memasukkan secret/service-role key ke kode aplikasi mobile.
 
+## Aplikasi (Milestone 0)
+
+Repositori ini kini berisi aplikasi **React Native + Expo + TypeScript** di root, dengan `docs/` tetap menjadi sumber kebenaran produk.
+
+Yang sudah ada: struktur Expo Router (`src/app`), design system gelap (charcoal + amber), komponen UI dasar, error boundary dan state primitives, konfigurasi lingkungan tanpa secret, serta profil build EAS. Fitur produk (akun, klub, perjalanan, live location, chat, laporan jalan) **belum** dibangun dan sengaja tidak ditampilkan sebagai tombol yang berfungsi.
+
+### Prasyarat
+
+- Node.js 22.13 atau lebih baru (disarankan 24.3+; pengembangan ini memakai Node 24.18).
+- npm sebagai satu-satunya package manager (lockfile `package-lock.json` di-commit).
+- Untuk mencoba di HP Android: aplikasi **Expo Go** (prototipe) atau APK development build.
+- Android Studio tidak diperlukan; APK dibuat di cloud dengan EAS Build.
+
+### Perintah utama (PowerShell)
+
+```powershell
+npm install                 # pasang dependency sesuai lockfile
+npx expo start              # jalankan Metro; pindai QR dengan Expo Go
+npm run typecheck           # TypeScript strict tanpa emit
+npm run lint                # ESLint (eslint-config-expo + Prettier)
+npm run format              # rapikan format dengan Prettier
+npm test                    # unit test (jest-expo)
+npm run doctor              # pemeriksaan kesehatan project
+npm run export:android      # verifikasi bundel Android tanpa perangkat
+```
+
+Catatan: tipe rute Expo Router dihasilkan saat `npx expo start` pertama kali dijalankan ke folder `.expo/types`. Pada clone baru, jalankan dev server sekali sebelum `npm run typecheck`.
+
+### Konfigurasi lingkungan
+
+1. Salin `.env.example` menjadi `.env.local`.
+2. Isi `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, dan `EXPO_PUBLIC_MAP_STYLE_URL` setelah project development tersedia.
+3. `.env.local` diabaikan Git. Hanya variabel `EXPO_PUBLIC_*` yang masuk ke bundle aplikasi; jangan pernah menaruh service role key, database password, LiveKit secret, atau token admin di sana.
+
+### Build APK Android tanpa Android Studio
+
+```powershell
+npx eas-cli@latest login                                       # masuk ke akun Expo
+npx eas-cli@latest init                                        # menulis projectId EAS ke app.json
+npx eas-cli@latest build --platform android --profile preview  # APK internal untuk pengujian
+npx eas-cli@latest build --platform android --profile development  # development build (expo-dev-client)
+```
+
+Profil `development` wajib dipakai untuk fitur native (background location, peta native, WebRTC) karena Expo Go tidak mendukungnya. Ubah nama paket Android (`com.rodakawan.app` di `app.json`) sebelum rilis ke Play Store bila identitas final berbeda.
+
+### Aset ikon
+
+Ikon, adaptive icon, dan splash mark dibuat dari kode tanpa dependency tambahan:
+
+```powershell
+npm run assets:generate
+```
+
+### Catatan pengujian
+
+- `npm test` memakai `jest-expo` preset Android dan `@testing-library/react-native` 14.
+- Pada RTL 14 `render`, `fireEvent`, dan `renderRouter` bersifat **asynchronous** — selalu `await` sebelum melakukan assertion.
+- Plugin `react-native-worklets/plugin` dimatikan khusus pada lingkungan test melalui `babel.config.js` (plugin itu menyuntikkan pemeriksaan Reanimated yang membutuhkan native worklets). Pada build Metro/APK plugin tetap aktif.
+- Test navigasi menjalankan rute asli dari `src/app` (bukan mock) sehingga perubahan nama tab atau penambahan route akan terdeteksi.
+
+### Struktur proyek
+
+```text
+src/
+  app/          # rute Expo Router (tab utama + layar Fondasi & sistem)
+  components/   # ui/ (primitif), feedback/ (error boundary), foundation/ (pratinjau token)
+  constants/    # theme.ts, roadmap.ts, strings.ts
+  hooks/        # useAppStatus
+  lib/          # env.ts (konfigurasi publik + validasi)
+  services/     # appInfo.ts (metadata build)
+  types/        # deklarasi tipe lingkungan
+  utils/        # color.ts (kontras WCAG)
+assets/         # ikon & splash
+scripts/        # generator aset
+docs/           # sumber kebenaran produk
+supabase/       # migration (dijalankan pada milestone berikutnya)
+```
+
+### Aturan branch dan commit
+
+- `main` harus selalu dapat dijalankan: `npm run typecheck` dan `npm test` hijau sebelum merge.
+- Satu milestone per branch, mis. `feat/m1-auth-profil`, `fix/m2-join-klub`, `chore/perbarui-eas`.
+- Commit mengikuti Conventional Commits (`feat:`, `fix:`, `chore:`, `docs:`), satu perubahan logis per commit.
+- Bila keputusan teknis berubah, perbarui juga `docs/PROJECT_DECISIONS.md` dan dokumen terkait pada commit yang sama.
+
 ## Status dan disclaimer
 
 Dokumen ini adalah baseline desain, bukan sertifikasi keselamatan berkendara, audit keamanan, atau jaminan performa jaringan. Akurasi GPS, batasan background execution, latensi audio, biaya peta, dan aturan distribusi aplikasi harus divalidasi di perangkat dan layanan yang benar-benar dipakai. Semua threshold yang tertulis merupakan target awal yang dapat diubah setelah uji lapangan.
