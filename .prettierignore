@@ -12,3 +12,4 @@ supabase/
 README.md
 
 assets/*.png
+pnpm-lock.yaml
