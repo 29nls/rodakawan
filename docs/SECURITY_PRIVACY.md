@@ -64,7 +64,7 @@ Jangan mengadopsi retensi tabel ini secara otomatis; tetapkan dasar, kebutuhan, 
 - **RLS tidak dilonggarkan.** `public.profiles` tetap memakai policy migration 0001: `SELECT` untuk pemilik, profil yang tidak privat, atau pengikut; `INSERT`/`UPDATE` hanya untuk baris dengan `id = auth.uid()`; tidak ada policy `DELETE` (penghapusan akun ada di Milestone 5). Tidak ada akses untuk peran `anon`.
 - **Aplikasi tidak pernah menyimpan atau menampilkan kredensial.** Hanya publishable/anon key yang dipakai; service-role key tidak boleh ada di repo maupun bundle. Pesan error dari backend dipetakan ke kalimat Bahasa Indonesia tanpa menyalin detail internal, dan tidak ada log yang memuat token atau isi kata sandi.
 - **Belum ada upload avatar** (butuh bucket Storage + policy, Milestone 2), dan belum ada fungsi upload palsu.
-- **Belum diverifikasi terhadap backend nyata.** Migration 0002 dan uji `supabase/tests/rls_profiles_test.sql` sudah ditulis dan direview, tetapi **belum pernah dijalankan** pada database karena project Supabase belum tersedia. Jangan menganggap RLS sudah terbukti sebelum skrip itu lulus di project development.
+- **Uji RLS siap dijalankan, tetapi belum pernah dijalankan.** Migration 0002 dan `supabase/tests/rls_profiles_test.sql` sudah ditulis, direview, dan memiliki runner (`npm run db:test`) yang membaca `DATABASE_URL` dari environment serta hanya melaporkan lulus bila notice penanda diterima server. Namun **belum ada database** tujuan karena project Supabase belum tersedia, jadi jangan menganggap RLS sudah terbukti. Skrip uji mencakup kontrol positif (profil publik memang terbaca), penolakan baca/ubah profil privat pengguna lain, penolakan `DELETE`, dan penolakan `INSERT`/`UPDATE` oleh peran `anon`.
 
 ## 5. Keamanan token dan storage
 
@@ -111,11 +111,14 @@ Matrix ini harus disesuaikan dengan kebijakan final, lalu diimplementasikan menj
 
 ## 9. Security release checklist
 
-Status per Milestone 1 (diperbarui pada milestone ini):
+Status per Milestone 1.5 (diperbarui pada milestone ini). Istilah status: **Implemented**,
+**Passed locally**, **Passed against dev backend**, **Tested on physical device**, **Blocked**.
 
-- RLS aktif pada tabel/API yang terekspos: **skrip tersedia, belum dijalankan** di database nyata.
-- Negative test lintas pengguna: **skrip tersedia** (`supabase/tests/rls_profiles_test.sql`), belum dijalankan.
-- Tidak ada service role/private key di bundle: **diverifikasi lokal** untuk bundle Android (`npm run export:android`, exit 0, tidak ada JWT/`supabase.co` yang ter-inline) dan pada tree repo. Verifikasi ini harus diulang setiap kali kredensial nyata dipakai, karena inlining `EXPO_PUBLIC_*` berubah saat `.env.local` terisi.
+- RLS aktif pada tabel/API yang terekspos: **skrip tersedia, belum dijalankan** di database nyata (*Blocked*).
+- Negative test lintas pengguna: **skrip diperluas** (`supabase/tests/rls_profiles_test.sql`) dan punya runner `npm run db:test`; jalur kegagalan runner sudah **Passed locally**, eksekusi terhadap database masih *Blocked*.
+- Tidak ada service role/private key di bundle: **Passed locally** untuk bundel Android (`npm run export:android`, exit 0; tidak ada JWT `eyJ…`, connection string, atau key yang ter-inline; string `service_role`/`sb_secret` yang muncul berasal dari pemeriksaan di `src/lib/env.ts` dan dari dependensi Supabase) dan pada tree repo. Verifikasi ini harus diulang setiap kali kredensial nyata dipakai, karena inlining `EXPO_PUBLIC_*` berubah saat `.env.local` terisi.
+- Kredensial database untuk pengujian: **Implemented** — `DATABASE_URL` hanya dibaca dari environment oleh `scripts/db-test.mjs`, hanya `user@host:port/database` yang dicetak, dan nilainya tidak boleh berada di `.env.local` (berkas itu ikut ke bundle aplikasi).
+- CI tidak diberi akses database pada push/PR: **Implemented** — job `quality` berjalan tanpa secret; uji RLS terpisah pada job `database-rls` yang hanya aktif manual. CI belum pernah dijalankan di GitHub (*Blocked*).
 - Belum diverifikasi karena memang belum dibangun: Realtime private channel, storage policies, rate limit, flow hapus akun, kebijakan privasi.
 
 - [ ] RLS aktif pada semua tabel/API yang terekspos.

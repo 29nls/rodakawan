@@ -22,6 +22,7 @@ export type AuthSpies = {
   exchangeCodeForSession: jest.Mock;
   verifyOtp: jest.Mock;
   setSession: jest.Mock;
+  initialize: jest.Mock;
   startAutoRefresh: jest.Mock;
   stopAutoRefresh: jest.Mock;
 };
@@ -43,8 +44,9 @@ export function createAuthSpies(overrides: Partial<AuthSpies> = {}): AuthSpies {
     exchangeCodeForSession: jest.fn(async () => DEFAULT_RESULT),
     verifyOtp: jest.fn(async () => DEFAULT_RESULT),
     setSession: jest.fn(async () => DEFAULT_RESULT),
-    startAutoRefresh: jest.fn(),
-    stopAutoRefresh: jest.fn(),
+    initialize: jest.fn(async () => ({ data: { session: null, user: null }, error: null })),
+    startAutoRefresh: jest.fn(async () => undefined),
+    stopAutoRefresh: jest.fn(async () => undefined),
     ...overrides,
   };
 }

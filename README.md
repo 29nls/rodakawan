@@ -1,86 +1,200 @@
-# RodaKawan — Paket Dokumentasi Produk
+# RodaKawan
 
-> **Nama kerja:** RodaKawan. Nama, logo, domain, dan identitas visual belum final.  
-> **Versi dokumen:** 1.0 · **Tanggal:** 12 Oktober 2026 · **Status:** Draft untuk validasi dan implementasi bertahap.
+Aplikasi pendamping berkendara untuk komunitas motor, klub sepeda, dan pecinta touring: berbagi
+perjalanan, lokasi konvoi, laporan kondisi jalan, dan komunitas.
 
-RodaKawan adalah aplikasi pendamping berkendara untuk komunitas motor, klub sepeda, dan pecinta touring. Paket ini disusun sebagai acuan produk dan teknis untuk membangun aplikasi Android menggunakan **React Native + Expo + TypeScript**, dengan **Supabase** sebagai backend awal.
+Repositori ini berisi aplikasi **React Native + Expo + TypeScript** (Android-first, struktur tidak
+menutup iOS) dengan **Supabase** sebagai backend awal. Dokumentasi produk tetap menjadi sumber
+kebenaran dan berada di [`docs/`](docs/).
 
-## Daftar dokumen
+> **Nama kerja.** Nama, logo, domain, dan identitas visual belum final (ADR-001 di
+> [`docs/PROJECT_DECISIONS.md`](docs/PROJECT_DECISIONS.md)).
 
-| File | Kegunaan |
-|---|---|
-| `docs/PRD.md` | Sasaran produk, pengguna, kebutuhan, ruang lingkup, requirement, acceptance criteria, risiko. |
-| `docs/ARCHITECTURE.md` | Arsitektur aplikasi, pilihan teknologi, alur data, batasan native dan build. |
-| `docs/UX_SITEMAP.md` | Sitemap, layar utama, alur pengguna, prinsip desain berkendara aman. |
-| `docs/DATA_AND_REALTIME.md` | Data model konseptual, event realtime, kontrak layanan, dan aturan lokasi. |
-| `docs/SECURITY_PRIVACY.md` | RLS, privasi lokasi, moderasi, retensi, izin perangkat, threat model. |
-| `docs/ROADMAP.md` | Milestone implementasi, urutan pekerjaan, dan definisi selesai. |
-| `docs/QA_TEST_PLAN.md` | Strategi pengujian, skenario penerimaan, uji perangkat dan kondisi jaringan. |
-| `docs/AI_CODING_AGENT_PROMPT.md` | Prompt utama untuk coding agent dan aturan kerja per milestone. |
-| `docs/ERD.md` | Diagram konseptual entitas dan hubungan data. |
-| `docs/SETUP_GUIDE.md` | Setup VS Code, Expo, Supabase, dan build APK cloud tanpa Android Studio. |
-| `supabase/migrations/0001_initial_schema.sql` | Fondasi skema PostgreSQL/Supabase untuk MVP. Perlu review dan pengujian sebelum produksi. |
+---
 
-## Keputusan awal
+## Status saat ini
 
-- Fokus rilis awal: **Android terlebih dahulu**, dengan struktur yang tidak menutup kemungkinan iOS.
-- Pengembangan dilakukan melalui VS Code dan perangkat Android fisik. Android Studio tidak diwajibkan jika development build dibuat di cloud melalui Expo EAS Build.
-- Expo Go digunakan hanya untuk prototipe yang kompatibel. Background location, peta native tertentu, dan voice room harus diuji dalam **development build**.
-- Backend awal: Supabase Auth, PostgreSQL, Row Level Security (RLS), Realtime, Storage, dan Edge Functions.
-- Live location dibagikan hanya saat pengguna menjadi peserta perjalanan aktif. Posisi terkini boleh disimpan singkat untuk pemulihan koneksi; histori perjalanan permanen tidak aktif secara default.
-- Fitur PTT/voice room menggunakan layanan WebRTC khusus (rekomendasi untuk proof-of-concept: LiveKit). Supabase Realtime bukan transport audio.
-- Fitur disusun bertahap. Jangan membangun tracking background, voice room, feed sosial, musik lokal, dan seluruh administrasi sekaligus.
+Istilah status dipakai konsisten di seluruh dokumentasi:
 
-## Cara menggunakan paket ini
+| Status                             | Artinya                                                                     |
+| ---------------------------------- | --------------------------------------------------------------------------- |
+| **Implemented**                    | Kode ada di repo (dan biasanya punya automated test).                       |
+| **Passed locally**                 | Sudah dijalankan di mesin developer, hasilnya dicatat di bawah.             |
+| **Passed against dev backend**     | Sudah diverifikasi terhadap project Supabase **development** yang nyata.    |
+| **Tested on physical device**      | Sudah dicoba di HP Android fisik.                                           |
+| **Blocked**                        | Tidak dapat dijalankan sekarang; alasannya disebutkan.                      |
 
-1. Baca `docs/PRD.md` dan pastikan keputusan produk sementara dipahami.
-2. Baca `docs/ARCHITECTURE.md` sebelum memilih dependency native.
-3. Buat repository, lalu salin dokumen ini ke folder `docs/` agar menjadi sumber kebenaran proyek; pertahankan struktur folder `docs/` dan `supabase/`.
-4. Implementasikan satu milestone dari `docs/ROADMAP.md` pada satu waktu.
-5. Jalankan acceptance test dalam `docs/QA_TEST_PLAN.md` dan uji RLS sebelum menambah pengguna sungguhan.
-6. Jangan pernah memasukkan secret/service-role key ke kode aplikasi mobile.
+| Area                                             | Implemented | Passed locally | Dev backend | Perangkat fisik |
+| ------------------------------------------------ | ----------- | -------------- | ----------- | --------------- |
+| Fondasi: Expo Router, design system, error state | Ya          | Ya             | —           | Blocked         |
+| Milestone 1: auth (daftar, login, logout, reset)  | Ya          | Ya             | **Blocked** | **Blocked**     |
+| Milestone 1: profil sendiri + username unik       | Ya          | Ya             | **Blocked** | **Blocked**     |
+| Milestone 1: RLS `public.profiles`                | Ya (skrip)  | **Blocked**    | **Blocked** | —               |
+| Milestone 2+: garasi, klub, perjalanan, lokasi, chat, hazard, feed, musik | **Belum** | — | — | — |
 
-## Aplikasi (Milestone 0 + 1)
+**Blocked** di sini berarti: project Supabase development dan kredensialnya belum tersedia, serta
+aplikasi belum pernah dipasang di HP fisik. Semua langkah yang dapat dijalankan tanpa backend sudah
+dijalankan — lihat [Perintah pengujian](#perintah-pengujian).
 
-Repositori ini kini berisi aplikasi **React Native + Expo + TypeScript** di root, dengan `docs/` tetap menjadi sumber kebenaran produk.
+Fitur Milestone 2 ke atas sengaja **tidak** ditampilkan sebagai tombol yang berfungsi: aksi seperti
+"Buat perjalanan" tampil dalam keadaan nonaktif.
 
-Yang sudah ada: struktur Expo Router (`src/app`), design system gelap (charcoal + amber), komponen UI dasar, error boundary dan state primitives, konfigurasi lingkungan tanpa secret, profil build EAS, serta **vertical slice autentikasi + profil** (Milestone 1): daftar, login, logout, lupa/reset password, konfirmasi email, session persistence, dan baca/ubah profil sendiri. Fitur produk berikutnya (garasi, klub, perjalanan, live location, chat, laporan jalan, feed, musik) **belum** dibangun dan sengaja tidak ditampilkan sebagai tombol yang berfungsi.
+---
 
-> **Status verifikasi Milestone 1:** seluruh kode, migration, dan automated test lulus secara lokal. Alur ke Supabase **belum pernah diuji** karena belum ada project/credential. Lihat bagian *Uji autentikasi dengan backend nyata* di bawah.
+## Prasyarat
 
-### Prasyarat
+- **Node.js 22.13 atau lebih baru** (`engines.node` di `package.json`; CI memakai 24.x).
+- **npm** sebagai satu-satunya package manager; `package-lock.json` di-commit dan dipakai `npm ci`.
+- Untuk mencoba di HP Android: aplikasi **Expo Go** (untuk UI/prototipe) atau APK development build.
+- Android Studio **tidak** diperlukan: APK dibuat di cloud dengan EAS Build.
+- Akun **Expo** (untuk EAS) dan akun **Supabase** (untuk backend) hanya dibutuhkan pada langkah
+  build/backend, bukan untuk menjalankan aplikasi atau seluruh automated test.
 
-- Node.js 22.13 atau lebih baru (disarankan 24.3+; pengembangan ini memakai Node 24.18).
-- npm sebagai satu-satunya package manager (lockfile `package-lock.json` di-commit).
-- Untuk mencoba di HP Android: aplikasi **Expo Go** (prototipe) atau APK development build.
-- Android Studio tidak diperlukan; APK dibuat di cloud dengan EAS Build.
-
-### Perintah utama (PowerShell)
+## Setup di Windows
 
 ```powershell
-npm install                 # pasang dependency sesuai lockfile
-npx expo start              # jalankan Metro; pindai QR dengan Expo Go
-npm run typecheck           # TypeScript strict tanpa emit
-npm run lint                # ESLint (eslint-config-expo + Prettier)
-npm run format              # rapikan format dengan Prettier
-npm test                    # unit test (jest-expo)
-npm run doctor              # pemeriksaan kesehatan project
-npm run export:android      # verifikasi bundel Android tanpa perangkat
+git clone https://github.com/29nls/rodakawan.git
+cd rodakawan
+npm ci                      # pasang dependency persis mengikuti lockfile
+npx expo start              # jalankan Metro
 ```
 
-Catatan: tipe rute Expo Router dihasilkan saat `npx expo start` pertama kali dijalankan ke folder `.expo/types`. Pada clone baru, jalankan dev server sekali sebelum `npm run typecheck`.
+Catatan Windows:
 
-### Konfigurasi lingkungan
+- Perintah di dokumentasi ini memakai PowerShell. Di CMD/Git Bash, sintaks variabel environment
+  berbeda (lihat [Uji RLS](#uji-rls-profil-supabase)).
+- Bila PowerShell memblokir `npm.ps1`, gunakan `npm.cmd` atau `Set-ExecutionPolicy -Scope Process
+  RemoteSigned` pada sesi itu saja.
+- `npm install` juga bekerja, tetapi `npm ci` yang dipakai di CI dan lebih dapat diulang.
 
-1. Salin `.env.example` menjadi `.env.local`.
-2. Isi `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, dan `EXPO_PUBLIC_MAP_STYLE_URL` setelah project development tersedia.
-3. `.env.local` diabaikan Git. Hanya variabel `EXPO_PUBLIC_*` yang masuk ke bundle aplikasi; jangan pernah menaruh service role key, database password, LiveKit secret, atau token admin di sana.
+## Menjalankan aplikasi di HP Android
 
-Tanpa `EXPO_PUBLIC_SUPABASE_URL` dan `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, aplikasi tetap terbuka: layar autentikasi menampilkan banner "konfigurasi belum tersedia", tombol kirim dinonaktifkan, dan tidak ada request jaringan yang dikirim. Aplikasi tidak crash dan tidak menampilkan nilai key apa pun.
+1. Pasang **Expo Go** dari Play Store, lalu sambungkan HP dan komputer ke Wi-Fi yang sama.
+2. Jalankan `npx expo start`, lalu pindai QR yang muncul (di Android: buka Expo Go → *Scan QR code*).
+   Bila jaringan memblokir, jalankan `npx expo start --tunnel`.
+3. Aplikasi terbuka di gerbang sesi: menampilkan *loading* singkat, lalu layar **Masuk**.
+   Tanpa konfigurasi Supabase, layar masuk menampilkan banner "Backend belum siap" — ini perilaku
+   yang benar, bukan crash.
+4. Tekan `a` pada terminal Metro untuk menjalankan di emulator Android, atau `r` untuk mengulang
+   muat. Perubahan berkas TypeScript/JS cukup memicu fast refresh.
 
-Langkah lengkap membuat project Supabase, menjalankan migration, dan mengatur URL konfirmasi email ada di [`docs/SETUP_GUIDE.md`](docs/SETUP_GUIDE.md).
+Untuk fitur native (background location, peta native, WebRTC) Expo Go tidak cukup; diperlukan
+development build (`--profile development`, lihat [Build APK](#build-apk-android-tanpa-android-studio)).
 
-### Build APK Android tanpa Android Studio
+## Konfigurasi Supabase
+
+1. Salin `.env.example` menjadi `.env.local` di root repo, lalu isi:
+
+   ```dotenv
+   EXPO_PUBLIC_SUPABASE_URL=https://<ref>.supabase.co
+   EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY=<publishable/anon key>
+   EXPO_PUBLIC_MAP_STYLE_URL=https://<tile provider>/style.json
+   ```
+
+2. Nilai sebenarnya diambil dari **Project Settings → API** pada project **development** (bukan
+   produksi). **Jangan** menaruh service role key, database password, LiveKit secret, atau token
+   admin di `.env.local`: setiap variabel `EXPO_PUBLIC_*` ikut masuk ke bundle aplikasi.
+3. Restart Metro setelah mengubah `.env.local` (nilai di-inline saat bundling).
+4. Langkah lengkap pembuatan project, urutan migration, dan pengaturan **Redirect URLs** untuk
+   tautan email ada di [`docs/SETUP_GUIDE.md`](docs/SETUP_GUIDE.md).
+
+Tanpa `EXPO_PUBLIC_SUPABASE_URL` dan `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, aplikasi tetap terbuka:
+tidak ada request jaringan yang dikirim, tombol kirim dinonaktifkan, dan tidak ada nilai key yang
+pernah ditampilkan di layar.
+
+## Perintah pengujian
+
+```powershell
+npm run typecheck        # TypeScript strict tanpa emit
+npm run lint             # ESLint (eslint-config-expo + Prettier)
+npm run format:check     # pastikan format Prettier
+npm test                 # unit + komponen test (jest-expo)
+npm run doctor           # expo-doctor
+npm run export:android   # bundel Android (Metro + Hermes) tanpa perangkat
+npm run db:test          # uji RLS ke database development (butuh DATABASE_URL)
+```
+
+Hasil nyata pada commit ini (13 Oktober 2026, Node 24.18, npm 12):
+
+| Perintah               | Hasil                                                        |
+| ---------------------- | ------------------------------------------------------------ |
+| `npm ci`               | Exit 0, 1.076 paket terpasang dari lockfile.                 |
+| `npm run typecheck`    | Exit 0 (juga lulus tanpa folder `.expo` — tidak perlu dev server dulu). |
+| `npm run lint`         | Exit 0.                                                       |
+| `npm run format:check` | Exit 0.                                                       |
+| `npm test`             | **15 suite, 164 test lulus**, exit 0.                         |
+| `npm run doctor`       | 21/21 pemeriksaan lulus.                                      |
+| `npm run export:android` | Exit 0, bundel Hermes `entry-*.hbc` (~3,6 MB), tidak ada JWT/service role key di dalam bundel. |
+| `npm run db:test`      | **Blocked** — butuh `DATABASE_URL` project development.      |
+| `npx eas-cli build`    | **Blocked** — butuh akun Expo.                               |
+
+`npm test` tidak menyentuh jaringan: fungsi api menerima client sebagai argumen sehingga test
+menyuntikkan fake client dari `src/test-support/fakeSupabase.ts`; test navigasi memakai `jest.mock`
+pada `@/lib/supabase/client` dan modul api.
+
+### Catatan pengujian
+
+- `npm test` memakai preset `jest-expo/android` dan `@testing-library/react-native` 14.
+- Pada RTL 14, `render`, `fireEvent`, dan `renderRouter` bersifat **asynchronous** — selalu `await`
+  sebelum melakukan assertion.
+- Plugin `react-native-worklets/plugin` dimatikan khusus pada lingkungan test lewat `babel.config.js`
+  (plugin itu menyuntikkan pemeriksaan Reanimated yang membutuhkan native worklets). Pada build
+  Metro/APK plugin tetap aktif.
+- Test navigasi menjalankan rute asli dari `src/app` (bukan mock), sehingga perubahan nama tab atau
+  penambahan route akan terdeteksi.
+- `moduleNameMapper` di `jest.config.js` hanya mengganti `expo-sqlite/localStorage/install` dengan
+  shim `src/test-support/sqliteLocalStorageShim.js`. Shim itu hanya berlaku di Jest; di aplikasi
+  nyata `expo-sqlite` tetap menjadi penyimpanan session.
+- Uji `src/lib/crypto/__tests__/webcrypto.test.ts` memakai nilai vektor tetap dan tidak memanggil
+  native module.
+
+## Uji RLS profil (Supabase)
+
+`supabase/tests/rls_profiles_test.sql` membuktikan bahwa user A tidak dapat membaca profil privat
+atau mengubah baris user B, bahwa `anon` tidak melihat apa pun, dan bahwa bootstrap trigger serta
+constraint username bekerja. Semua asersi berjalan dalam satu transaksi yang diakhiri `ROLLBACK`,
+jadi tidak ada data uji yang tertinggal.
+
+Dua cara menjalankannya:
+
+```powershell
+# 1. Lewat runner (membaca DATABASE_URL dari environment; password tidak pernah dicetak)
+$env:DATABASE_URL="postgresql://postgres:<password>@db.<ref>.supabase.co:5432/postgres?sslmode=require"
+npm run db:test
+```
+
+```text
+# 2. Tanpa runner: tempel seluruh isi supabase/tests/rls_profiles_test.sql ke
+#    Supabase Dashboard → SQL Editor, lalu pastikan notice
+#    "UJI RLS PROFIL LULUS" muncul tanpa exception.
+```
+
+Aturan penting:
+
+- Jalankan hanya pada project **development**. Jangan memakai kredensial produksi.
+- `DATABASE_URL` **jangan** disimpan di `.env.local` (berkas itu untuk variabel `EXPO_PUBLIC_*` yang
+  masuk ke bundle aplikasi). Isi langsung di shell untuk satu perintah.
+- Runner hanya melaporkan lulus bila notice penanda benar-benar diterima dari server, sehingga
+  "hijau palsu" (mis. berkas uji terpotong) tidak bisa lolos.
+- Status saat ini: **Blocked** — runner dan skripnya sudah tersedia dan sudah diuji pada jalur
+  kegagalan (tanpa `DATABASE_URL`, host tidak terjangkau, berkas tanpa penanda), tetapi belum pernah
+  dijalankan terhadap database karena project Supabase belum ada.
+
+## CI (GitHub Actions)
+
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml) berisi dua job:
+
+- **`quality`** berjalan pada push ke `main` dan setiap pull request: `npm ci`, `typecheck`, `lint`,
+  `format:check`, `npm test -- --ci`, `doctor`, dan `export:android`. Job ini **tidak memakai satu pun
+  secret** Supabase dan justru membuktikan aplikasi tetap bersih saat backend belum dikonfigurasi.
+- **`database-rls`** hanya berjalan lewat **Actions → Run workflow** dengan input `run_db_tests`
+  dicentang, dan hanya bila secret `DB_TEST_DATABASE_URL` sudah diatur. Job ini tidak pernah berjalan
+  pada push/PR biasa, sehingga database produksi tidak tersentuh.
+
+Workflow tidak pernah mencetak nilai environment. Status: workflow sudah ditambahkan, tetapi **belum
+pernah dijalankan** di GitHub (belum ada push/run yang diamati).
+
+## Build APK Android tanpa Android Studio
 
 ```powershell
 npx eas-cli@latest login                                       # masuk ke akun Expo
@@ -89,27 +203,23 @@ npx eas-cli@latest build --platform android --profile preview  # APK internal un
 npx eas-cli@latest build --platform android --profile development  # development build (expo-dev-client)
 ```
 
-Profil `development` wajib dipakai untuk fitur native (background location, peta native, WebRTC) karena Expo Go tidak mendukungnya. Ubah nama paket Android (`com.rodakawan.app` di `app.json`) sebelum rilis ke Play Store bila identitas final berbeda.
+Profil build ada di [`eas.json`](eas.json): `development` (development client, APK),
+`preview` (APK internal), `production` (AAB). Nama paket Android `com.rodakawan.app` di
+[`app.json`](app.json) masih sementara dan wajib diganti sebelum rilis Play Store bila identitas
+final berbeda (ADR-015).
+
+Status: **Blocked** — belum ada akun Expo yang terhubung, jadi belum ada APK. Verifikasi bundel
+lokal sudah dilakukan lewat `npm run export:android`.
 
 ### Aset ikon
 
-Ikon, adaptive icon, dan splash mark dibuat dari kode tanpa dependency tambahan:
+Ikon, adaptive icon, dan splash dibuat dari kode tanpa dependency tambahan:
 
 ```powershell
 npm run assets:generate
 ```
 
-### Catatan pengujian
-
-- `npm test` memakai `jest-expo` preset Android dan `@testing-library/react-native` 14.
-- Pada RTL 14 `render`, `fireEvent`, dan `renderRouter` bersifat **asynchronous** — selalu `await` sebelum melakukan assertion.
-- Plugin `react-native-worklets/plugin` dimatikan khusus pada lingkungan test melalui `babel.config.js` (plugin itu menyuntikkan pemeriksaan Reanimated yang membutuhkan native worklets). Pada build Metro/APK plugin tetap aktif.
-- Test navigasi menjalankan rute asli dari `src/app` (bukan mock) sehingga perubahan nama tab atau penambahan route akan terdeteksi.
-- Uji fitur auth/profil tidak menyentuh jaringan: fungsi api menerima client sebagai argumen sehingga test menyuntikkan fake client dari `src/test-support/fakeSupabase.ts`, sedangkan test navigasi melakukan `jest.mock` pada `@/lib/supabase/client` dan modul api. `moduleNameMapper` di `jest.config.js` hanya mengganti `expo-sqlite/localStorage/install` dengan shim.
-- Uji `src/lib/crypto/__tests__/webcrypto.test.ts` memakai nilai vektor tetap; tidak memanggil native module.
-- Shim itu hanya berlaku di Jest; di aplikasi nyata `expo-sqlite` tetap menjadi penyimpanan session.
-
-### Struktur proyek
+## Struktur proyek
 
 ```text
 src/
@@ -127,46 +237,90 @@ src/
     auth/       # api.ts, session.tsx, errors.ts, validation.ts, redirect.ts, linkParams.ts, components/
     profile/    # api.ts, useProfile.ts, validation.ts, components/
   hooks/        # useAppStatus
-  lib/          # env.ts (konfigurasi publik + validasi), supabase/client.ts
+  lib/          # env.ts (konfigurasi publik + validasi), supabase/client.ts, crypto/webcrypto.ts
   services/     # appInfo.ts (metadata build)
+  test-support/ # fake client Supabase + shim storage untuk Jest
   types/        # deklarasi tipe lingkungan
   utils/        # color.ts (kontras WCAG)
 assets/         # ikon & splash
-scripts/        # generator aset
+scripts/        # generate-assets.mjs, db-test.mjs (runner uji RLS)
 docs/           # sumber kebenaran produk
 supabase/
   migrations/   # 0001_initial_schema.sql, 0002_auth_profile_bootstrap.sql
-  tests/        # rls_profiles_test.sql (uji RLS dua akun)
+  tests/        # rls_profiles_test.sql (uji RLS dua akun + kontrol positif)
+.github/
+  workflows/    # ci.yml
 ```
 
-### Autentikasi dan profil (Milestone 1)
+## Cara kerja autentikasi dan profil (Milestone 1)
 
-- **Client:** satu instance Supabase di `src/lib/supabase/client.ts`, dibuat lazy. Session disimpan lewat `expo-sqlite/localStorage/install` dengan `persistSession`, `autoRefreshToken`, `flowType: 'pkce'`, dan `detectSessionInUrl: false` (aplikasi native, bukan web). Auto-refresh dihentikan saat aplikasi tidak di depan.
-- **PKCE di Hermes:** `expo-crypto` dipasang dan `src/lib/crypto/webcrypto.ts` menyediakan `crypto.getRandomValues`/`TextEncoder`/`btoa` yang belum ada di Hermes; tanpa itu alur PKCE gagal dengan error kripto.
-- **Proteksi rute:** [src/app/_layout.tsx](src/app/_layout.tsx) memakai `Stack.Protected` — rute privat hanya terdaftar bila sesi sudah diperiksa dan valid, dan grup `(auth)` hanya bila belum ada sesi. [src/app/index.tsx](src/app/index.tsx) adalah gerbang awal: menampilkan loading selama sesi diperiksa, lalu `<Redirect>` ke `/ringkasan` atau `/sign-in`. Tidak ada redirect berbasis `useEffect`, jadi tidak ada redirect loop. Proteksi ini hanya lapisan navigasi klien — otorisasi data tetap milik RLS di database.
-- **Profil:** `public.profiles` dibuat otomatis oleh trigger `on_auth_user_created` yang memanggil fungsi `bootstrap_profile()` (migration 0002), memakai `NEW.id` dari `auth.users` — bukan identitas yang dikirim klien. Username dinormalisasi (huruf kecil, `_`), divalidasi, dan keunikannya dijaga unique index. Bila username bentrok, trigger memakai username sementara `rider_xxxxxx` dan aplikasi menampilkan banner untuk menggantinya.
-- **Belum ada:** upload avatar (menunggu bucket Storage + policy), ubah email/password dari dalam aplikasi.
+- **Client:** satu instance Supabase di [`src/lib/supabase/client.ts`](src/lib/supabase/client.ts),
+  dibuat lazy. Session disimpan lewat `expo-sqlite/localStorage/install` dengan `persistSession`,
+  `autoRefreshToken`, `flowType: 'pkce'`, dan `detectSessionInUrl: false` (aplikasi native, bukan web).
+- **Auto-refresh token:** `auth-js` menyalakan ticker-nya sendiri pada saat client dibuat di React
+  Native (platform non-browser dianggap selalu foreground). Karena itu client menyelaraskan ticker
+  dengan `AppState` **setelah** `initialize()` selesai: refresh berhenti saat aplikasi ke background
+  dan menyala lagi saat kembali ke depan, listener-nya dibersihkan saat client dibuat ulang, dan
+  promise-nya selalu di-handle supaya tidak menjadi unhandled rejection.
+- **PKCE di Hermes:** `expo-crypto` dipasang dan [`src/lib/crypto/webcrypto.ts`](src/lib/crypto/webcrypto.ts)
+  menyediakan `crypto.getRandomValues`/`TextEncoder`/`btoa` yang belum ada di Hermes; tanpa itu alur
+  PKCE turun ke metode `plain` dan memakai `Math.random` untuk verifier.
+- **Proteksi rute:** [`src/app/_layout.tsx`](src/app/_layout.tsx) memakai `Stack.Protected` — rute
+  privat hanya terdaftar bila sesi sudah diperiksa dan valid, dan grup `(auth)` hanya bila belum ada
+  sesi. [`src/app/index.tsx`](src/app/index.tsx) adalah gerbang awal: menampilkan loading selama sesi
+  diperiksa, lalu `<Redirect>` ke `/ringkasan` atau `/sign-in`. Tidak ada redirect berbasis
+  `useEffect`, jadi tidak ada redirect loop. Ini hanya lapisan navigasi klien — otorisasi data tetap
+  milik RLS di database.
+- **Profil:** `public.profiles` dibuat otomatis oleh trigger `on_auth_user_created` yang memanggil
+  fungsi `bootstrap_profile()` (migration 0002), memakai `NEW.id` dari `auth.users` — bukan identitas
+  yang dikirim klien. Username dinormalkan (huruf kecil, `_`), divalidasi, dan keunikannya dijaga
+  unique index + CHECK `profiles_username_format`. Bila username bentrok, trigger memakai username
+  sementara `rider_xxxxxx` dan aplikasi menampilkan banner untuk menggantinya.
+- **Belum ada:** upload avatar (menunggu bucket Storage + policy), ubah email/password dari dalam
+  aplikasi.
 
-### Uji autentikasi dengan backend nyata
+### Uji manual autentikasi (butuh backend + perangkat)
 
-Setelah `.env.local` terisi, jalankan alur berikut di perangkat/emulator:
+Setelah `.env.local` terisi, jalankan alur ini di perangkat:
 
-1. `npx expo start` lalu buka aplikasi.
-2. Daftar akun baru → cek email konfirmasi → buka tautan → masuk.
-3. Login, buka tab **Profil**, ubah nama tampilan/username/kota/bio, simpan, muat ulang aplikasi.
-4. Coba daftarkan username yang sudah dipakai; harus muncul pesan yang jelas, bukan crash.
-5. Logout; pastikan tab privat tidak bisa dibuka kembali lewat tautan langsung.
-6. Kirim permintaan reset password dari layar **Lupa password** dan selesaikan alurnya.
+1. Daftar akun baru → ikuti alur konfirmasi email → masuk.
+2. Masuk, buka tab **Profil**, ubah nama tampilan/username/kota/bio, simpan, lalu muat ulang aplikasi.
+3. Daftarkan username yang sudah dipakai; harus muncul pesan yang jelas, bukan crash.
+4. Keluar; pastikan tab privat tidak bisa dibuka kembali lewat tautan langsung.
+5. Kirim permintaan reset password dari layar **Lupa password** dan selesaikan tautannya.
 
-Jalankan juga uji RLS di SQL Editor (langkah 4.6 di [`docs/SETUP_GUIDE.md`](docs/SETUP_GUIDE.md)) untuk memastikan user A tidak dapat membaca atau mengubah profil user B.
+## Aturan branch dan commit
 
-### Aturan branch dan commit
+- `main` harus selalu dapat dijalankan: `npm run typecheck`, `npm run lint`, dan `npm test` hijau
+  sebelum merge.
+- Satu milestone per branch, mis. `feat/m1-auth-profil`, `chore/m1-5-verifikasi-ci`.
+- Commit mengikuti Conventional Commits (`feat:`, `fix:`, `chore:`, `docs:`), satu perubahan logis
+  per commit.
+- Bila keputusan teknis berubah, perbarui juga [`docs/PROJECT_DECISIONS.md`](docs/PROJECT_DECISIONS.md)
+  dan dokumen terkait pada commit yang sama.
 
-- `main` harus selalu dapat dijalankan: `npm run typecheck` dan `npm test` hijau sebelum merge.
-- Satu milestone per branch, mis. `feat/m1-auth-profil`, `fix/m2-join-klub`, `chore/perbarui-eas`.
-- Commit mengikuti Conventional Commits (`feat:`, `fix:`, `chore:`, `docs:`), satu perubahan logis per commit.
-- Bila keputusan teknis berubah, perbarui juga `docs/PROJECT_DECISIONS.md` dan dokumen terkait pada commit yang sama.
+## Dokumentasi produk
+
+| Dokumen                                                    | Isi                                                                        |
+| ---------------------------------------------------------- | -------------------------------------------------------------------------- |
+| [`docs/PRD.md`](docs/PRD.md)                               | Sasaran produk, pengguna, kebutuhan, ruang lingkup, acceptance criteria.    |
+| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)             | Arsitektur aplikasi, pilihan teknologi, alur data, batasan native & build.  |
+| [`docs/UX_SITEMAP.md`](docs/UX_SITEMAP.md)                 | Sitemap, layar utama, alur pengguna, prinsip berkendara aman.               |
+| [`docs/DATA_AND_REALTIME.md`](docs/DATA_AND_REALTIME.md)   | Model data konseptual, event realtime, kontrak layanan, aturan lokasi.      |
+| [`docs/SECURITY_PRIVACY.md`](docs/SECURITY_PRIVACY.md)     | RLS, privasi lokasi, moderasi, retensi, izin perangkat, threat model.       |
+| [`docs/ERD.md`](docs/ERD.md)                               | Diagram konseptual entitas dan hubungan data.                              |
+| [`docs/ROADMAP.md`](docs/ROADMAP.md)                       | Milestone, urutan pekerjaan, definisi selesai, status verifikasi.           |
+| [`docs/QA_TEST_PLAN.md`](docs/QA_TEST_PLAN.md)             | Strategi pengujian, skenario penerimaan, uji perangkat dan jaringan.        |
+| [`docs/SETUP_GUIDE.md`](docs/SETUP_GUIDE.md)               | Setup Expo/Supabase dan build APK tanpa Android Studio.                     |
+| [`docs/PROJECT_DECISIONS.md`](docs/PROJECT_DECISIONS.md)   | ADR: keputusan teknis beserta alasannya.                                    |
+| [`docs/AI_CODING_AGENT_PROMPT.md`](docs/AI_CODING_AGENT_PROMPT.md) | Aturan kerja untuk coding agent per milestone.                     |
+| [`supabase/migrations/`](supabase/migrations)              | Skema PostgreSQL/Supabase: 0001 (fondasi) dan 0002 (bootstrap profil).      |
+
+Seluruh dokumen di atas sudah ada di repositori ini; tidak ada langkah "menyalin dokumen ke repo".
 
 ## Status dan disclaimer
 
-Dokumen ini adalah baseline desain, bukan sertifikasi keselamatan berkendara, audit keamanan, atau jaminan performa jaringan. Akurasi GPS, batasan background execution, latensi audio, biaya peta, dan aturan distribusi aplikasi harus divalidasi di perangkat dan layanan yang benar-benar dipakai. Semua threshold yang tertulis merupakan target awal yang dapat diubah setelah uji lapangan.
+Dokumen ini adalah baseline desain, bukan sertifikasi keselamatan berkendara, audit keamanan, atau
+jaminan performa jaringan. Akurasi GPS, batasan background execution, latensi audio, biaya peta, dan
+aturan distribusi aplikasi harus divalidasi di perangkat dan layanan yang benar-benar dipakai. Semua
+threshold yang tertulis merupakan target awal yang dapat diubah setelah uji lapangan.

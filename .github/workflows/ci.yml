@@ -1,0 +1,108 @@
+name: CI
+
+# Pemeriksaan otomatis Milestone 1.5.
+#
+# Dua job yang sengaja dipisah:
+# - `quality`   : seluruh pemeriksaan yang dapat dijalankan TANPA backend. Job ini
+#                 tidak memakai satu pun secret Supabase, dan justru membuktikan
+#                 aplikasi tetap bisa di-typecheck, di-test, dan dibundel ketika
+#                 konfigurasi backend belum ada (docs/QA_TEST_PLAN.md AUTH-13).
+# - `database-rls`: uji RLS terhadap database Supabase **development** nyata. Job ini
+#                 hanya berjalan lewat `workflow_dispatch` dan hanya bila secret
+#                 `DB_TEST_DATABASE_URL` sudah diatur, sehingga database produksi tidak
+#                 pernah tersentuh oleh push/PR biasa.
+#
+# Aturan yang dipegang: workflow ini tidak pernah menampilkan nilai environment
+# (tidak ada `echo $DATABASE_URL`, tidak ada `env` tanpa filter).
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      run_db_tests:
+        description: 'Jalankan uji RLS terhadap database development (butuh secret DB_TEST_DATABASE_URL)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Pemeriksaan lokal (tanpa backend)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CI: 'true'
+      EXPO_NO_TELEMETRY: '1'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Siapkan Node.js
+        uses: actions/setup-node@v7
+        with:
+          # `engines.node` di package.json adalah ">=22.13.0"; CI memakai 24.x
+          # supaya sama dengan versi yang dipakai saat memverifikasi secara lokal.
+          node-version: '24.x'
+          cache: npm
+
+      - name: Pasang dependency dari lockfile
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Format
+        run: npm run format:check
+
+      - name: Unit & komponen test
+        run: npm test -- --ci
+
+      - name: Expo doctor
+        run: npm run doctor
+
+      - name: Bundel Android (Metro + Hermes)
+        run: npm run export:android
+
+  database-rls:
+    name: Uji RLS (manual, butuh database development)
+    if: github.event_name == 'workflow_dispatch' && inputs.run_db_tests == true
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Siapkan Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24.x'
+          cache: npm
+
+      - name: Pasang dependency dari lockfile
+        run: npm ci
+
+      - name: Pastikan secret tersedia (nilai tidak dicetak)
+        env:
+          DATABASE_URL: ${{ secrets.DB_TEST_DATABASE_URL }}
+        run: |
+          if [ -z "${DATABASE_URL}" ]; then
+            echo "::error::Secret DB_TEST_DATABASE_URL belum diatur. Uji RLS hanya boleh dijalankan terhadap database development."
+            exit 1
+          fi
+          echo "Secret tersedia; isinya tidak ditampilkan."
+
+      - name: Jalankan uji RLS profil
+        env:
+          DATABASE_URL: ${{ secrets.DB_TEST_DATABASE_URL }}
+        run: npm run db:test

@@ -122,7 +122,10 @@ Jangan rilis jika ditemukan salah satu:
 - Permission request menyesatkan pengguna atau kontrol stop-sharing tidak berfungsi.
 - Peringatan bahaya kedaluwarsa masih tampil sebagai aktif tanpa indikator.
 
-## 9. Status otomatisasi Milestone 1
+## 9. Status otomatisasi dan verifikasi (Milestone 1 + 1.5)
+
+Istilah status yang dipakai: **Implemented**, **Passed locally**, **Passed against dev backend**,
+**Tested on physical device**, **Blocked**.
 
 Yang **sudah otomatis** (`npm test`, jaringan dimatikan; client Supabase diganti fake di `src/test-support/fakeSupabase.ts`):
 
@@ -135,12 +138,26 @@ Yang **sudah otomatis** (`npm test`, jaringan dimatikan; client Supabase diganti
 | `src/features/auth/__tests__/api.test.ts` | Registrasi, login, logout, reset, resend; termasuk penolakan saat konfigurasi kosong. |
 | `src/features/profile/__tests__/api.test.ts` | Baca dan ubah profil; kasus profil belum ada dan sesi tidak valid. |
 | `src/features/auth/__tests__/session.test.tsx` | State `loading`/`ready`, perubahan session, pembersihan saat logout. |
+| `src/lib/__tests__/supabaseClient.test.ts` | Konfigurasi auth client (PKCE, persist session, satu instance) dan lifecycle auto-refresh mengikuti `AppState` (aktif, background, perpindahan status, pembersihan listener, promise yang gagal). |
 | `src/__tests__/navigation.test.tsx` | Rute asli: gerbang awal, alur auth, area privat, dan tidak ada redirect loop. |
 | `src/components/ui/__tests__/*` | Perilaku dasar komponen yang dipakai form (tombol, field). |
 
-Yang **hanya bisa diuji manual** untuk sekarang (butuh project Supabase / perangkat): AUTH-01, AUTH-04 s.d. AUTH-10, PROF-01 s.d. PROF-03, PROF-06, PROF-07, dan seluruh `supabase/tests/rls_profiles_test.sql`.
+Hasil terakhir dijalankan (13 Oktober 2026, Node 24.18): `npm test -- --ci` → **15 suite, 164 test
+lulus**; `npm run typecheck`, `npm run lint`, `npm run format:check`, `npm run doctor` (21/21), dan
+`npm run export:android` semuanya exit 0.
 
-Aturan pelaporan: jangan mencatat AUTH/PROF sebagai lulus pada tabel di atas bila hanya test lokal yang dijalankan. Tandai "lulus (unit)" atau "belum dijalankan".
+Yang **Blocked** (butuh project Supabase / kredensial / perangkat):
+
+- `supabase/tests/rls_profiles_test.sql` — runner `npm run db:test` sudah tersedia dan sudah diuji pada
+  jalur kegagalan (tanpa `DATABASE_URL`, host tidak terjangkau, berkas tanpa penanda lulus), tetapi
+  belum pernah dijalankan terhadap database. PROF-01, PROF-02, PROF-03, PROF-04, PROF-05, PROF-06.
+- AUTH-01 dan AUTH-04 s.d. AUTH-14 — butuh project Supabase development dan/atau perangkat.
+- PROF-07 — butuh sesi nyata yang kedaluwarsa.
+- Job `database-rls` pada CI — butuh secret `DB_TEST_DATABASE_URL`.
+
+Aturan pelaporan: jangan mencatat AUTH/PROF sebagai lulus pada tabel di atas bila hanya test lokal yang
+dijalankan. Tandai "lulus (unit)" atau "belum dijalankan". Runner `db:test` hanya melaporkan lulus bila
+notice penanda dari server diterima, jadi berkas uji yang terpotong tidak bisa menghasilkan "hijau".
 
 ## 10. Sign-off
 

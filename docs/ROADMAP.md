@@ -1,6 +1,10 @@
 # Roadmap Implementasi
 
 > Perkiraan sprint adalah cara mengurutkan pekerjaan, bukan janji durasi. Waktu aktual bergantung pada pengalaman developer, kondisi dependency, akses backend dan hasil uji perangkat.
+>
+> Istilah status yang dipakai konsisten di seluruh dokumen: **Implemented**, **Passed locally**,
+> **Passed against dev backend**, **Tested on physical device**, dan **Blocked**. Artinya dijelaskan
+> di README dan `docs/QA_TEST_PLAN.md` bagian 9.
 
 ## Prinsip eksekusi
 
@@ -22,11 +26,12 @@
 - [x] Error boundary/loading/empty-state primitives.
 - [x] README project berisi cara menjalankan dan aturan branch.
 
-**Exit criteria:** aplikasi terbuka di perangkat (terverifikasi bundel + Metro, belum diuji di perangkat fisik); CI lokal typecheck bersih; preview build bisa dipasang (belum — menunggu akun Expo).
+**Exit criteria:** aplikasi terbuka di perangkat (bundel + Metro **sudah diverifikasi lokal**; **Tested on physical device** masih *Blocked*); CI lokal typecheck bersih; preview build bisa dipasang (belum — menunggu akun Expo).
 
 ## Milestone 1 — Auth, profil, privasi dasar
 
-Status: **implementasi dan pengujian lokal selesai; verifikasi terhadap backend Supabase nyata belum dilakukan** (belum ada project/credential).
+Status: **Implemented · Passed locally**. Verifikasi terhadap backend Supabase nyata dan perangkat
+fisik masih **Blocked** (belum ada project/kredensial dan belum ada build terpasang).
 
 Kode dan skrip (implementasi):
 
@@ -37,15 +42,36 @@ Kode dan skrip (implementasi):
 - [x] Migration `0002_auth_profile_bootstrap.sql` (bootstrap trigger + constraint) ditulis.
 - [x] Skrip uji RLS dua akun ditulis: `supabase/tests/rls_profiles_test.sql`.
 
-Belum terverifikasi (jangan ditandai selesai):
+**Blocked** (jangan ditandai selesai):
 
 - [ ] Profil privat tidak mengungkap data internal **dibuktikan di database** (jalankan skrip RLS).
 - [ ] Registrasi + konfirmasi email diuji ke project Supabase development.
 - [ ] Login, reset password, dan session persistence diuji di perangkat fisik.
 - [ ] Migration 0001 + 0002 benar-benar diterapkan ke project development.
-- [ ] Uji RLS otomatis lewat CLI (`npm run db:test` belum tersedia).
 
-**Exit criteria:** dua user dapat masuk di perangkat/sesi berbeda; user A tidak dapat mengedit profil user B. — *belum diverifikasi end-to-end pada backend nyata; unit/komponen test dan skrip RLS sudah tersedia.*
+**Exit criteria:** dua user dapat masuk di perangkat/sesi berbeda; user A tidak dapat mengedit profil user B. — *belum diverifikasi end-to-end pada backend nyata; unit/komponen test dan skrip RLS sudah tersedia dan (untuk test lokal) sudah lulus.*
+
+## Milestone 1.5 — Verifikasi, hardening & CI
+
+Status: **Implemented · Passed locally**; langkah yang butuh akun/backend tetap **Blocked**.
+
+- [x] Audit kode auth/profil dan migration 0001+0002; temuan didokumentasikan dan diperbaiki.
+- [x] Audit lifecycle auto-refresh token; client kini menyelaraskan ticker **setelah** `initialize()`
+      (bukan sebelum), menangani promise `startAutoRefresh`/`stopAutoRefresh`, dan membersihkan
+      listener saat client dibuat ulang — dengan 6 automated test baru.
+- [x] Uji RLS diperluas: kontrol positif (profil publik memang terbaca), penolakan `DELETE`,
+      serta penolakan `INSERT`/`UPDATE` untuk peran `anon`.
+- [x] Runner reproducibility: `npm run db:test` (membaca `DATABASE_URL` dari environment, tidak pernah
+      mencetak kredensial, hanya melaporkan lulus bila notice penanda diterima server).
+- [x] CI GitHub Actions: job `quality` tanpa secret + job `database-rls` manual (`workflow_dispatch`).
+- [x] Dokumentasi diselaraskan dengan kode: README, `SETUP_GUIDE.md`, `QA_TEST_PLAN.md`,
+      `SECURITY_PRIVACY.md`, dan `PROJECT_DECISIONS.md`.
+- [ ] Menjalankan `npm run db:test` terhadap database development. — **Blocked** (belum ada project).
+- [ ] Melihat job CI benar-benar hijau di GitHub. — **Blocked** (belum ada run yang diamati).
+- [ ] Uji manual AUTH-01…AUTH-14 dan PROF-01…PROF-07 di perangkat. — **Blocked** (belum ada APK).
+
+**Exit criteria:** seluruh pemeriksaan lokal tercatat beserta hasilnya; uji RLS punya cara jalan yang
+reproducible; tidak ada kredensial di repo/laporan; tidak ada fitur Milestone 2 yang dimulai.
 
 ## Milestone 2 — Garasi dan klub
 

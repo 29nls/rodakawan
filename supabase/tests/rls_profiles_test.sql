@@ -6,11 +6,20 @@
 --   3. user A TIDAK dapat membaca profil privat user B, dan tidak dapat menyentuh
 --      baris user B (update 0 baris, insert ditolak);
 --   4. username duplikat ditolak unique constraint, format salah ditolak CHECK;
---   5. peran `anon` tidak melihat satu pun baris profil.
+--   5. peran `anon` tidak melihat satu pun baris profil;
+--   6. kontrol positif: profil PUBLIK user B memang terbaca user A (kalau tidak,
+--      asersi "tidak membaca profil privat" bisa lulus secara palsu);
+--   7. penghapusan profil sendiri ditolak (tidak ada policy DELETE);
+--   8. peran `anon` juga ditolak untuk INSERT dan UPDATE, bukan hanya SELECT.
 --
 -- Cara menjalankan (project development, JANGAN produksi):
+--   npm run db:test            (runner Node, membaca DATABASE_URL)
 --   psql "$env:DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/tests/rls_profiles_test.sql
 -- atau tempelkan seluruh isi berkas ini ke Supabase Dashboard → SQL Editor.
+--
+-- Prasyarat peran: koneksi harus memakai kredensial pemilik/superuser database
+-- (mis. `postgres` pada project Supabase development), karena blok persiapan di
+-- bawah menulis ke `auth.users` dan mengubah `is_private` melewati RLS.
 --
 -- Seluruh perubahan dibungkus satu transaksi dan diakhiri ROLLBACK, sehingga tidak
 -- ada pengguna/profil uji yang tertinggal di database.
@@ -20,11 +29,15 @@ begin;
 -- 0. Bersihkan sisa uji sebelumnya (id tetap, hanya untuk keamanan pengulangan).
 delete from public.profiles where id in (
   '11111111-1111-1111-1111-111111111111',
-  '22222222-2222-2222-2222-222222222222'
+  '22222222-2222-2222-2222-222222222222',
+  '33333333-3333-3333-3333-333333333333',
+  '44444444-4444-4444-4444-444444444444'
 );
 delete from auth.users where id in (
   '11111111-1111-1111-1111-111111111111',
-  '22222222-2222-2222-2222-222222222222'
+  '22222222-2222-2222-2222-222222222222',
+  '33333333-3333-3333-3333-333333333333',
+  '44444444-4444-4444-4444-444444444444'
 );
 
 -- 1. Dua akun uji. Trigger 0002 harus membuat profilnya.
@@ -204,7 +217,7 @@ exception
 end;
 $$;
 
--- 3g. Format username salah ditolak CHECK constraint.
+-- 3g. Format username salah ditolak CHECK constraint (pola karakter migration 0002).
 do $$
 begin
   update public.profiles
@@ -215,6 +228,20 @@ begin
 exception
   when check_violation then
     null; -- ditolak: perilaku yang benar
+end;
+$$;
+
+-- 3h. A TIDAK dapat menghapus profilnya sendiri (tidak ada policy DELETE).
+do $$
+declare
+  v_rows int;
+begin
+  delete from public.profiles where id = '11111111-1111-1111-1111-111111111111';
+
+  get diagnostics v_rows = row_count;
+  if v_rows <> 0 then
+    raise exception 'UJI GAGAL: user A menghapus % baris profil (policy DELETE seharusnya tidak ada)', v_rows;
+  end if;
 end;
 $$;
 
@@ -231,6 +258,86 @@ begin
 
   if v_visible <> 0 then
     raise exception 'UJI GAGAL: peran anon melihat % baris profil', v_visible;
+  end if;
+end;
+$$;
+
+-- 4b. Anon juga tidak dapat mengubah profil siapa pun.
+do $$
+declare
+  v_rows int;
+begin
+  update public.profiles
+  set display_name = 'Diubah oleh anon'
+  where id = '11111111-1111-1111-1111-111111111111';
+
+  get diagnostics v_rows = row_count;
+  if v_rows <> 0 then
+    raise exception 'UJI GAGAL: peran anon mengubah % baris profil', v_rows;
+  end if;
+end;
+$$;
+
+-- 4c. Anon tidak dapat membuat baris profil, walau id-nya milik akun yang ada
+--     (jalur yang mencegah pembuatan profil atas nama akun orang lain).
+reset role;
+
+insert into auth.users (
+  id, instance_id, aud, role, email, email_confirmed_at,
+  raw_app_meta_data, raw_user_meta_data, created_at, updated_at
+) values (
+  '44444444-4444-4444-4444-444444444444',
+  '00000000-0000-0000-0000-000000000000',
+  'authenticated', 'authenticated', 'uji.d@contoh.test', now(),
+  '{"provider":"email","providers":["email"]}',
+  '{"username":"uji_user_d","display_name":"Uji User D"}',
+  now(), now()
+);
+
+-- Kosongkan profil akun itu (sebagai pemilik database) supaya tidak ada konflik
+-- primary key/foreign key yang menyamarkan penolakan RLS.
+delete from public.profiles where id = '44444444-4444-4444-4444-444444444444';
+
+set local role anon;
+set local request.jwt.claims = '{}';
+
+do $$
+declare
+  v_rows int;
+begin
+  insert into public.profiles (id, username, display_name)
+  values ('44444444-4444-4444-4444-444444444444', 'anon_baru', 'Anon');
+
+  get diagnostics v_rows = row_count;
+  raise exception 'UJI GAGAL: peran anon membuat % baris profil', v_rows;
+exception
+  when insufficient_privilege then
+    null; -- ditolak RLS: perilaku yang benar
+end;
+$$;
+
+reset role;
+
+-- 5. Kontrol positif: profil PUBLIK user B harus terbaca user A.
+--    Tanpa asersi ini, uji 3b dapat lulus walaupun policy SELECT menolak semua baris
+--    (mis. policy salah ketik) — jadi kontrol positif wajib ada.
+update public.profiles
+set is_private = false
+where id = '22222222-2222-2222-2222-222222222222';
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+
+do $$
+declare
+  v_visible int;
+begin
+  select count(*) into v_visible
+  from public.profiles
+  where id = '22222222-2222-2222-2222-222222222222';
+
+  if v_visible <> 1 then
+    raise exception 'UJI GAGAL: user A tidak dapat membaca profil publik user B (% baris)', v_visible;
   end if;
 end;
 $$;

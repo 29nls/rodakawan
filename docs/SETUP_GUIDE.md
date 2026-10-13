@@ -4,7 +4,7 @@ Panduan ini untuk Windows + VS Code + HP Android fisik. Periksa kembali versi da
 
 ## 1. Prasyarat
 
-- Node.js versi LTS yang kompatibel dengan versi Expo yang dipakai.
+- Node.js 22.13 atau lebih baru (`engines.node` di `package.json`; CI memakai 24.x).
 - VS Code.
 - Git.
 - HP Android dengan internet.
@@ -13,21 +13,43 @@ Panduan ini untuk Windows + VS Code + HP Android fisik. Periksa kembali versi da
 
 Android Studio tidak dibutuhkan untuk membuat build melalui EAS cloud. Expo Go tetap berguna untuk UI/prototipe awal, tetapi background location dan native modules perlu development build.
 
-## 2. Buat aplikasi Expo
+## 2. Ambil repository dan pasang dependency
+
+Repository ini **sudah** berisi aplikasi Expo-nya, jadi jangan membuat project baru dengan
+`create-expo-app` dan jangan menyalin dokumen `docs/` kembali ke repo — semua dokumen, migration, dan
+konfigurasi sudah ada di sini.
 
 Di PowerShell:
 
 ```powershell
-npx create-expo-app@latest rodagroup-app
-cd rodagroup-app
+git clone https://github.com/29nls/rodakawan.git
+cd rodakawan
+npm ci
 npx expo start
 ```
 
-Untuk prototipe yang kompatibel, instal Expo Go di ponsel lalu scan QR code yang ditampilkan terminal. Jika router/template yang dipilih membuat QR flow berbeda, ikuti instruksi CLI pada versi yang terpasang.
+`npm ci` memasang dependency persis mengikuti `package-lock.json`. Setelah Metro berjalan, instal Expo
+Go di ponsel lalu pindai QR code yang ditampilkan terminal; untuk fitur native gunakan development
+build (bagian 5). Jika router/CLI pada versi terpasang menampilkan alur QR yang berbeda, ikuti
+instruksi CLI tersebut.
 
-## 3. Tambahkan quality tools
+## 3. Quality tools yang sudah tersedia
 
-Pastikan repository menggunakan satu package manager dan commit lockfile. Tambahkan script lint/typecheck/test bertahap, bukan memasang semua library sekaligus. Sebelum memasang dependency native, baca dokumentasi kompatibilitasnya dengan Expo SDK aktif.
+Tidak perlu memasang tool tambahan: ESLint (`eslint-config-expo` + `eslint-plugin-prettier`),
+TypeScript strict, Jest (`jest-expo` + `@testing-library/react-native`), dan `expo-doctor` sudah
+dikonfigurasi di repo ini.
+
+```powershell
+npm run typecheck
+npm run lint
+npm run format:check
+npm test
+npm run doctor
+npm run export:android   # verifikasi bundel Android tanpa perangkat
+```
+
+Tetap pakai satu package manager (npm) dan commit lockfile. Sebelum memasang dependency native baru,
+baca dokumentasi kompatibilitasnya dengan Expo SDK aktif lalu jalankan `npm run doctor`.
 
 ## 4. Hubungkan Supabase (langkah konkret Milestone 1)
 
@@ -85,11 +107,44 @@ EXPO_PUBLIC_MAP_STYLE_URL=https://YOUR_TILE_PROVIDER/STYLE.json
 
 ### 4.6 Jalankan uji RLS profil
 
-Uji ini membuktikan user A tidak dapat membaca/mengubah profil privat user B, memakai dua akun uji di dalam satu transaksi yang berakhir `ROLLBACK`.
+Uji ini membuktikan user A tidak dapat membaca atau mengubah profil privat user B, bahwa `anon` tidak
+melihat apa pun, bahwa `DELETE` profil sendiri ditolak, dan bahwa bootstrap trigger serta constraint
+username bekerja. Semua asersi berjalan dalam satu transaksi yang berakhir `ROLLBACK`, sehingga tidak
+ada pengguna/profil uji yang tertinggal.
 
-- **Cara cepat:** tempel seluruh isi [`supabase/tests/rls_profiles_test.sql`](../supabase/tests/rls_profiles_test.sql) ke SQL Editor → **Run**. Hasil lulus ditandai notice `UJI RLS PROFIL LULUS`. Jika ada `UJI GAGAL`, pesan menyebutkan asersi mana yang gagal.
-- **Catatan:** perintah `set local role ...` hanya berlaku di dalam transaksi; pastikan seluruh berkas dijalankan sebagai satu blok, bukan baris per baris.
-- Skrip tidak menyisakan pengguna uji karena diakhiri `rollback`.
+**Cara 1 — runner `npm run db:test` (disarankan).** Ambil connection string dari **Project Settings →
+Database → Connection string** (mode direkt, bukan pooler) dan tambahkan `?sslmode=require`.
+
+```powershell
+$env:DATABASE_URL="postgresql://postgres:<password>@db.<ref>.supabase.co:5432/postgres?sslmode=require"
+npm run db:test
+Remove-Item Env:\DATABASE_URL   # jangan biarkan nilai ini tertinggal di sesi shell
+```
+
+Di Bash/Git Bash:
+
+```bash
+DATABASE_URL="postgresql://..." npm run db:test
+```
+
+Runner hanya melaporkan lulus bila notice `UJI RLS PROFIL LULUS` benar-benar diterima dari server.
+Password tidak pernah dicetak; hanya `user@host:port/database` yang ditampilkan. Jalankan
+`npm run db:test -- --help` untuk melihat opsi.
+
+**Cara 2 — SQL Editor.** Tempel seluruh isi
+[`supabase/tests/rls_profiles_test.sql`](../supabase/tests/rls_profiles_test.sql) ke SQL Editor →
+**Run**. Hasil lulus ditandai notice `UJI RLS PROFIL LULUS`; bila ada masalah, pesan menyebutkan
+asersi mana yang gagal.
+
+Catatan penting:
+
+- Jalankan hanya pada project **development**. Jangan memakai kredensial produksi.
+- Perintah `set local role ...` hanya berlaku di dalam transaksi; pastikan seluruh berkas dijalankan
+  sebagai satu blok, bukan baris per baris.
+- **Jangan** menyimpan `DATABASE_URL` di `.env.local`: berkas itu berisi variabel `EXPO_PUBLIC_*` yang
+  ikut masuk ke bundle aplikasi. Untuk CI, simpan sebagai secret repository (`DB_TEST_DATABASE_URL`).
+- Status saat ini: **belum pernah dijalankan** terhadap database mana pun karena project Supabase
+  belum tersedia (lihat `docs/QA_TEST_PLAN.md` bagian 9).
 
 ### 4.7 Uji manual alur autentikasi
 
@@ -104,7 +159,9 @@ Uji ini membuktikan user A tidak dapat membaca/mengubah profil privat user B, me
 
 - Bucket Storage dan policy avatar (Milestone 2). Karena itu tidak ada tombol upload foto profil.
 - Edge Function, private Realtime channel, push notification, dan peta.
-- Perintah `supabase` CLI, `npm run db:test`, atau CI database: migration dijalankan manual lewat SQL Editor.
+- Migration yang dijalankan dari command line (`supabase` CLI) atau CI database otomatis: migration
+  0001 dan 0002 masih dijalankan manual lewat SQL Editor. Uji RLS **sudah** punya runner
+  (`npm run db:test`, lihat 4.6).
 
 ## 5. Buat cloud development build
 
@@ -176,15 +233,38 @@ Gunakan development build dan perangkat fisik untuk:
 
 Perangkat vendor dapat menerapkan battery optimization secara berbeda. Tes perjalanan nyata dan catat model perangkat, Android version, jenis jaringan, serta perilaku permission.
 
-## 8. Commands yang disarankan untuk setiap milestone
+## 8. Commands dan CI
 
 ```powershell
+npm ci
 npx expo start
-npx tsc --noEmit
-npx expo-doctor
+npm run typecheck
+npm run lint
+npm run format:check
+npm test
+npm run doctor
+npm run export:android
 ```
 
-Jalankan perintah sesuai dependency/script yang benar-benar tersedia. Tambahkan lint dan test scripts di `package.json`; jangan laporkan sukses bila command belum dijalankan.
+Jalankan perintah sesuai script yang benar-benar tersedia di `package.json`; jangan melaporkan sukses
+bila command belum dijalankan.
+
+### 8.1 CI (GitHub Actions)
+
+[`.github/workflows/ci.yml`](../.github/workflows/ci.yml) menjalankan seluruh pemeriksaan di atas pada
+push ke `main` dan setiap pull request. Job itu **tidak** memakai secret apa pun, jadi tidak ada yang
+perlu dikonfigurasi untuk mulai memakainya.
+
+Job kedua (`database-rls`) menjalankan `npm run db:test` dan hanya aktif lewat
+**Actions → CI → Run workflow** dengan input `run_db_tests` dicentang. Sebelum mengaktifkannya:
+
+1. Buat repository **development** khusus pengujian (jangan produksi).
+2. Tambahkan secret **`DB_TEST_DATABASE_URL`** di **Settings → Secrets and variables → Actions**.
+   Nilainya adalah connection string PostgreSQL project development dengan `?sslmode=require`.
+3. Jalankan workflow secara manual dan periksa bahwa langkah uji lulus.
+
+Jangan pernah menaruh connection string atau service role key di berkas repo, log, atau dokumentasi
+publik; nilai itu hanya boleh berada di secret GitHub atau environment server.
 
 ## 9. Dokumentasi resmi
 

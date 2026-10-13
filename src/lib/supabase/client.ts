@@ -35,7 +35,7 @@ export type SupabaseClientState =
   | { available: false; reason: SupabaseUnavailableReason };
 
 let cachedState: SupabaseClientState | undefined;
-let autoRefreshListenerAttached = false;
+let detachAutoRefreshListener: (() => void) | undefined;
 
 /** Penjelasan singkat kenapa backend tidak dapat dipakai (ditampilkan ke pengguna). */
 export function describeUnavailableReason(reason: SupabaseUnavailableReason): string {
@@ -51,20 +51,51 @@ export function describeUnavailableReason(reason: SupabaseUnavailableReason): st
 }
 
 /**
- * Menyalakan/mematikan refresh token mengikuti status aplikasi. Meniru pola resmi
- * Supabase: refresh dihentikan saat aplikasi tidak di depan agar tidak boros baterai.
+ * Menyalakan/mematikan refresh token sesuai status aplikasi (pola resmi Supabase
+ * untuk React Native).
+ *
+ * Tiga detail yang mudah terlewat dan sudah ditangani di sini:
+ *
+ * 1. `auth-js` menyalakan ticker auto-refresh sendiri saat client dibuat pada
+ *    lingkungan non-browser (`_handleVisibilityChange()` menganggap React Native
+ *    selalu foreground), dan itu terjadi **setelah** pemulihan session selesai.
+ *    Karena itu penyesuaian pertama harus menunggu `initialize()` selesai — kalau
+ *    tidak, ticker yang dinyalakan SDK sesudahnya akan tetap berjalan di background.
+ * 2. `startAutoRefresh()`/`stopAutoRefresh()` mengembalikan Promise. Promise-nya
+ *    sengaja *dihandle* (bukan dibiarkan menggantung) supaya tidak menjadi unhandled
+ *    rejection yang bisa memicu peringatan/crash di React Native. Kegagalan ticker
+ *    tidak punya tindakan pemulihan di sini: tick berikutnya dan event foreground
+ *    berikutnya akan mencoba lagi.
+ * 3. Listener dikembalikan sebagai fungsi pembersih agar client lama tidak
+ *    meninggalkan handler yang menunjuk ke client yang sudah tidak dipakai.
  */
-function attachAutoRefreshListener(client: RodaKawanSupabaseClient): void {
-  if (autoRefreshListenerAttached) return;
-  autoRefreshListenerAttached = true;
+function applyAppStateToAutoRefresh(
+  client: RodaKawanSupabaseClient,
+  state: AppStateStatus | null | undefined,
+): void {
+  const action =
+    state === 'active'
+      ? () => client.auth.startAutoRefresh()
+      : () => client.auth.stopAutoRefresh();
 
-  AppState.addEventListener('change', (state: AppStateStatus) => {
-    if (state === 'active') {
-      client.auth.startAutoRefresh();
-    } else {
-      client.auth.stopAutoRefresh();
-    }
+  void action().catch(() => undefined);
+}
+
+/** Menunggu SDK selesai inisialisasi, lalu menyamakan ticker dengan status aplikasi. */
+async function syncAutoRefreshWithAppState(client: RodaKawanSupabaseClient): Promise<void> {
+  await client.auth.initialize().catch(() => undefined);
+  applyAppStateToAutoRefresh(client, AppState.currentState);
+}
+
+/** @returns fungsi pembersih listener. */
+function attachAutoRefreshListener(client: RodaKawanSupabaseClient): () => void {
+  const subscription = AppState.addEventListener('change', (state: AppStateStatus) => {
+    applyAppStateToAutoRefresh(client, state);
   });
+
+  void syncAutoRefreshWithAppState(client);
+
+  return () => subscription.remove();
 }
 
 /**
@@ -108,7 +139,7 @@ export function getSupabaseState(): SupabaseClientState {
     },
   );
 
-  attachAutoRefreshListener(client);
+  detachAutoRefreshListener = attachAutoRefreshListener(client);
   cachedState = { available: true, client };
   return cachedState;
 }
@@ -120,10 +151,12 @@ export function getSupabaseClient(): RodaKawanSupabaseClient | null {
 }
 
 /**
- * Mengosongkan cache client. Hanya dipakai pengujian dan pemulihan konfigurasi;
- * aplikasi normal cukup memakai `getSupabaseClient()`.
+ * Mengosongkan cache client beserta listener auto-refresh-nya. Hanya dipakai
+ * pengujian dan pemulihan konfigurasi; aplikasi normal cukup memakai
+ * `getSupabaseClient()`.
  */
 export function resetSupabaseClientForTests(): void {
   cachedState = undefined;
-  autoRefreshListenerAttached = false;
+  detachAutoRefreshListener?.();
+  detachAutoRefreshListener = undefined;
 }
