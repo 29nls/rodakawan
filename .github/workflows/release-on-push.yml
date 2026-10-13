@@ -1,0 +1,87 @@
+# .github/workflows/release-on-push.yml
+name: Release on push to main
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: release-on-push-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify-and-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      EXPO_NO_TELEMETRY: 1
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup PNPM
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.18.1
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm run typecheck
+
+      - name: Lint
+        run: pnpm run lint
+
+      - name: Format check
+        run: pnpm run format:check
+
+      - name: Test
+        run: pnpm run test -- --maxWorkers=2
+
+      - name: Expo Doctor
+        run: pnpm exec expo-doctor@1.17.7 || true
+
+      - name: Export Android (preflight)
+        run: pnpm run export:android
+
+      - name: Read app version
+        id: appver
+        run: |
+          VERSION=$(node -e "console.log(require('./app.json').expo.version)")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Create release tag
+        id: tag
+        run: |
+          TAG="v${{ steps.appver.outputs.version }}-build${{ github.run_number }}"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag "$TAG"
+          git push origin "$TAG"
+
+      - name: Setup EAS CLI
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Build APK (preview)
+        run: eas build --profile preview --platform android --non-interactive --output=app-preview.apk
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          name: ${{ steps.tag.outputs.tag }}
+          prerelease: true
+          files: app-preview.apk
