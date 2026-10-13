@@ -93,13 +93,15 @@ DATABASE_URL=postgresql://postgres:<password>@db.<ref>.supabase.co:5432/postgres
 Lalu jalankan dari root repo:
 
 ```powershell
-npx supabase init                     # sekali saja: menulis supabase/config.toml
 npx supabase migration list --db-url "$env:DATABASE_URL"   # periksa riwayat lokal vs remote
 npx supabase db push --db-url "$env:DATABASE_URL" --dry-run   # lihat apa yang akan dijalankan
 npx supabase db push --db-url "$env:DATABASE_URL"             # terapkan
 ```
 
-Catatan: `npx supabase` mengunduh CLI ke cache npm; CLI **tidak** ditambahkan ke `package.json`.
+Catatan: semua perintah di atas memakai `--db-url`, jadi `npx supabase init` (dan berkas
+`supabase/config.toml`) **tidak diperlukan** — CLI langsung membaca `supabase/migrations` dan
+menghubungi database dari URL yang diberikan. `npx supabase` mengunduh CLI ke cache npm; CLI **tidak**
+ditambahkan ke `package.json`.
 Bila PowerShell belum mengisi `DATABASE_URL`, jalankan lebih dulu:
 `$env:DATABASE_URL=(Get-Content .env.db | Where-Object { $_ -match '^DATABASE_URL=' }) -replace '^DATABASE_URL=',''`.
 
