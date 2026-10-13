@@ -36,7 +36,8 @@ erDiagram
 ## Catatan akses
 
 - `profiles` berisi field profil yang aman saja; jangan menambahkan email atau data privat ke tabel ini tanpa meninjau RLS.
-- `motorcycle_private_details` menyimpan plat nomor dan hanya dapat dibaca pemilik.
+- `follows` menyimpan relasi terarah antar profil dengan kolom `status` (`pending`/`accepted`). Kolom itu diisi server: follow ke profil privat baru memberi akses baca setelah pemilik menyetujuinya (lihat ADR-039).
+- `motorcycle_private_details` menyimpan plat nomor dan hanya dapat dibaca pemilik. Foreign key komposit `(motorcycle_id, owner_id) -> motorcycles(id, owner_id)` memastikan pemilik detail selalu pemilik kendaraan (ADR-040).
 - `ride_locations` adalah posisi terakhir yang diperlukan selama ride aktif, bukan history trail default.
 - Membership klub dan ride adalah sumber otorisasi untuk data privat.
 - Voice room, media object storage, audit log, dan analytics provider dapat memiliki resource non-relasional tersendiri; secrets tidak pernah masuk tabel yang dibaca mobile.

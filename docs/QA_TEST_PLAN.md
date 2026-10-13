@@ -42,8 +42,11 @@
 | PROF-05 | Username dengan format tidak valid | Ditolak validasi aplikasi dan CHECK constraint database. |
 | PROF-06 | Profil belum ada (mis. bootstrap trigger belum terpasang) | Aplikasi menampilkan state eksplisit, bukan layar kosong, dan tetap dapat membuat profil. |
 | PROF-07 | Sesi kedaluwarsa saat menyimpan profil | Diarahkan keluar dengan pesan jelas; tidak menyimpan sebagai pengguna lain. |
+| PROF-08 | User A membuat relasi follow ke profil privat User B | Tidak ada akses baru: permintaan berstatus `pending` sampai pemilik menyetujui, dan status tidak dapat dipaksa klien. |
+| PROF-09 | Pemilik profil menyetujui atau mencabut relasi follow | Akses baca muncul setelah disetujui dan hilang kembali setelah relasi dihapus. |
 | GAR-01 | User lain membuka garage publik | Hanya field yang diizinkan terlihat. |
 | GAR-02 | User lain membaca plat pribadi | Ditolak tanpa kebocoran payload. |
+| GAR-03 | User A membuat/mengubah detail privat untuk kendaraan User B | Ditolak policy dan foreign key komposit, termasuk ketika `motorcycle_id` diubah. |
 | CLUB-01 | Buat klub | Creator menjadi owner; data valid. |
 | CLUB-02 | Non-member membaca klub privat | Ditolak atau hanya metadata minimum sesuai aturan final. |
 | CLUB-03 | Member biasa mengubah role anggota | Ditolak. |
@@ -147,15 +150,30 @@ lulus**; `npm run typecheck`, `npm run lint`, `npm run format:check`, `npm run d
 `npm run export:android` semuanya exit 0.
 
 Yang **sudah diverifikasi terhadap dev backend** (13 Oktober 2026, project development khusus
-RodaKawan — ADR-035):
+RodaKawan — ADR-035; diperluas pada Milestone 1.6):
 
 - `supabase/tests/rls_profiles_test.sql` — `npm run db:test` mencetak notice `UJI RLS PROFIL LULUS`
-  (38 perintah, exit 0). Yang dibuktikan di sisi database: bootstrap trigger membuat profil dengan
-  username yang dinormalkan, user A tidak dapat membaca profil privat user B maupun mengubah barisnya
-  (0 baris terpengaruh, `INSERT` ditolak), username duplikat ditolak unique constraint, format salah
-  ditolak CHECK, peran `anon` tidak melihat baris apa pun, kontrol positif (profil publik user B
-  memang terbaca user A), dan `DELETE` profil sendiri ditolak. **PROF-01, PROF-02, PROF-03, PROF-04,
-  PROF-05.**
+  (**88 perintah**, exit 0) pada database development yang memuat kelima migration.
+  - **Profil — PROF-01…PROF-05.** Bootstrap trigger membuat profil dengan username yang dinormalkan,
+    A tidak dapat membaca profil privat B maupun mengubah baris B (0 baris, `INSERT` ditolak),
+    username duplikat ditolak unique constraint, format salah ditolak CHECK, `anon` tidak melihat
+    baris apa pun, kontrol positif profil publik, dan `DELETE` profil sendiri ditolak.
+  - **Privasi follow — PROF-08, PROF-09.** A membuat permintaan follow ke profil privat B → status
+    `pending` (nilai `accepted` yang dikirim klien ditimpa server) dan **A tetap membaca 0 baris**;
+    A tidak dapat menerima permintaannya sendiri; B melihat permintaan, menerimanya (setelah itu A
+    membaca 1 baris), dan menolaknya lewat `DELETE` (akses hilang kembali); tidak ada policy `UPDATE`
+    sehingga `UPDATE` langsung selalu 0 baris; `anon` tidak melihat dan tidak dapat membuat baris.
+  - **Detail privat kendaraan — GAR-03.** A dapat membuat dan mengubah detail privat kendaraannya
+    sendiri; B membaca 0 baris dan mengubah 0 baris milik A; B gagal membuat baris untuk kendaraan A
+    (ditolak policy, dan jalur lain ditolak foreign key komposit); A gagal memindahkan `motorcycle_id`
+    ke kendaraan B — ditolak policy `with check` (SQLSTATE 42501) dan barisnya tidak berubah.
+  - **Paritas skema.** Blok pertama berkas uji gagal dengan pesan eksplisit bila migration Milestone
+    1.6 belum diterapkan (kolom `follows.status`, fungsi `accept_follow_request`, trigger
+    `follows_set_status`, foreign key komposit, dan tidak adanya policy `UPDATE` pada `follows`).
+- Demonstrasi sebelum/sesudah pada project development (satu transaksi `ROLLBACK`, tidak meninggalkan
+data): dengan policy **lama**, A membuat relasi follow sendiri lalu membaca profil privat B → **1
+baris terbaca** (kerentanan nyata, bukan teoretis); dengan policy **baru**, percobaan yang sama → **0
+baris**, penerimaan oleh A sendiri → `false`, dan setelah B (pemilik) menerima → 1 baris.
 
 Yang **masih Blocked** (butuh perangkat / alur aplikasi / akun):
 
@@ -163,7 +181,11 @@ Yang **masih Blocked** (butuh perangkat / alur aplikasi / akun):
   belum diuji di perangkat.
 - AUTH-01 dan AUTH-04 s.d. AUTH-14 — butuh alur aplikasi terhadap backend dan/atau perangkat.
 - PROF-07 — butuh sesi nyata yang kedaluwarsa.
-- Job `database-rls` pada CI — butuh secret `DB_TEST_DATABASE_URL` dan run pertama di GitHub.
+- Job `database-rls` pada CI — belum pernah berjalan; job ini hanya aktif lewat `workflow_dispatch`
+  dengan input `run_db_tests` dan secret `DB_TEST_DATABASE_URL` yang belum diatur. Job `quality` sudah
+  diamati **hijau** di GitHub (run `38353855927`, 13 Oktober 2026).
+- Alur follow dari **aplikasi** (kirim permintaan, terima permintaan) belum ada; yang terbukti baru
+  aturan dan fungsi di database.
 
 Aturan pelaporan: jangan mencatat AUTH/PROF sebagai lulus pada tabel di atas bila hanya test lokal yang
 dijalankan. Tandai "lulus (unit)" atau "belum dijalankan". Runner `db:test` hanya melaporkan lulus bila

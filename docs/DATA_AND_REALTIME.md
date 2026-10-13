@@ -12,7 +12,7 @@ Entitas MVP:
 - `ride_locations`: posisi terakhir yang disimpan untuk initial map/reconnect.
 - `chat_messages`: pesan perjalanan yang persisten.
 - `hazard_reports`: laporan kondisi jalan dengan masa berlaku.
-- `follows`, `club_posts`, `post_comments`, `post_reactions`: fase sosial.
+- `follows`, `club_posts`, `post_comments`, `post_reactions`: fase sosial. `follows.status` (`pending`/`accepted`) diisi server: follow ke profil privat adalah permintaan sampai pemilik memanggil `accept_follow_request` (ADR-039).
 - `notifications`, `push_tokens`: notifikasi dan endpoint perangkat.
 
 SQL awal ada pada `supabase/migrations/20261013022938_initial_schema.sql` (migration awal). Skema perlu direview dan dijalankan di project development sebelum dipakai.
@@ -41,6 +41,8 @@ Ini adalah pembagian operasi/logical API. Nama endpoint final dapat berupa Supab
 | Start/end ride | Host/admin | Transisi status valid, kirim system event, tutup session tracking saat selesai. |
 | Publish location | Peserta ride aktif | Validasi payload, cap rate, otorisasi ride, update last-known state bila dibutuhkan. |
 | Send chat message | Peserta ride aktif | Validasi panjang pesan, rate limit dan status perjalanan. |
+| Follow / permintaan follow | User autentikasi | Menetapkan `status` berdasarkan privasi target (publik langsung berlaku, privat menjadi permintaan), mencegah self-accept, dan menyediakan `accept_follow_request` untuk pemilik profil. |
+| Simpan/ubah detail privat kendaraan | Pemilik kendaraan | Memastikan `motorcycle_id` dan `owner_id` menunjuk kendaraan milik pengguna pada setiap INSERT/UPDATE (policy + foreign key komposit). |
 | Create hazard | User autentikasi | Validasi kategori, coordinates, expiry default dan rate limit. |
 | Upload media | Pemilik konten | Signed/authorized storage path, validasi ukuran dan tipe. |
 | Create voice token | Peserta ride yang berwenang | Validasi role/status dan terbitkan token WebRTC berumur pendek. |

@@ -30,13 +30,15 @@ Istilah status dipakai konsisten di seluruh dokumentasi:
 | Milestone 1: auth (daftar, login, logout, reset)  | Ya          | Ya             | **Blocked** | **Blocked**     |
 | Milestone 1: profil sendiri + username unik       | Ya          | Ya             | **Blocked** | **Blocked**     |
 | Milestone 1: RLS `public.profiles`                | Ya          | Ya             | **Ya** (uji RLS LULUS) | —    |
+| Milestone 1.6: privasi follow + detail privat kendaraan | Ya    | Ya             | **Ya** (uji RLS LULUS) | —    |
 | Milestone 2+: garasi, klub, perjalanan, lokasi, chat, hazard, feed, musik | **Belum** | — | — | — |
 
 **Blocked** yang tersisa berarti: alur aplikasi belum pernah dijalankan terhadap project development
 nyata, dan aplikasi belum pernah dipasang di HP fisik. Project Supabase development **sudah ada**
-sejak 13 Oktober 2026, kedua migration sudah diterapkan, dan uji RLS `public.profiles` sudah lulus
-(ADR-035). Semua langkah yang dapat dijalankan tanpa backend sudah dijalankan — lihat
-[Perintah pengujian](#perintah-pengujian).
+sejak 13 Oktober 2026, kelima migration sudah diterapkan, uji RLS `public.profiles` sudah lulus
+(ADR-035), dan lubang privasi follow serta integritas detail privat kendaraan sudah diperbaiki dengan
+uji allow/deny (ADR-039, ADR-040). Semua langkah yang dapat dijalankan tanpa backend sudah dijalankan
+— lihat [Perintah pengujian](#perintah-pengujian).
 
 Fitur Milestone 2 ke atas sengaja **tidak** ditampilkan sebagai tombol yang berfungsi: aksi seperti
 "Buat perjalanan" tampil dalam keadaan nonaktif.
@@ -49,9 +51,9 @@ menyebut `is_private`, migration **tidak** dijalankan di project tersebut. Keput
 development baru yang bersih. Audit lengkap ada di `docs/PROJECT_DECISIONS.md` (ADR-033).
 
 **Tindak lanjut (13 Oktober 2026).** Project development bersih sudah dibuat dan dihubungkan lewat
-`.env` (URL + publishable key) dan `.env.db` (session pooler, `sslmode=require`). Kedua migration
+`.env` (URL + publishable key) dan `.env.db` (session pooler, `sslmode=require`). Kelima migration
 diterapkan dengan `npx supabase link` + `npx supabase db push`; `npx supabase migration list`
-menunjukkan kolom Local dan Remote sama untuk kedua versi. `npm run db:test` lulus dengan notice
+menunjukkan kolom Local dan Remote sama untuk kelima versi. `npm run db:test` lulus dengan notice
 `UJI RLS PROFIL LULUS`. Project lama tidak disentuh sama sekali (ADR-035).
 
 ---
@@ -140,8 +142,8 @@ Hasil nyata pada commit ini (13 Oktober 2026, Node 24.18, npm 12):
 | `npm test`             | **15 suite, 164 test lulus**, exit 0.                         |
 | `npm run doctor`       | 21/21 pemeriksaan lulus.                                      |
 | `npm run export:android` | Exit 0, bundel Hermes `entry-*.hbc` (~3,6 MB), tidak ada JWT/service role key di dalam bundel. |
-| `npm run db:test`      | **Exit 0 — `UJI RLS PROFIL LULUS`** (38 perintah) terhadap project development, 13 Oktober 2026. |
-| `npx supabase ...`     | CLI 2.120.0 (lewat `npx`, tidak masuk `package.json`). `link` + `db push` menerapkan kedua migration; jangan menaruh connection string di argumen perintah karena npm/npx mencetak ulang argumennya. |
+| `npm run db:test`      | **Exit 0 — `UJI RLS PROFIL LULUS`** (88 perintah: profil, follow/privasi, detail privat kendaraan) terhadap project development, 13 Oktober 2026. |
+| `npx supabase ...`     | CLI 2.120.0 (lewat `npx`, tidak masuk `package.json`). `link` + `db push` menerapkan seluruh migration (kelima versi); jangan menaruh connection string di argumen perintah karena npm/npx mencetak ulang argumennya. |
 | `npx eas-cli build`    | **Blocked** — butuh akun Expo + secret `EXPO_TOKEN`. Profil `production-apk` dan workflow rilis sudah ada, tetapi belum ada build cloud yang dijalankan/diamati. |
 
 `npm test` tidak menyentuh jaringan: fungsi api menerima client sebagai argumen sehingga test
@@ -168,8 +170,13 @@ pada `@/lib/supabase/client` dan modul api.
 
 `supabase/tests/rls_profiles_test.sql` membuktikan bahwa user A tidak dapat membaca profil privat
 atau mengubah baris user B, bahwa `anon` tidak melihat apa pun, dan bahwa bootstrap trigger serta
-constraint username bekerja. Semua asersi berjalan dalam satu transaksi yang diakhiri `ROLLBACK`,
-jadi tidak ada data uji yang tertinggal.
+constraint username bekerja. Sejak Milestone 1.6 berkas ini juga membuktikan bahwa **relasi follow
+yang dibuat sendiri tidak memberi akses** ke profil privat (permintaan berstatus `pending` sampai
+pemilik menyetujui lewat `accept_follow_request`), dan bahwa **detail privat kendaraan hanya dapat
+dibuat/diubah untuk kendaraan milik sendiri** — termasuk ketika `motorcycle_id` diubah. Berkas uji
+juga memeriksa paritas skema di awal sehingga database yang belum dimigrasi gagal dengan pesan yang
+jelas. Semua asersi berjalan dalam satu transaksi yang diakhiri `ROLLBACK`, jadi tidak ada data uji
+yang tertinggal.
 
 Cara pertama (disarankan): simpan connection string project **development** di berkas `.env.db` di root repo
 (satu baris, diabaikan Git, dan **tidak** dibaca Expo sehingga tidak ikut ke bundel aplikasi):
@@ -199,9 +206,9 @@ Aturan penting:
 - Runner hanya melaporkan lulus bila notice penanda benar-benar diterima dari server, sehingga
   "hijau palsu" (mis. berkas uji terpotong) tidak bisa lolos.
 - Status saat ini: **Passed against dev backend** (13 Oktober 2026) — `npm run db:test` mencetak
-  `UJI RLS PROFIL LULUS`, 38 perintah selesai, exit 0. Jalur kegagalan runner juga sudah diuji
-  sebelumnya (tanpa `DATABASE_URL`, host tidak terjangkau, berkas tanpa penanda lulus). Jalankan ulang
-  setiap kali policy/RPC berubah.
+  `UJI RLS PROFIL LULUS`, 88 perintah selesai, exit 0, pada database development yang sudah memuat
+  kelima migration. Jalur kegagalan runner juga sudah diuji sebelumnya (tanpa `DATABASE_URL`, host
+  tidak terjangkau, berkas tanpa penanda lulus). Jalankan ulang setiap kali policy/RPC berubah.
 
 ## CI dan rilis APK (GitHub Actions)
 
@@ -222,9 +229,12 @@ tanpa filter).
   `production-apk`, lalu diunggah sebagai Actions artifact) → **`release`** (hanya untuk ref tag:
   melampirkan APK ke GitHub Release). Tidak ada build Android cloud pada push/PR biasa.
 
-Status: kedua workflow sudah ada di repo, tetapi **belum pernah dijalankan** di GitHub (belum ada
-push/run yang diamati) dan secret `EXPO_TOKEN` belum diatur. Konfigurasi sekali saja ada di
-[`docs/SETUP_GUIDE.md`](docs/SETUP_GUIDE.md) bagian 5.
+Status: `ci.yml` sudah berjalan di GitHub — job `quality` **hijau** pada run `38353855927` (13 Oktober
+2026, commit `0b989a0`) dan pada lima run sebelumnya. Job `database-rls` belum pernah berjalan dan
+memang hanya aktif lewat **Actions → CI → Run workflow** dengan input `run_db_tests` dicentang **dan**
+secret `DB_TEST_DATABASE_URL` sudah diatur, sehingga database development tidak tersentuh oleh
+push/PR biasa. `android-release.yml` belum pernah berjalan dan secret `EXPO_TOKEN` belum diatur.
+Konfigurasi sekali saja ada di [`docs/SETUP_GUIDE.md`](docs/SETUP_GUIDE.md) bagian 5.
 
 ## Build APK Android tanpa Android Studio
 

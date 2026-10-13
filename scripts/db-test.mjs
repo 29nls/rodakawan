@@ -162,7 +162,7 @@ function connectionHint(error) {
     case '3F000':
     case '42P01':
     case 'PGRST205':
-      return 'Objek database belum ada. Jalankan kedua migration lebih dulu (lihat docs/SETUP_GUIDE.md bagian 4.3).';
+      return 'Objek database belum ada. Jalankan migration yang belum diterapkan lebih dulu (lihat docs/SETUP_GUIDE.md bagian 4.3).';
     default:
       return undefined;
   }

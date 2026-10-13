@@ -53,7 +53,7 @@ baca dokumentasi kompatibilitasnya dengan Expo SDK aktif lalu jalankan `npm run 
 
 ## 4. Hubungkan Supabase (langkah konkret Milestone 1)
 
-Bagian ini adalah urutan yang sudah disesuaikan dengan kode di repo. Project development RodaKawan **sudah dibuat dan kedua migration sudah diterapkan** (13 Oktober 2026, ADR-035), jadi langkah di bawah adalah panduan lengkap untuk project baru — staging, produksi, atau mesin developer lain.
+Bagian ini adalah urutan yang sudah disesuaikan dengan kode di repo. Project development RodaKawan **sudah dibuat dan seluruh migration sudah diterapkan** (13 Oktober 2026, ADR-035), jadi langkah di bawah adalah panduan lengkap untuk project baru — staging, produksi, atau mesin developer lain.
 
 ### 4.1 Buat project development
 
@@ -102,7 +102,7 @@ Lalu hubungkan CLI ke project itu dan terapkan migration:
 npx supabase link --project-ref <ref>   # menanyakan password database sekali, bukan lewat argumen
 npx supabase migration list            # bandingkan riwayat lokal vs remote
 npx supabase db push --dry-run          # lihat apa yang akan dijalankan
-npx supabase db push --yes              # terapkan kedua migration
+npx supabase db push --yes              # terapkan seluruh migration yang belum ada di remote
 ```
 
 **Jangan** menuliskan connection string sebagai argumen perintah (mis. `--db-url "$env:DATABASE_URL"`,
@@ -159,8 +159,16 @@ EXPO_PUBLIC_MAP_STYLE_URL=https://YOUR_TILE_PROVIDER/STYLE.json
 
 Uji ini membuktikan user A tidak dapat membaca atau mengubah profil privat user B, bahwa `anon` tidak
 melihat apa pun, bahwa `DELETE` profil sendiri ditolak, dan bahwa bootstrap trigger serta constraint
-username bekerja. Semua asersi berjalan dalam satu transaksi yang berakhir `ROLLBACK`, sehingga tidak
-ada pengguna/profil uji yang tertinggal.
+username bekerja. Sejak Milestone 1.6 berkas yang sama juga membuktikan bahwa permintaan follow tidak
+memberi akses ke profil privat (permintaan berstatus `pending` sampai pemilik menyetujui lewat
+`accept_follow_request`) dan bahwa detail privat kendaraan hanya dapat dibuat/diubah untuk kendaraan
+milik sendiri. Semua asersi berjalan dalam satu transaksi yang berakhir `ROLLBACK`, sehingga tidak ada
+pengguna/profil uji yang tertinggal.
+
+Berkas uji dimulai dengan pemeriksaan **paritas skema**: bila migration Milestone 1.6 belum diterapkan
+pada database yang diuji, uji gagal dengan pesan yang menyebut objek yang hilang (kolom
+`follows.status`, fungsi `accept_follow_request`, trigger `follows_set_status`, foreign key komposit)
+alih-alih error `column does not exist` di tengah berkas.
 
 **Cara 1 — runner `npm run db:test` (disarankan).** Ambil connection string dari **Project Settings →
 Database → Connection string → Session pooler** (host `aws-0-<region>.pooler.supabase.com`, user
@@ -203,7 +211,8 @@ Catatan penting:
 - **Jangan** menyimpan `DATABASE_URL` di `.env.local`: berkas itu berisi variabel `EXPO_PUBLIC_*` yang
   ikut masuk ke bundle aplikasi. Untuk CI, simpan sebagai secret repository (`DB_TEST_DATABASE_URL`).
 - Status saat ini: **LULUS** pada project development khusus RodaKawan (ADR-035): notice
-  `UJI RLS PROFIL LULUS` diterima dan 38 perintah selesai tanpa error. Sebelumnya uji ini **belum pernah
+  `UJI RLS PROFIL LULUS` diterima dan 88 perintah selesai tanpa error (13 Oktober 2026, kelima
+  migration diterapkan). Sebelumnya uji ini **belum pernah
   lulus**: pada project lama yang dipakai bersama aplikasi lain, `bootstrap_profile()` gagal
   `42703 column "display_name" of relation "profiles" does not exist` karena `public.profiles` di sana
   bukan tabel buatan migration (ADR-033). Pesan itu berguna sebagai gejala khas schema drift: lihat
@@ -222,7 +231,7 @@ Catatan penting:
 
 - Bucket Storage dan policy avatar (Milestone 2). Karena itu tidak ada tombol upload foto profil.
 - Edge Function, private Realtime channel, push notification, dan peta.
-- Riwayat migration di project: CLI sudah dipakai untuk menerapkan kedua migration (bagian 4.3).
+- Riwayat migration di project: CLI sudah dipakai untuk menerapkan seluruh migration (bagian 4.3).
   CI database otomatis belum ada — job `database-rls` di CI hanya menjalankan uji RLS, bukan migration.
 - Uji RLS **sudah** punya runner (`npm run db:test`, lihat 4.6) yang membaca `.env.db` otomatis.
 

@@ -21,7 +21,7 @@
 - [x] Inisialisasi Expo app dengan TypeScript dan Expo Router.
 - [x] Format/lint/typecheck scripts.
 - [x] Environment config dan `.env.example` tanpa secret.
-- [x] Setup Supabase development project (project khusus RodaKawan; kedua migration diterapkan dan uji RLS lulus, ADR-035). Lihat `docs/SETUP_GUIDE.md`.
+- [x] Setup Supabase development project (project khusus RodaKawan; seluruh migration diterapkan dan uji RLS lulus, ADR-035). Lihat `docs/SETUP_GUIDE.md`.
 - [ ] Setup EAS build dan APK development/preview. *(profil `production-apk` dan workflow rilis sudah ada di repo — ADR-036…038; yang tersisa hanya akun Expo + secret `EXPO_TOKEN`, jadi belum ada APK. Bundel Android sudah diverifikasi lokal lewat `npm run export:android`)*
 - [x] Error boundary/loading/empty-state primitives.
 - [x] README project berisi cara menjalankan dan aturan branch.
@@ -85,15 +85,42 @@ butuh akun Expo/perangkat tetap **Blocked**.
       perintah maupun log (ADR-032).
 - [x] Membuat project development baru yang bersih, lalu mengisi `.env` (kunci publik) dan `.env.db`
       (connection string session pooler) — 13 Oktober 2026.
-- [x] Menerapkan kedua migration (`npx supabase link` + `npx supabase db push`) dan menjalankan
-      `npm run db:test` sampai notice `UJI RLS PROFIL LULUS` muncul — 38 perintah, exit 0.
-- [ ] Melihat job CI benar-benar hijau di GitHub. — **Blocked** (belum ada run yang diamati).
+- [x] Menerapkan migration (`npx supabase link` + `npx supabase db push`) dan menjalankan
+      `npm run db:test` sampai notice `UJI RLS PROFIL LULUS` muncul — 88 perintah, exit 0 (termasuk
+      migration Milestone 1.6).
+- [x] CI `ci.yml` benar-benar berjalan di GitHub: job `quality` (tanpa secret) hijau pada run
+      `38353855927` (13 Oktober 2026, commit `0b989a0`, ±1 menit) dan pada lima run sebelumnya.
+- [ ] Job `database-rls` hijau di CI. — **Blocked** (secret `DB_TEST_DATABASE_URL` belum diatur; job
+      hanya aktif lewat `workflow_dispatch` + input `run_db_tests`, jadi belum pernah berjalan).
 - [ ] Menjalankan rilis APK pertama lewat tag `v*` sampai GitHub Release berisi APK terpasang di
       perangkat. — **Blocked** (butuh akun Expo + secret `EXPO_TOKEN` + signing credentials).
 - [ ] Uji manual AUTH-01…AUTH-14 dan PROF-01…PROF-07 di perangkat. — **Blocked** (belum ada APK).
 
 **Exit criteria:** seluruh pemeriksaan lokal tercatat beserta hasilnya; uji RLS punya cara jalan yang
 reproducible; tidak ada kredensial di repo/laporan; tidak ada fitur Milestone 2 yang dimulai.
+
+## Milestone 1.6 — Hardening privasi profil & integritas garasi
+
+Status: **Implemented · Passed locally · Passed against dev backend** (13 Oktober 2026).
+
+- [x] Privasi profil: relasi follow yang dibuat sendiri tidak lagi memberi akses ke profil privat.
+      Status permintaan/persetujuan dikelola server dan pemilik menyetujui lewat
+      `accept_follow_request` (ADR-039). Kerentanan lama direproduksi (1 baris terbaca) dan perilaku
+      baru dibuktikan (0 baris sampai disetujui, akses hilang lagi setelah relasi dihapus).
+- [x] Integritas `motorcycle_private_details`: `INSERT`/`UPDATE` memeriksa kepemilikan kendaraan —
+      termasuk saat `motorcycle_id` diubah — dan invarian pemilik dijaga foreign key komposit
+      (ADR-040).
+- [x] Cakupan uji RLS diperluas dari 38 menjadi **88 perintah**: paritas skema di awal berkas,
+      asersi follow (allow/deny/persetujuan/pencabutan), detail privat kendaraan lintas pengguna, dan
+      penolakan peran `anon` pada `public.follows`.
+- [x] Grant `EXECUTE` untuk peran `anon` dicabut pada fungsi baru Milestone 1.6 (ADR-041).
+- [ ] Ratifikasi pemilik produk atas model persetujuan follow (ADR-039): notifikasi permintaan,
+      layar daftar permintaan, dan apakah follow ke profil publik juga perlu persetujuan.
+- [ ] Rate limit permintaan follow dan penolakan permintaan dari akun yang diblokir (belum ada;
+      `user_blocks` hanya terlihat oleh pihak yang memblokir, jadi butuh helper tersendiri).
+
+**Exit criteria:** setiap temuan keamanan pada audit policy ditutup atau dilaporkan sebagai risiko
+terbuka, dengan uji allow/deny yang benar-benar dijalankan di project development.
 
 ## Milestone 2 — Garasi dan klub
 
@@ -144,7 +171,7 @@ reproducible; tidak ada kredensial di repo/laporan; tidak ada fitur Milestone 2 
 ## Milestone 6 — Feed dan komunitas sosial (P1)
 
 - [ ] Post teks/foto.
-- [ ] Like, komentar, follow/follow-back.
+- [ ] Like, komentar, follow/follow-back (termasuk UI permintaan/persetujuan follow sesuai ADR-039).
 - [ ] Notification activity.
 - [ ] Block/report/moderation queue.
 - [ ] Pagination, media optimization, storage cleanup.
