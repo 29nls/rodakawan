@@ -39,6 +39,13 @@ dijalankan — lihat [Perintah pengujian](#perintah-pengujian).
 Fitur Milestone 2 ke atas sengaja **tidak** ditampilkan sebagai tombol yang berfungsi: aksi seperti
 "Buat perjalanan" tampil dalam keadaan nonaktif.
 
+**Konteks database (13 Oktober 2026).** Project Supabase yang sebelumnya terkonfigurasi di `.env`
+**bukan** database bersih: tabel `public.profiles` sudah ada dalam bentuk yang berbeda (hanya `id`,
+`username`, `role`, `created_at`) dan seluruh tabel lain dari migration awal belum ada. Karena
+`create table if not exists` akan melewati tabel itu diam-diam lalu migration gagal di policy yang
+menyebut `is_private`, migration **tidak** dijalankan di project tersebut. Keputusan: memakai project
+development baru yang bersih. Audit lengkap ada di `docs/PROJECT_DECISIONS.md` (ADR-033).
+
 ---
 
 ## Prasyarat
@@ -111,7 +118,7 @@ npm run format:check     # pastikan format Prettier
 npm test                 # unit + komponen test (jest-expo)
 npm run doctor           # expo-doctor
 npm run export:android   # bundel Android (Metro + Hermes) tanpa perangkat
-npm run db:test          # uji RLS ke database development (butuh DATABASE_URL)
+npm run db:test          # uji RLS ke database development (butuh .env.db / DATABASE_URL)
 ```
 
 Hasil nyata pada commit ini (13 Oktober 2026, Node 24.18, npm 12):
@@ -125,7 +132,8 @@ Hasil nyata pada commit ini (13 Oktober 2026, Node 24.18, npm 12):
 | `npm test`             | **15 suite, 164 test lulus**, exit 0.                         |
 | `npm run doctor`       | 21/21 pemeriksaan lulus.                                      |
 | `npm run export:android` | Exit 0, bundel Hermes `entry-*.hbc` (~3,6 MB), tidak ada JWT/service role key di dalam bundel. |
-| `npm run db:test`      | **Blocked** — butuh `DATABASE_URL` project development.      |
+| `npm run db:test`      | **Blocked** — butuh database development; runner + `.env.db` sudah diuji jalur gagalnya. |
+| `npx supabase ...`     | CLI 2.120.0 siap (lewat `npx`, tidak masuk `package.json`); perintah `--db-url` bekerja tanpa login. |
 | `npx eas-cli build`    | **Blocked** — butuh akun Expo.                               |
 
 `npm test` tidak menyentuh jaringan: fungsi api menerima client sebagai argumen sehingga test
@@ -155,12 +163,15 @@ atau mengubah baris user B, bahwa `anon` tidak melihat apa pun, dan bahwa bootst
 constraint username bekerja. Semua asersi berjalan dalam satu transaksi yang diakhiri `ROLLBACK`,
 jadi tidak ada data uji yang tertinggal.
 
-Dua cara menjalankannya:
+Cara pertama (disarankan): simpan connection string project **development** di berkas `.env.db` di root repo
+(satu baris, diabaikan Git, dan **tidak** dibaca Expo sehingga tidak ikut ke bundel aplikasi):
+
+```dotenv
+DATABASE_URL=postgresql://postgres:<password>@db.<ref>.supabase.co:5432/postgres?sslmode=require
+```
 
 ```powershell
-# 1. Lewat runner (membaca DATABASE_URL dari environment; password tidak pernah dicetak)
-$env:DATABASE_URL="postgresql://postgres:<password>@db.<ref>.supabase.co:5432/postgres?sslmode=require"
-npm run db:test
+npm run db:test      # memuat .env.db otomatis; password tidak pernah dicetak
 ```
 
 ```text
@@ -246,7 +257,8 @@ assets/         # ikon & splash
 scripts/        # generate-assets.mjs, db-test.mjs (runner uji RLS)
 docs/           # sumber kebenaran produk
 supabase/
-  migrations/   # 0001_initial_schema.sql, 0002_auth_profile_bootstrap.sql
+  migrations/   # 20261013022938_initial_schema.sql (fondasi)
+                # 20261013023038_auth_profile_bootstrap.sql (bootstrap profil + constraint)
   tests/        # rls_profiles_test.sql (uji RLS dua akun + kontrol positif)
 .github/
   workflows/    # ci.yml
@@ -272,7 +284,7 @@ supabase/
   `useEffect`, jadi tidak ada redirect loop. Ini hanya lapisan navigasi klien — otorisasi data tetap
   milik RLS di database.
 - **Profil:** `public.profiles` dibuat otomatis oleh trigger `on_auth_user_created` yang memanggil
-  fungsi `bootstrap_profile()` (migration 0002), memakai `NEW.id` dari `auth.users` — bukan identitas
+  fungsi `bootstrap_profile()` (migration bootstrap profil), memakai `NEW.id` dari `auth.users` — bukan identitas
   yang dikirim klien. Username dinormalkan (huruf kecil, `_`), divalidasi, dan keunikannya dijaga
   unique index + CHECK `profiles_username_format`. Bila username bentrok, trigger memakai username
   sementara `rider_xxxxxx` dan aplikasi menampilkan banner untuk menggantinya.
@@ -314,7 +326,7 @@ Setelah `.env.local` terisi, jalankan alur ini di perangkat:
 | [`docs/SETUP_GUIDE.md`](docs/SETUP_GUIDE.md)               | Setup Expo/Supabase dan build APK tanpa Android Studio.                     |
 | [`docs/PROJECT_DECISIONS.md`](docs/PROJECT_DECISIONS.md)   | ADR: keputusan teknis beserta alasannya.                                    |
 | [`docs/AI_CODING_AGENT_PROMPT.md`](docs/AI_CODING_AGENT_PROMPT.md) | Aturan kerja untuk coding agent per milestone.                     |
-| [`supabase/migrations/`](supabase/migrations)              | Skema PostgreSQL/Supabase: 0001 (fondasi) dan 0002 (bootstrap profil).      |
+| [`supabase/migrations/`](supabase/migrations)              | Skema PostgreSQL/Supabase: migration awal (fondasi) + migration bootstrap profil. |
 
 Seluruh dokumen di atas sudah ada di repositori ini; tidak ada langkah "menyalin dokumen ke repo".
 

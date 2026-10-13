@@ -9,18 +9,22 @@
  *   menyalin-tempel ke dashboard, dan tanpa menaruh kredensial di baris perintah.
  *
  * Aturan keamanan yang dipegang file ini:
- * - Kredensial hanya dibaca dari environment (`DATABASE_URL`, atau `SUPABASE_DB_URL`).
+ * - Kredensial hanya dibaca dari environment (`DATABASE_URL`, atau `SUPABASE_DB_URL`). `npm run
+ *   db:test` memuat berkas `.env.db` secara otomatis (`node --env-file-if-exists=.env.db`), jadi
+ *   password tidak perlu ditulis di baris perintah proses dan tidak pernah ikut ke bundel aplikasi
+ *   (Expo hanya membaca `.env`, `.env.local`, dan varian mode-nya).
  *   Nilainya tidak pernah dikirim sebagai argumen proses, tidak pernah ditampilkan,
  *   dan tidak pernah ditulis ke log — yang dicetak hanya `user@host:port/database`
  *   tanpa password.
  * - Runner hanya membuktikan hasil bila notice penanda lulus benar-benar diterima dari
  *   server. Exit code 0 tanpa notice itu tidak mungkin terjadi, sehingga "hijau palsu"
  *   (mis. berkas uji terpotong) tidak bisa lolos.
- * - Jangan memakai berkas `.env.local` untuk `DATABASE_URL`: berkas itu berisi variabel
- *   `EXPO_PUBLIC_*` yang ikut masuk ke bundle aplikasi. Isi `DATABASE_URL` langsung di
- *   shell untuk satu perintah saja.
+ * - Jangan memakai berkas `.env` / `.env.local` untuk `DATABASE_URL`: keduanya dibaca Expo dan
+ *   variabel `EXPO_PUBLIC_*` di dalamnya ikut masuk ke bundel aplikasi. Pakai `.env.db` (diabaikan
+ *   Git, tidak dibaca Expo) atau isi `DATABASE_URL` langsung di shell untuk satu perintah.
  *
  * Pemakaian:
+ *   Berkas .env.db: isi satu baris `DATABASE_URL=...`, lalu `npm run db:test`
  *   Bash      : DATABASE_URL="postgresql://..." npm run db:test
  *   PowerShell: $env:DATABASE_URL="postgresql://..."; npm run db:test
  *   Berkas lain: npm run db:test -- --file supabase/tests/<nama>.sql
@@ -47,6 +51,11 @@ Environment:
                          mis. postgresql://postgres:<password>@db.<ref>.supabase.co:5432/postgres?sslmode=require
   SUPABASE_DB_URL        Dipakai bila DATABASE_URL tidak ada.
   DB_TEST_FILE           Berkas uji alternatif (default ${DEFAULT_TEST_FILE}).
+
+Berkas .env.db:
+  Simpan connection string di .env.db (root repo, diabaikan Git dan tidak dibaca Expo):
+    DATABASE_URL=postgresql://postgres:<password>@db.<ref>.supabase.co:5432/postgres?sslmode=require
+  Nilai itu dimuat otomatis oleh npm run db:test, jadi tidak perlu diketik di baris perintah.
 
 Catatan:
   - Skrip uji mengakhiri dirinya dengan ROLLBACK, jadi tidak ada data uji yang
@@ -101,7 +110,7 @@ function connectionHint(error) {
     case '3F000':
     case '42P01':
     case 'PGRST205':
-      return 'Objek database belum ada. Jalankan migration 0001 lalu 0002 lebih dulu (lihat docs/SETUP_GUIDE.md).';
+      return 'Objek database belum ada. Jalankan kedua migration lebih dulu (lihat docs/SETUP_GUIDE.md bagian 4.3).';
     default:
       return undefined;
   }
@@ -146,7 +155,7 @@ async function main() {
     );
     console.error('[db:test] Contoh (Bash)      : DATABASE_URL="postgresql://..." npm run db:test');
     console.error(
-      '[db:test] Jangan menyimpan DATABASE_URL di .env.local (berkas itu untuk variabel EXPO_PUBLIC_* yang masuk ke bundle aplikasi).',
+      '[db:test] Simpan connection string di berkas .env.db (diabaikan Git, tidak dibaca Expo), jangan di .env/.env.local.',
     );
     return 1;
   }

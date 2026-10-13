@@ -39,7 +39,7 @@ const styles = StyleSheet.create({
  * Pendaftaran akun baru: email, kata sandi, nama tampilan, dan username.
  *
  * Username dan nama tampilan dikirim sebagai metadata; bootstrap trigger Supabase
- * (migration 0002) memakai metadata itu untuk membuat baris `public.profiles`.
+ * (migration bootstrap profil) memakai metadata itu untuk membuat baris `public.profiles`.
  * Bila username sudah dipakai, trigger memakai username sementara berawalan
  * `rider_` dan aplikasi memberi tahu pengguna di layar Profil.
  */

@@ -25,6 +25,10 @@ expo-env.d.ts
 *.pem
 credentials.json
 
+# Supabase CLI cache (config.toml belum dipakai: perintah dijalankan dengan --db-url)
+supabase/.temp/
+supabase/.branches/
+
 # Logs & caches
 *.log
 npm-debug.*

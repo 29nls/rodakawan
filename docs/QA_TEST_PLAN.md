@@ -40,7 +40,7 @@
 | PROF-03 | Peran anon membaca `public.profiles` | Nol baris. |
 | PROF-04 | Username duplikat lewat API | Ditolak unique constraint; aplikasi menampilkan pesan yang bisa dipahami. |
 | PROF-05 | Username dengan format tidak valid | Ditolak validasi aplikasi dan CHECK constraint database. |
-| PROF-06 | Profil belum ada (mis. dibuat sebelum migration 0002) | Aplikasi menampilkan state eksplisit, bukan layar kosong, dan tetap dapat membuat profil. |
+| PROF-06 | Profil belum ada (mis. bootstrap trigger belum terpasang) | Aplikasi menampilkan state eksplisit, bukan layar kosong, dan tetap dapat membuat profil. |
 | PROF-07 | Sesi kedaluwarsa saat menyimpan profil | Diarahkan keluar dengan pesan jelas; tidak menyimpan sebagai pengguna lain. |
 | GAR-01 | User lain membuka garage publik | Hanya field yang diizinkan terlihat. |
 | GAR-02 | User lain membaca plat pribadi | Ditolak tanpa kebocoran payload. |

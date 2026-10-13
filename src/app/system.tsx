@@ -60,7 +60,7 @@ const foundationChecklist: readonly ChecklistItem[] = [
   },
   {
     label: 'Project development Supabase',
-    detail: 'Perlu akun Anda. Migrasi 0001_initial_schema.sql dijalankan setelah review.',
+    detail: 'Perlu akun Anda. Migration awal dijalankan lewat Supabase CLI atau SQL Editor.',
     status: 'tindakan',
   },
   {
@@ -104,7 +104,7 @@ const authChecklist: readonly ChecklistItem[] = [
     status: 'selesai',
   },
   {
-    label: 'Migration 0002 + uji RLS profil',
+    label: 'Migration bootstrap profil + uji RLS',
     detail: 'Jalankan di project development; dua akun diuji lewat SQL (supabase/tests).',
     status: 'tindakan',
   },

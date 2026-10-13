@@ -14,7 +14,7 @@
     "typecheck": "tsc --noEmit",
     "test": "jest",
     "test:watch": "jest --watch",
-    "db:test": "node scripts/db-test.mjs",
+    "db:test": "node --env-file-if-exists=.env.db scripts/db-test.mjs",
     "doctor": "npx expo-doctor",
     "export:android": "expo export --platform android",
     "assets:generate": "node scripts/generate-assets.mjs"

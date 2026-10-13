@@ -69,13 +69,46 @@ Bagian ini adalah urutan yang sudah disesuaikan dengan kode di repo. Belum ada p
 
 ### 4.3 Jalankan migration
 
-Di **SQL Editor**, jalankan berurutan dan periksa pesan error tiap langkah:
+Ada dua migration, dan urutannya penting:
 
-1. Tempel isi [`supabase/migrations/0001_initial_schema.sql`](../supabase/migrations/0001_initial_schema.sql) → **Run**.
-2. Tempel isi [`supabase/migrations/0002_auth_profile_bootstrap.sql`](../supabase/migrations/0002_auth_profile_bootstrap.sql) → **Run**. Migration ini idempotent (`create or replace`, `drop trigger if exists`) sehingga aman dijalankan ulang, dan tidak menghapus data.
-3. Verifikasi cepat: **Table Editor → profiles** harus ada, dan **Database → Triggers** pada skema `auth` menampilkan `on_auth_user_created`.
+1. `supabase/migrations/20261013022938_initial_schema.sql` — skema fondasi (migration awal).
+2. `supabase/migrations/20261013023038_auth_profile_bootstrap.sql` — bootstrap profil, constraint
+   username, dan trigger `updated_at`. Migration ini idempotent (`create or replace`,
+   `drop trigger if exists`) sehingga aman dijalankan ulang dan tidak menghapus data.
 
-Migration 0001 **tidak diubah** pada Milestone 1. Semua penyesuaian ada di 0002 supaya project yang sudah terlanjur memakai 0001 tidak perlu di-reset.
+**Penting:** migration awal memakai `create table if not exists`. Bila tabel `profiles` sudah ada di
+database dengan bentuk yang berbeda, tabel itu **dilewati diam-diam** lalu migration gagal di policy
+yang menyebut `is_private` — dan database berakhir setengah jadi. Pastikan database benar-benar bersih
+(tidak ada `public.profiles`) sebelum menjalankan migration awal.
+
+**Cara 1 — Supabase CLI (disarankan, otomatis dan dapat diulang).** Simpan connection string project
+di berkas `.env.db` di root repo (berkas ini diabaikan Git dan **tidak** dibaca Expo, jadi password
+tidak masuk ke bundel aplikasi):
+
+```dotenv
+# .env.db — hanya satu baris, jangan di-commit
+DATABASE_URL=postgresql://postgres:<password>@db.<ref>.supabase.co:5432/postgres?sslmode=require
+```
+
+Lalu jalankan dari root repo:
+
+```powershell
+npx supabase init                     # sekali saja: menulis supabase/config.toml
+npx supabase migration list --db-url "$env:DATABASE_URL"   # periksa riwayat lokal vs remote
+npx supabase db push --db-url "$env:DATABASE_URL" --dry-run   # lihat apa yang akan dijalankan
+npx supabase db push --db-url "$env:DATABASE_URL"             # terapkan
+```
+
+Catatan: `npx supabase` mengunduh CLI ke cache npm; CLI **tidak** ditambahkan ke `package.json`.
+Bila PowerShell belum mengisi `DATABASE_URL`, jalankan lebih dulu:
+`$env:DATABASE_URL=(Get-Content .env.db | Where-Object { $_ -match '^DATABASE_URL=' }) -replace '^DATABASE_URL=',''`.
+
+**Cara 2 — SQL Editor (tanpa CLI).** Tempel isi kedua berkas di atas secara berurutan dan periksa
+pesan error tiap langkah. Cara ini tidak mencatat riwayat migration di database, sehingga nanti tidak
+bisa dipakai `db push` untuk perubahan berikutnya tanpa `supabase migration repair`.
+
+Verifikasi setelah selesai: **Table Editor → profiles** harus ada, kolom `is_private` harus terlihat,
+dan **Database → Triggers** pada skema `auth` menampilkan `on_auth_user_created`.
 
 ### 4.4 Atur URL konfirmasi email
 
@@ -93,7 +126,8 @@ Tanpa langkah ini, email konfirmasi/reset akan membuka halaman web dan aplikasi 
 
 ### 4.5 Isi environment lokal
 
-1. Salin `.env.example` menjadi `.env.local` di root repo.
+1. Salin `.env.example` menjadi `.env.local` di root repo (`.env` juga dibaca Expo dan diabaikan Git;
+pilih salah satu, jangan keduanya dengan nilai berbeda).
 2. Isi nilainya:
 
 ```dotenv
@@ -159,9 +193,9 @@ Catatan penting:
 
 - Bucket Storage dan policy avatar (Milestone 2). Karena itu tidak ada tombol upload foto profil.
 - Edge Function, private Realtime channel, push notification, dan peta.
-- Migration yang dijalankan dari command line (`supabase` CLI) atau CI database otomatis: migration
-  0001 dan 0002 masih dijalankan manual lewat SQL Editor. Uji RLS **sudah** punya runner
-  (`npm run db:test`, lihat 4.6).
+- Riwayat migration di project: CLI sudah dipakai untuk menerapkan kedua migration (bagian 4.3).
+  CI database otomatis belum ada — job `database-rls` di CI hanya menjalankan uji RLS, bukan migration.
+- Uji RLS **sudah** punya runner (`npm run db:test`, lihat 4.6) yang membaca `.env.db` otomatis.
 
 ## 5. Buat cloud development build
 

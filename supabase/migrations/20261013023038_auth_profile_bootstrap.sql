@@ -119,7 +119,8 @@ create trigger profiles_touch_updated_at
   execute function public.touch_updated_at();
 
 -- 3. Penguatan format username -------------------------------------------------
--- Panjang sudah dibatasi pada migration 0001; di sini ditambahkan pola karakter
+-- Panjang sudah dibatasi pada migration awal (20261013022938_initial_schema.sql); di sini
+-- ditambahkan pola karakter
 -- supaya aturan "huruf kecil, angka, garis bawah" juga dijamin database.
 do $$
 begin
@@ -137,7 +138,7 @@ end;
 $$;
 
 -- 4. Catatan hak akses ---------------------------------------------------------
--- RLS pada public.profiles (migration 0001) sudah membatasi:
+-- RLS pada public.profiles (migration awal, 20261013022938_initial_schema.sql) sudah membatasi:
 -- * SELECT: pemilik, profil publik, atau pengikut (tidak ada policy untuk anon);
 -- * INSERT/UPDATE: hanya baris dengan id = auth.uid();
 -- * DELETE: tidak ada policy (penghapusan akun ditangani backend, Milestone 5).

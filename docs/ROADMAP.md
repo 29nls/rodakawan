@@ -38,8 +38,8 @@ Kode dan skrip (implementasi):
 - [x] Sign in/sign up/reset diimplementasikan dengan Supabase Auth (alur email + password).
 - [x] Buat/edit profil dan username unik diimplementasikan (+ validasi dan penanganan benturan).
 - [x] Pengaturan sesi/logout diimplementasikan (persistensi `expo-sqlite`, auto-refresh, PKCE).
-- [x] Policy RLS profil migration 0001 dipertahankan tanpa pelonggaran.
-- [x] Migration `0002_auth_profile_bootstrap.sql` (bootstrap trigger + constraint) ditulis.
+- [x] Policy RLS profil dari migration awal dipertahankan tanpa pelonggaran.
+- [x] Migration bootstrap profil (`20261013023038_auth_profile_bootstrap.sql`) ditulis.
 - [x] Skrip uji RLS dua akun ditulis: `supabase/tests/rls_profiles_test.sql`.
 
 **Blocked** (jangan ditandai selesai):
@@ -47,7 +47,7 @@ Kode dan skrip (implementasi):
 - [ ] Profil privat tidak mengungkap data internal **dibuktikan di database** (jalankan skrip RLS).
 - [ ] Registrasi + konfirmasi email diuji ke project Supabase development.
 - [ ] Login, reset password, dan session persistence diuji di perangkat fisik.
-- [ ] Migration 0001 + 0002 benar-benar diterapkan ke project development.
+- [ ] Migration awal + migration bootstrap profil benar-benar diterapkan ke project development.
 
 **Exit criteria:** dua user dapat masuk di perangkat/sesi berbeda; user A tidak dapat mengedit profil user B. — *belum diverifikasi end-to-end pada backend nyata; unit/komponen test dan skrip RLS sudah tersedia dan (untuk test lokal) sudah lulus.*
 
@@ -55,7 +55,7 @@ Kode dan skrip (implementasi):
 
 Status: **Implemented · Passed locally**; langkah yang butuh akun/backend tetap **Blocked**.
 
-- [x] Audit kode auth/profil dan migration 0001+0002; temuan didokumentasikan dan diperbaiki.
+- [x] Audit kode auth/profil dan kedua migration; temuan didokumentasikan dan diperbaiki.
 - [x] Audit lifecycle auto-refresh token; client kini menyelaraskan ticker **setelah** `initialize()`
       (bukan sebelum), menangani promise `startAutoRefresh`/`stopAutoRefresh`, dan membersihkan
       listener saat client dibuat ulang — dengan 6 automated test baru.
@@ -66,7 +66,19 @@ Status: **Implemented · Passed locally**; langkah yang butuh akun/backend tetap
 - [x] CI GitHub Actions: job `quality` tanpa secret + job `database-rls` manual (`workflow_dispatch`).
 - [x] Dokumentasi diselaraskan dengan kode: README, `SETUP_GUIDE.md`, `QA_TEST_PLAN.md`,
       `SECURITY_PRIVACY.md`, dan `PROJECT_DECISIONS.md`.
-- [ ] Menjalankan `npm run db:test` terhadap database development. — **Blocked** (belum ada project).
+- [x] Adopsi Supabase CLI (2.120.0 lewat `npx`, tidak masuk `package.json`) dan audit read-only
+      terhadap project development yang terkonfigurasi: `public.profiles` ada dalam bentuk berbeda
+      (`id`, `username`, `role`, `created_at`) dan tabel lain belum ada, jadi migration **tidak**
+      dijalankan di project itu (ADR-033).
+- [x] Nama berkas migration disesuaikan konvensi CLI (`<timestamp>_name.sql`); karena belum ada
+      migration yang diterapkan di database mana pun, penamaan ulang tidak butuh `migration repair`
+      (ADR-031).
+- [x] `npm run db:test` memuat `.env.db` otomatis sehingga password tidak pernah berada di baris
+      perintah maupun log (ADR-032).
+- [ ] Membuat project development baru yang bersih, lalu mengisi `.env` (kunci publik) dan `.env.db`
+      (connection string). — **Blocked** (butuh akun pemilik).
+- [ ] Menerapkan kedua migration lewat `npx supabase db push --db-url` dan menjalankan
+      `npm run db:test` sampai notice `UJI RLS PROFIL LULUS` muncul. — **Blocked** (menunggu project).
 - [ ] Melihat job CI benar-benar hijau di GitHub. — **Blocked** (belum ada run yang diamati).
 - [ ] Uji manual AUTH-01…AUTH-14 dan PROF-01…PROF-07 di perangkat. — **Blocked** (belum ada APK).
 

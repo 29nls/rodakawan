@@ -40,7 +40,7 @@ delete from auth.users where id in (
   '44444444-4444-4444-4444-444444444444'
 );
 
--- 1. Dua akun uji. Trigger 0002 harus membuat profilnya.
+-- 1. Dua akun uji. Trigger bootstrap profil harus membuat barisnya.
 insert into auth.users (
   id, instance_id, aud, role, email, email_confirmed_at,
   raw_app_meta_data, raw_user_meta_data, created_at, updated_at
@@ -217,7 +217,7 @@ exception
 end;
 $$;
 
--- 3g. Format username salah ditolak CHECK constraint (pola karakter migration 0002).
+-- 3g. Format username salah ditolak CHECK constraint (pola karakter dari migration bootstrap profil).
 do $$
 begin
   update public.profiles

@@ -36,7 +36,7 @@ export type SignUpOutcome = {
 
 /**
  * Mendaftarkan akun baru. Username dan nama tampilan ikut dikirim sebagai metadata
- * agar bootstrap trigger bisa membuat baris `public.profiles` (migration 0002).
+ * agar bootstrap trigger bisa membuat baris `public.profiles` (migration bootstrap profil).
  * Metadata tidak dipakai untuk otorisasi apa pun.
  */
 export async function signUpWithEmail(

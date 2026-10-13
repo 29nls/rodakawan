@@ -15,7 +15,7 @@ Entitas MVP:
 - `follows`, `club_posts`, `post_comments`, `post_reactions`: fase sosial.
 - `notifications`, `push_tokens`: notifikasi dan endpoint perangkat.
 
-SQL awal ada pada `supabase/migrations/0001_initial_schema.sql`. Skema perlu direview dan dijalankan di project development sebelum dipakai.
+SQL awal ada pada `supabase/migrations/20261013022938_initial_schema.sql` (migration awal). Skema perlu direview dan dijalankan di project development sebelum dipakai.
 
 ## 2. Kebijakan identitas
 
