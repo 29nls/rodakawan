@@ -167,7 +167,10 @@ Cara pertama (disarankan): simpan connection string project **development** di b
 (satu baris, diabaikan Git, dan **tidak** dibaca Expo sehingga tidak ikut ke bundel aplikasi):
 
 ```dotenv
-DATABASE_URL=postgresql://postgres:<password>@db.<ref>.supabase.co:5432/postgres?sslmode=require
+# Pakai host *session pooler* dari Project Settings → Database → Connection string.
+# Host langsung db.<ref>.supabase.co hanya punya record AAAA (tanpa IPv4) sehingga sering
+# gagal ENOTFOUND; di pooler user ditulis postgres.<ref>.
+DATABASE_URL=postgresql://postgres.<ref>:<password>@aws-0-<region>.pooler.supabase.com:5432/postgres?sslmode=require
 ```
 
 ```powershell

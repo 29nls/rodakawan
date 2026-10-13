@@ -28,6 +28,18 @@
  *   Bash      : DATABASE_URL="postgresql://..." npm run db:test
  *   PowerShell: $env:DATABASE_URL="postgresql://..."; npm run db:test
  *   Berkas lain: npm run db:test -- --file supabase/tests/<nama>.sql
+ *
+ * SSL:
+ * - Connection string memakai host *session pooler* (`aws-0-<region>.pooler.supabase.com`),
+ *   karena host langsung `db.<ref>.supabase.co` hanya punya record AAAA (tanpa IPv4) sehingga
+ *   sering gagal `ENOTFOUND`. Di pooler, user ditulis `postgres.<ref>`.
+ * - `sslmode=require` di URL diperlakukan mengikuti semantik libpq: enkripsi aktif, tetapi
+ *   rantai sertifikat *tidak* diverifikasi. Itu perlu karena sejak pg-connection-string 2.14
+ *   node-postgres memetakan `require` ke `verify-full`, sedangkan pooler Supabase memakai CA
+ *   internal (bukan CA publik) sehingga koneksi gagal `SELF_SIGNED_CERT_IN_CHAIN`. Nilai
+ *   `require` juga tetap dipahami psql/pgx/`npx supabase`, jadi satu URL yang sama bisa dipakai
+ *   untuk CLI maupun runner ini. Gunakan `sslmode=verify-full` bila ingin verifikasi penuh
+ *   (perlu `sslrootcert` berisi CA project Supabase).
  */
 
 import { readFile } from 'node:fs/promises';
@@ -47,14 +59,14 @@ Pemakaian:
   npm run db:test [-- --file <berkas.sql>]
 
 Environment:
-  DATABASE_URL (wajib)   Connection string PostgreSQL project DEVELOPMENT,
-                         mis. postgresql://postgres:<password>@db.<ref>.supabase.co:5432/postgres?sslmode=require
+  DATABASE_URL (wajib)   Connection string PostgreSQL project DEVELOPMENT (host session pooler),
+                         mis. postgresql://postgres.<ref>:<password>@aws-0-<region>.pooler.supabase.com:5432/postgres?sslmode=require
   SUPABASE_DB_URL        Dipakai bila DATABASE_URL tidak ada.
   DB_TEST_FILE           Berkas uji alternatif (default ${DEFAULT_TEST_FILE}).
 
 Berkas .env.db:
   Simpan connection string di .env.db (root repo, diabaikan Git dan tidak dibaca Expo):
-    DATABASE_URL=postgresql://postgres:<password>@db.<ref>.supabase.co:5432/postgres?sslmode=require
+    DATABASE_URL=postgresql://postgres.<ref>:<password>@aws-0-<region>.pooler.supabase.com:5432/postgres?sslmode=require
   Nilai itu dimuat otomatis oleh npm run db:test, jadi tidak perlu diketik di baris perintah.
 
 Catatan:
@@ -92,10 +104,50 @@ function describeTarget(connectionString) {
   }
 }
 
+/**
+ * Terjemahkan connection string menjadi konfigurasi client pg.
+ *
+ * `sslmode=require` ditangani sendiri dengan semantik libpq (enkripsi tanpa verifikasi CA),
+ * lihat catatan SSL di atas; nilainya dihapus dari URL supaya tidak dipetakan ulang oleh
+ * pg-connection-string menjadi `verify-full`.
+ */
+function clientConfig(connectionString) {
+  const base = {
+    application_name: 'rodakawan-rls-test',
+    connectionTimeoutMillis: 15_000,
+    statement_timeout: 60_000,
+  };
+
+  let url;
+  try {
+    url = new URL(connectionString);
+  } catch {
+    return { config: { ...base, connectionString }, note: undefined };
+  }
+
+  if (url.searchParams.get('sslmode') !== 'require') {
+    return { config: { ...base, connectionString }, note: undefined };
+  }
+
+  url.searchParams.delete('sslmode');
+
+  return {
+    config: { ...base, connectionString: url.toString(), ssl: { rejectUnauthorized: false } },
+    note: 'sslmode=require → enkripsi aktif tanpa verifikasi CA (semantik libpq; pooler Supabase memakai CA internal).',
+  };
+}
+
 function connectionHint(error) {
   const code = String(error?.code ?? '');
 
   switch (code) {
+    case 'SELF_SIGNED_CERT_IN_CHAIN':
+    case 'DEPTH_ZERO_SELF_SIGNED_CERT':
+    case 'UNABLE_TO_VERIFY_LEAF_SIGNATURE':
+      return 'Sertifikat TLS server tidak dapat diverifikasi dengan CA publik (pooler Supabase memakai CA internal). Pakai `sslmode=require` pada connection string, atau `sslmode=verify-full` bila Anda menyediakan CA project lewat `sslrootcert`.';
+    case 'ENOTFOUND':
+      // Pesan khusus untuk host langsung yang hanya punya record AAAA.
+      return 'Host tidak ditemukan. Host langsung `db.<ref>.supabase.co` hanya punya record AAAA (tanpa IPv4), jadi sering gagal di jaringan IPv4 — pakai host session pooler `aws-0-<region>.pooler.supabase.com` dengan user `postgres.<ref>`. Periksa juga koneksi internet dan apakah IP Anda diizinkan pada project tersebut.';
     case '28P01':
       return 'Password/kredensial database ditolak. Pastikan DATABASE_URL memakai kredensial project development, bukan yang lama.';
     case '3D000':
@@ -151,7 +203,7 @@ async function main() {
   if (!connectionString) {
     console.error('[db:test] DATABASE_URL belum diatur.');
     console.error(
-      '[db:test] Contoh (PowerShell): $env:DATABASE_URL="postgresql://postgres:<password>@db.<ref>.supabase.co:5432/postgres?sslmode=require"; npm run db:test',
+      '[db:test] Contoh (PowerShell): $env:DATABASE_URL="postgresql://postgres.<ref>:<password>@aws-0-<region>.pooler.supabase.com:5432/postgres?sslmode=require"; npm run db:test',
     );
     console.error('[db:test] Contoh (Bash)      : DATABASE_URL="postgresql://..." npm run db:test');
     console.error(
@@ -177,16 +229,14 @@ async function main() {
     return 1;
   }
 
+  const { config: clientOptions, note: sslNote } = clientConfig(connectionString);
+
   console.log(`[db:test] Target : ${describeTarget(connectionString)}`);
   console.log(`[db:test] Berkas : ${path.relative(process.cwd(), testFile)}`);
   console.log('[db:test] Kredensial dibaca dari environment dan tidak ditampilkan di sini.');
+  if (sslNote) console.log(`[db:test] TLS    : ${sslNote}`);
 
-  const client = new pg.Client({
-    connectionString,
-    application_name: 'rodakawan-rls-test',
-    connectionTimeoutMillis: 15_000,
-    statement_timeout: 60_000,
-  });
+  const client = new pg.Client(clientOptions);
 
   let sawSuccessNotice = false;
 

@@ -87,22 +87,36 @@ tidak masuk ke bundel aplikasi):
 
 ```dotenv
 # .env.db — hanya satu baris, jangan di-commit
-DATABASE_URL=postgresql://postgres:<password>@db.<ref>.supabase.co:5432/postgres?sslmode=require
+# Salin dari Project Settings → Database → Connection string → **Session pooler**:
+# host langsung db.<ref>.supabase.co hanya punya record AAAA (tanpa IPv4) sehingga sering gagal
+# ENOTFOUND, jadi pakai host pooler dan tulis user sebagai postgres.<ref>.
+DATABASE_URL=postgresql://postgres.<ref>:<password>@aws-0-<region>.pooler.supabase.com:5432/postgres?sslmode=require
 ```
 
-Lalu jalankan dari root repo:
+`sslmode=require` adalah nilai standar yang juga dipahami `psql` dan `npx supabase`. Runner
+`npm run db:test` menerapkannya dengan semantik libpq; alasannya dijelaskan di bagian 4.6.
+
+Lalu hubungkan CLI ke project itu dan terapkan migration:
 
 ```powershell
-npx supabase migration list --db-url "$env:DATABASE_URL"   # periksa riwayat lokal vs remote
-npx supabase db push --db-url "$env:DATABASE_URL" --dry-run   # lihat apa yang akan dijalankan
-npx supabase db push --db-url "$env:DATABASE_URL"             # terapkan
+npx supabase link --project-ref <ref>   # menanyakan password database sekali, bukan lewat argumen
+npx supabase migration list            # bandingkan riwayat lokal vs remote
+npx supabase db push --dry-run          # lihat apa yang akan dijalankan
+npx supabase db push --yes              # terapkan kedua migration
 ```
 
-Catatan: semua perintah di atas memakai `--db-url`, jadi `npx supabase init` (dan berkas
-`supabase/config.toml`) **tidak diperlukan** — CLI langsung membaca `supabase/migrations` dan
-menghubungi database dari URL yang diberikan. `npx supabase` mengunduh CLI ke cache npm; CLI **tidak**
-ditambahkan ke `package.json`.
-Bila PowerShell belum mengisi `DATABASE_URL`, jalankan lebih dulu:
+**Jangan** menuliskan connection string sebagai argumen perintah (mis. `--db-url "$env:DATABASE_URL"`,
+termasuk pada `npm run <script> -- ...`): npm/npx mencetak ulang argumen lengkap lewat baris
+`npm notice run ...`, sehingga password database muncul di layar dan di log CI. Jika password pernah
+tercetak, segera reset di Dashboard → **Project Settings → Database → Reset database password**, lalu
+perbarui `.env.db`. Bila Anda memang harus memakai `--db-url` (tanpa `link`), redam dulu outputnya,
+mis. `... 2>&1 | sed -E 's#://[^@/]*@#://***@#g'`.
+
+Catatan: `npx supabase link` menulis project ref ke `supabase/.temp/` (diabaikan Git) dan CLI langsung
+membaca `supabase/migrations`. `npx supabase` mengunduh CLI ke cache npm; CLI **tidak** ditambahkan ke
+`package.json`. Setelah pindah project, **link wajib diperbarui**: tanpa itu, `npx supabase db push`
+tanpa argumen masih menargetkan project lama. Kalau memilih jalur `--db-url` daripada `link`, muat nilai
+`.env.db` lebih dulu (di PowerShell):
 `$env:DATABASE_URL=(Get-Content .env.db | Where-Object { $_ -match '^DATABASE_URL=' }) -replace '^DATABASE_URL=',''`.
 
 **Cara 2 — SQL Editor (tanpa CLI).** Tempel isi kedua berkas di atas secara berurutan dan periksa
@@ -149,13 +163,22 @@ username bekerja. Semua asersi berjalan dalam satu transaksi yang berakhir `ROLL
 ada pengguna/profil uji yang tertinggal.
 
 **Cara 1 — runner `npm run db:test` (disarankan).** Ambil connection string dari **Project Settings →
-Database → Connection string** (mode direkt, bukan pooler) dan tambahkan `?sslmode=require`.
+Database → Connection string → Session pooler** (host `aws-0-<region>.pooler.supabase.com`, user
+`postgres.<ref>`) dan tambahkan `?sslmode=require`. Jangan memakai host langsung: `db.<ref>.supabase.co`
+hanya punya record AAAA (tanpa IPv4), sehingga koneksi gagal `ENOTFOUND` pada jaringan biasa.
 
 ```powershell
-$env:DATABASE_URL="postgresql://postgres:<password>@db.<ref>.supabase.co:5432/postgres?sslmode=require"
+$env:DATABASE_URL="postgresql://postgres.<ref>:<password>@aws-0-<region>.pooler.supabase.com:5432/postgres?sslmode=require"
 npm run db:test
 Remove-Item Env:\DATABASE_URL   # jangan biarkan nilai ini tertinggal di sesi shell
 ```
+
+`sslmode=require` diperlakukan mengikuti semantik libpq: koneksi terenkripsi, tetapi rantai
+sertifikat tidak diverifikasi. Itu diperlukan karena pooler Supabase memakai CA internal, sedangkan
+`node-postgres` (sejak `pg-connection-string` 2.14) memetakan `require` ke `verify-full` sehingga
+koneksi gagal `SELF_SIGNED_CERT_IN_CHAIN`. Runner memakai semantik libpq untuk `require` dan mencetak
+catatannya satu baris di output. Bila ingin verifikasi penuh, pakai `sslmode=verify-full` bersama
+`sslrootcert` berisi CA project Supabase.
 
 Di Bash/Git Bash:
 
@@ -179,8 +202,12 @@ Catatan penting:
   sebagai satu blok, bukan baris per baris.
 - **Jangan** menyimpan `DATABASE_URL` di `.env.local`: berkas itu berisi variabel `EXPO_PUBLIC_*` yang
   ikut masuk ke bundle aplikasi. Untuk CI, simpan sebagai secret repository (`DB_TEST_DATABASE_URL`).
-- Status saat ini: **belum pernah dijalankan** terhadap database mana pun karena project Supabase
-  belum tersedia (lihat `docs/QA_TEST_PLAN.md` bagian 9).
+- Status saat ini: **LULUS** pada project development khusus RodaKawan (ADR-035): notice
+  `UJI RLS PROFIL LULUS` diterima dan 38 perintah selesai tanpa error. Sebelumnya uji ini **belum pernah
+  lulus**: pada project lama yang dipakai bersama aplikasi lain, `bootstrap_profile()` gagal
+  `42703 column "display_name" of relation "profiles" does not exist` karena `public.profiles` di sana
+  bukan tabel buatan migration (ADR-033). Pesan itu berguna sebagai gejala khas schema drift: lihat
+  juga langkah verifikasi di bagian 4.3 dan `docs/QA_TEST_PLAN.md` bagian 9.
 
 ### 4.7 Uji manual alur autentikasi
 
