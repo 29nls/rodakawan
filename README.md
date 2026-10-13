@@ -29,12 +29,14 @@ Istilah status dipakai konsisten di seluruh dokumentasi:
 | Fondasi: Expo Router, design system, error state | Ya          | Ya             | —           | Blocked         |
 | Milestone 1: auth (daftar, login, logout, reset)  | Ya          | Ya             | **Blocked** | **Blocked**     |
 | Milestone 1: profil sendiri + username unik       | Ya          | Ya             | **Blocked** | **Blocked**     |
-| Milestone 1: RLS `public.profiles`                | Ya (skrip)  | **Blocked**    | **Blocked** | —               |
+| Milestone 1: RLS `public.profiles`                | Ya          | Ya             | **Ya** (uji RLS LULUS) | —    |
 | Milestone 2+: garasi, klub, perjalanan, lokasi, chat, hazard, feed, musik | **Belum** | — | — | — |
 
-**Blocked** di sini berarti: project Supabase development dan kredensialnya belum tersedia, serta
-aplikasi belum pernah dipasang di HP fisik. Semua langkah yang dapat dijalankan tanpa backend sudah
-dijalankan — lihat [Perintah pengujian](#perintah-pengujian).
+**Blocked** yang tersisa berarti: alur aplikasi belum pernah dijalankan terhadap project development
+nyata, dan aplikasi belum pernah dipasang di HP fisik. Project Supabase development **sudah ada**
+sejak 13 Oktober 2026, kedua migration sudah diterapkan, dan uji RLS `public.profiles` sudah lulus
+(ADR-035). Semua langkah yang dapat dijalankan tanpa backend sudah dijalankan — lihat
+[Perintah pengujian](#perintah-pengujian).
 
 Fitur Milestone 2 ke atas sengaja **tidak** ditampilkan sebagai tombol yang berfungsi: aksi seperti
 "Buat perjalanan" tampil dalam keadaan nonaktif.
@@ -45,6 +47,12 @@ Fitur Milestone 2 ke atas sengaja **tidak** ditampilkan sebagai tombol yang berf
 `create table if not exists` akan melewati tabel itu diam-diam lalu migration gagal di policy yang
 menyebut `is_private`, migration **tidak** dijalankan di project tersebut. Keputusan: memakai project
 development baru yang bersih. Audit lengkap ada di `docs/PROJECT_DECISIONS.md` (ADR-033).
+
+**Tindak lanjut (13 Oktober 2026).** Project development bersih sudah dibuat dan dihubungkan lewat
+`.env` (URL + publishable key) dan `.env.db` (session pooler, `sslmode=require`). Kedua migration
+diterapkan dengan `npx supabase link` + `npx supabase db push`; `npx supabase migration list`
+menunjukkan kolom Local dan Remote sama untuk kedua versi. `npm run db:test` lulus dengan notice
+`UJI RLS PROFIL LULUS`. Project lama tidak disentuh sama sekali (ADR-035).
 
 ---
 
@@ -132,8 +140,8 @@ Hasil nyata pada commit ini (13 Oktober 2026, Node 24.18, npm 12):
 | `npm test`             | **15 suite, 164 test lulus**, exit 0.                         |
 | `npm run doctor`       | 21/21 pemeriksaan lulus.                                      |
 | `npm run export:android` | Exit 0, bundel Hermes `entry-*.hbc` (~3,6 MB), tidak ada JWT/service role key di dalam bundel. |
-| `npm run db:test`      | **Blocked** — butuh database development; runner + `.env.db` sudah diuji jalur gagalnya. |
-| `npx supabase ...`     | CLI 2.120.0 siap (lewat `npx`, tidak masuk `package.json`); perintah `--db-url` bekerja tanpa login. |
+| `npm run db:test`      | **Exit 0 — `UJI RLS PROFIL LULUS`** (38 perintah) terhadap project development, 13 Oktober 2026. |
+| `npx supabase ...`     | CLI 2.120.0 (lewat `npx`, tidak masuk `package.json`). `link` + `db push` menerapkan kedua migration; jangan menaruh connection string di argumen perintah karena npm/npx mencetak ulang argumennya. |
 | `npx eas-cli build`    | **Blocked** — butuh akun Expo.                               |
 
 `npm test` tidak menyentuh jaringan: fungsi api menerima client sebagai argumen sehingga test
@@ -190,9 +198,10 @@ Aturan penting:
   masuk ke bundle aplikasi). Isi langsung di shell untuk satu perintah.
 - Runner hanya melaporkan lulus bila notice penanda benar-benar diterima dari server, sehingga
   "hijau palsu" (mis. berkas uji terpotong) tidak bisa lolos.
-- Status saat ini: **Blocked** — runner dan skripnya sudah tersedia dan sudah diuji pada jalur
-  kegagalan (tanpa `DATABASE_URL`, host tidak terjangkau, berkas tanpa penanda), tetapi belum pernah
-  dijalankan terhadap database karena project Supabase belum ada.
+- Status saat ini: **Passed against dev backend** (13 Oktober 2026) — `npm run db:test` mencetak
+  `UJI RLS PROFIL LULUS`, 38 perintah selesai, exit 0. Jalur kegagalan runner juga sudah diuji
+  sebelumnya (tanpa `DATABASE_URL`, host tidak terjangkau, berkas tanpa penanda lulus). Jalankan ulang
+  setiap kali policy/RPC berubah.
 
 ## CI (GitHub Actions)
 

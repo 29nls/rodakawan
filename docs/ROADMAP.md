@@ -21,7 +21,7 @@
 - [x] Inisialisasi Expo app dengan TypeScript dan Expo Router.
 - [x] Format/lint/typecheck scripts.
 - [x] Environment config dan `.env.example` tanpa secret.
-- [ ] Setup Supabase development project. *(butuh akun pemilik; lihat `docs/SETUP_GUIDE.md`)*
+- [x] Setup Supabase development project (project khusus RodaKawan; kedua migration diterapkan dan uji RLS lulus, ADR-035). Lihat `docs/SETUP_GUIDE.md`.
 - [ ] Setup EAS build dan APK development/preview. *(butuh akun Expo; bundel Android sudah diverifikasi lokal lewat `npm run export:android`)*
 - [x] Error boundary/loading/empty-state primitives.
 - [x] README project berisi cara menjalankan dan aturan branch.
@@ -30,8 +30,9 @@
 
 ## Milestone 1 — Auth, profil, privasi dasar
 
-Status: **Implemented · Passed locally**. Verifikasi terhadap backend Supabase nyata dan perangkat
-fisik masih **Blocked** (belum ada project/kredensial dan belum ada build terpasang).
+Status: **Implemented · Passed locally**; lapisan database sudah **Passed against dev backend**
+(migration diterapkan dan uji RLS lulus, 13 Oktober 2026 — ADR-035). Verifikasi alur aplikasi dan
+perangkat fisik masih **Blocked** (belum ada build terpasang), bukan lagi karena kredensial.
 
 Kode dan skrip (implementasi):
 
@@ -44,16 +45,20 @@ Kode dan skrip (implementasi):
 
 **Blocked** (jangan ditandai selesai):
 
-- [ ] Profil privat tidak mengungkap data internal **dibuktikan di database** (jalankan skrip RLS).
-- [ ] Registrasi + konfirmasi email diuji ke project Supabase development.
+- [x] Profil privat tidak mengungkap data internal **dibuktikan di database** — `npm run db:test`
+      LULUS di project development (PROF-01…PROF-05 tercakup).
+- [x] Migration awal + migration bootstrap profil diterapkan ke project development (`npx supabase db
+      push`; riwayat remote berisi kedua versi).
+- [ ] Registrasi + konfirmasi email diuji ke project Supabase development (project sudah ada, uji
+      manual belum dijalankan).
 - [ ] Login, reset password, dan session persistence diuji di perangkat fisik.
-- [ ] Migration awal + migration bootstrap profil benar-benar diterapkan ke project development.
 
-**Exit criteria:** dua user dapat masuk di perangkat/sesi berbeda; user A tidak dapat mengedit profil user B. — *belum diverifikasi end-to-end pada backend nyata; unit/komponen test dan skrip RLS sudah tersedia dan (untuk test lokal) sudah lulus.*
+**Exit criteria:** dua user dapat masuk di perangkat/sesi berbeda; user A tidak dapat mengedit profil user B. — *aturan di database sudah terbukti (uji RLS LULUS di project development); alur dua user di perangkat belum diverifikasi.*
 
 ## Milestone 1.5 — Verifikasi, hardening & CI
 
-Status: **Implemented · Passed locally**; langkah yang butuh akun/backend tetap **Blocked**.
+Status: **Implemented · Passed locally**; lapisan database **Passed against dev backend**; langkah yang
+butuh akun Expo/perangkat tetap **Blocked**.
 
 - [x] Audit kode auth/profil dan kedua migration; temuan didokumentasikan dan diperbaiki.
 - [x] Audit lifecycle auto-refresh token; client kini menyelaraskan ticker **setelah** `initialize()`
@@ -75,10 +80,10 @@ Status: **Implemented · Passed locally**; langkah yang butuh akun/backend tetap
       (ADR-031).
 - [x] `npm run db:test` memuat `.env.db` otomatis sehingga password tidak pernah berada di baris
       perintah maupun log (ADR-032).
-- [ ] Membuat project development baru yang bersih, lalu mengisi `.env` (kunci publik) dan `.env.db`
-      (connection string). — **Blocked** (butuh akun pemilik).
-- [ ] Menerapkan kedua migration lewat `npx supabase db push --db-url` dan menjalankan
-      `npm run db:test` sampai notice `UJI RLS PROFIL LULUS` muncul. — **Blocked** (menunggu project).
+- [x] Membuat project development baru yang bersih, lalu mengisi `.env` (kunci publik) dan `.env.db`
+      (connection string session pooler) — 13 Oktober 2026.
+- [x] Menerapkan kedua migration (`npx supabase link` + `npx supabase db push`) dan menjalankan
+      `npm run db:test` sampai notice `UJI RLS PROFIL LULUS` muncul — 38 perintah, exit 0.
 - [ ] Melihat job CI benar-benar hijau di GitHub. — **Blocked** (belum ada run yang diamati).
 - [ ] Uji manual AUTH-01…AUTH-14 dan PROF-01…PROF-07 di perangkat. — **Blocked** (belum ada APK).
 

@@ -53,7 +53,7 @@ baca dokumentasi kompatibilitasnya dengan Expo SDK aktif lalu jalankan `npm run 
 
 ## 4. Hubungkan Supabase (langkah konkret Milestone 1)
 
-Bagian ini adalah urutan yang sudah disesuaikan dengan kode di repo. Belum ada project Supabase yang terhubung saat dokumen ini diperbarui, jadi langkah di bawah **belum pernah dijalankan** dan harus Anda lakukan sendiri.
+Bagian ini adalah urutan yang sudah disesuaikan dengan kode di repo. Project development RodaKawan **sudah dibuat dan kedua migration sudah diterapkan** (13 Oktober 2026, ADR-035), jadi langkah di bawah adalah panduan lengkap untuk project baru — staging, produksi, atau mesin developer lain.
 
 ### 4.1 Buat project development
 

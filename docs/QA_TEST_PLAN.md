@@ -146,14 +146,24 @@ Hasil terakhir dijalankan (13 Oktober 2026, Node 24.18): `npm test -- --ci` → 
 lulus**; `npm run typecheck`, `npm run lint`, `npm run format:check`, `npm run doctor` (21/21), dan
 `npm run export:android` semuanya exit 0.
 
-Yang **Blocked** (butuh project Supabase / kredensial / perangkat):
+Yang **sudah diverifikasi terhadap dev backend** (13 Oktober 2026, project development khusus
+RodaKawan — ADR-035):
 
-- `supabase/tests/rls_profiles_test.sql` — runner `npm run db:test` sudah tersedia dan sudah diuji pada
-  jalur kegagalan (tanpa `DATABASE_URL`, host tidak terjangkau, berkas tanpa penanda lulus), tetapi
-  belum pernah dijalankan terhadap database. PROF-01, PROF-02, PROF-03, PROF-04, PROF-05, PROF-06.
-- AUTH-01 dan AUTH-04 s.d. AUTH-14 — butuh project Supabase development dan/atau perangkat.
+- `supabase/tests/rls_profiles_test.sql` — `npm run db:test` mencetak notice `UJI RLS PROFIL LULUS`
+  (38 perintah, exit 0). Yang dibuktikan di sisi database: bootstrap trigger membuat profil dengan
+  username yang dinormalkan, user A tidak dapat membaca profil privat user B maupun mengubah barisnya
+  (0 baris terpengaruh, `INSERT` ditolak), username duplikat ditolak unique constraint, format salah
+  ditolak CHECK, peran `anon` tidak melihat baris apa pun, kontrol positif (profil publik user B
+  memang terbaca user A), dan `DELETE` profil sendiri ditolak. **PROF-01, PROF-02, PROF-03, PROF-04,
+  PROF-05.**
+
+Yang **masih Blocked** (butuh perangkat / alur aplikasi / akun):
+
+- PROF-06 — sisi database sudah tertutup oleh uji RLS, tetapi state "profil belum ada" di aplikasi
+  belum diuji di perangkat.
+- AUTH-01 dan AUTH-04 s.d. AUTH-14 — butuh alur aplikasi terhadap backend dan/atau perangkat.
 - PROF-07 — butuh sesi nyata yang kedaluwarsa.
-- Job `database-rls` pada CI — butuh secret `DB_TEST_DATABASE_URL`.
+- Job `database-rls` pada CI — butuh secret `DB_TEST_DATABASE_URL` dan run pertama di GitHub.
 
 Aturan pelaporan: jangan mencatat AUTH/PROF sebagai lulus pada tabel di atas bila hanya test lokal yang
 dijalankan. Tandai "lulus (unit)" atau "belum dijalankan". Runner `db:test` hanya melaporkan lulus bila
