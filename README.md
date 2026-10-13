@@ -142,7 +142,7 @@ Hasil nyata pada commit ini (13 Oktober 2026, Node 24.18, npm 12):
 | `npm run export:android` | Exit 0, bundel Hermes `entry-*.hbc` (~3,6 MB), tidak ada JWT/service role key di dalam bundel. |
 | `npm run db:test`      | **Exit 0 — `UJI RLS PROFIL LULUS`** (38 perintah) terhadap project development, 13 Oktober 2026. |
 | `npx supabase ...`     | CLI 2.120.0 (lewat `npx`, tidak masuk `package.json`). `link` + `db push` menerapkan kedua migration; jangan menaruh connection string di argumen perintah karena npm/npx mencetak ulang argumennya. |
-| `npx eas-cli build`    | **Blocked** — butuh akun Expo.                               |
+| `npx eas-cli build`    | **Blocked** — butuh akun Expo + secret `EXPO_TOKEN`. Profil `production-apk` dan workflow rilis sudah ada, tetapi belum ada build cloud yang dijalankan/diamati. |
 
 `npm test` tidak menyentuh jaringan: fungsi api menerima client sebagai argumen sehingga test
 menyuntikkan fake client dari `src/test-support/fakeSupabase.ts`; test navigasi memakai `jest.mock`
@@ -203,36 +203,79 @@ Aturan penting:
   sebelumnya (tanpa `DATABASE_URL`, host tidak terjangkau, berkas tanpa penanda lulus). Jalankan ulang
   setiap kali policy/RPC berubah.
 
-## CI (GitHub Actions)
+## CI dan rilis APK (GitHub Actions)
 
-[`.github/workflows/ci.yml`](.github/workflows/ci.yml) berisi dua job:
+Dua workflow; keduanya tidak pernah mencetak nilai secret (tidak ada `echo $SECRET`, tidak ada `env`
+tanpa filter).
 
-- **`quality`** berjalan pada push ke `main` dan setiap pull request: `npm ci`, `typecheck`, `lint`,
-  `format:check`, `npm test -- --ci`, `doctor`, dan `export:android`. Job ini **tidak memakai satu pun
-  secret** Supabase dan justru membuktikan aplikasi tetap bersih saat backend belum dikonfigurasi.
-- **`database-rls`** hanya berjalan lewat **Actions → Run workflow** dengan input `run_db_tests`
-  dicentang, dan hanya bila secret `DB_TEST_DATABASE_URL` sudah diatur. Job ini tidak pernah berjalan
-  pada push/PR biasa, sehingga database produksi tidak tersentuh.
+- [`.github/workflows/ci.yml`](.github/workflows/ci.yml) — pemeriksaan rutin, berisi dua job:
+  - **`quality`** berjalan pada push ke `main` dan setiap pull request: `npm ci`, `typecheck`, `lint`,
+    `format:check`, `npm test -- --ci`, `doctor`, dan `export:android`. Job ini **tidak memakai satu
+    pun secret** Supabase dan justru membuktikan aplikasi tetap bersih saat backend belum
+    dikonfigurasi.
+  - **`database-rls`** hanya berjalan lewat **Actions → CI → Run workflow** dengan input `run_db_tests`
+    dicentang, dan hanya bila secret `DB_TEST_DATABASE_URL` sudah diatur. Job ini tidak pernah berjalan
+    pada push/PR biasa, sehingga database produksi tidak tersentuh.
+- [`.github/workflows/android-release.yml`](.github/workflows/android-release.yml) — rilis APK.
+  Berjalan pada push tag `v*` (mis. `v0.1.0`) dan lewat `workflow_dispatch`. Urutan job:
+  **`verify`** (pemeriksaan kualitas) → **`build-apk`** (build APK di EAS Cloud dengan profil
+  `production-apk`, lalu diunggah sebagai Actions artifact) → **`release`** (hanya untuk ref tag:
+  melampirkan APK ke GitHub Release). Tidak ada build Android cloud pada push/PR biasa.
 
-Workflow tidak pernah mencetak nilai environment. Status: workflow sudah ditambahkan, tetapi **belum
-pernah dijalankan** di GitHub (belum ada push/run yang diamati).
+Status: kedua workflow sudah ada di repo, tetapi **belum pernah dijalankan** di GitHub (belum ada
+push/run yang diamati) dan secret `EXPO_TOKEN` belum diatur. Konfigurasi sekali saja ada di
+[`docs/SETUP_GUIDE.md`](docs/SETUP_GUIDE.md) bagian 5.
 
 ## Build APK Android tanpa Android Studio
 
 ```powershell
-npx eas-cli@latest login                                       # masuk ke akun Expo
-npx eas-cli@latest init                                        # menulis projectId EAS ke app.json
-npx eas-cli@latest build --platform android --profile preview  # APK internal untuk pengujian
-npx eas-cli@latest build --platform android --profile development  # development build (expo-dev-client)
+npx eas-cli@latest login                                              # masuk ke akun Expo
+npx eas-cli@latest init                                              # menulis projectId EAS ke app.json (sudah ada di repo ini)
+npx eas-cli@latest build --platform android --profile development    # development build (expo-dev-client)
+npx eas-cli@latest build --platform android --profile preview        # APK internal untuk pengujian
+npx eas-cli@latest build --platform android --profile production-apk # APK siap pasang (variabel produksi)
+npx eas-cli@latest build --platform android --profile production     # AAB untuk Google Play
 ```
 
-Profil build ada di [`eas.json`](eas.json): `development` (development client, APK),
-`preview` (APK internal), `production` (AAB). Nama paket Android `com.rodakawan.app` di
-[`app.json`](app.json) masih sementara dan wajib diganti sebelum rilis Play Store bila identitas
-final berbeda (ADR-015).
+Profil build ada di [`eas.json`](eas.json):
 
-Status: **Blocked** — belum ada akun Expo yang terhubung, jadi belum ada APK. Verifikasi bundel
-lokal sudah dilakukan lewat `npm run export:android`.
+| Profil           | Artifact | Distribusi | Kegunaan                                                    |
+| ---------------- | -------- | ---------- | ----------------------------------------------------------- |
+| `development`    | APK      | internal   | development build (`expo-dev-client`)                       |
+| `preview`        | APK      | internal   | APK uji cepat internal                                      |
+| `production-apk` | APK      | internal   | APK untuk GitHub Release (dibangun otomatis oleh workflow)  |
+| `production`     | AAB      | store      | unggah ke Google Play                                       |
+
+`production-apk` memakai `extends: "production"`, jadi keduanya berbagi `autoIncrement` dan variabel
+`environment: production`; yang berbeda hanya format berkas dan jalur distribusi. Nama paket Android
+`com.rodakawan.app` di [`app.json`](app.json) masih sementara dan wajib diganti sebelum rilis Play
+Store bila identitas final berbeda (ADR-015).
+
+Status: **Blocked** — belum ada `EXPO_TOKEN` yang diatur dan belum ada build cloud yang dijalankan,
+jadi belum ada APK. Verifikasi bundel lokal sudah dilakukan lewat `npm run export:android`.
+
+### Merilis APK dari GitHub Release
+
+```powershell
+# 1. Naikkan "version" di app.json (mis. 0.1.0 → 0.2.0), lalu commit.
+# 2. Tandai commit itu dan dorong tag-nya.
+git tag v0.2.0
+git push origin v0.2.0
+```
+
+Setelah tag didorong, `.github/workflows/android-release.yml` menjalankan pemeriksaan kualitas,
+membangun APK di EAS Cloud, mengunggahnya sebagai Actions artifact, dan membuat GitHub Release
+`v0.2.0` berisi `RodaKawan-v0.2.0.apk`. APK diunduh dari halaman **Releases** repository, atau dari
+artifacts run bila build dipicu manual.
+
+- `versionCode` Android **tidak** dinaikkan manual: `appVersionSource: remote` membuat EAS
+  menaikkannya di server pada setiap build (ADR-036). Yang dinaikkan manual hanya `version`.
+- Setiap rilis butuh **tag baru**; tag yang sudah dipakai akan memperbarui aset release yang ada,
+  bukan membuat rilis kedua.
+- Build manual tanpa rilis: **Actions → Android APK Release → Run workflow** — APK hanya menjadi
+  Actions artifact, tanpa GitHub Release.
+- Rilis ini **tidak** mengunggah apa pun ke Google Play; AAB Play Store tetap dikirim terpisah dari
+  profil `production`.
 
 ### Aset ikon
 

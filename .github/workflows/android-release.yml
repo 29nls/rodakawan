@@ -1,0 +1,268 @@
+name: Android APK Release
+
+# Pipeline rilis APK Android (Milestone 1.5 → distribusi internal).
+#
+# Alur:
+#   1. `verify`    — pemeriksaan kualitas kode tanpa backend/secret, supaya build
+#                    cloud tidak dihabiskan untuk kode yang gagal typecheck/test.
+#   2. `build-apk` — build APK di EAS Cloud (profil `production-apk`), lalu unduh
+#                    artifact dari **build yang barusan dibuat** dan unggah sebagai
+#                    Actions artifact.
+#   3. `release`   — hanya bila ref-nya tag `v*`: lampirkan APK ke GitHub Release.
+#
+# Aturan yang dipegang:
+# - Job yang memegang `EXPO_TOKEN` tidak punya izin tulis ke repository, dan job yang
+#   punya `contents: write` tidak memegang secret Expo.
+# - Nilai secret dan URL artifact EAS tidak pernah dicetak ke log.
+# - Build gagal ⇒ workflow gagal ⇒ tidak ada release palsu.
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  # Grup global, bukan per-ref: versionCode remote dinaikkan EAS saat build dimulai,
+  # jadi dua rilis bersamaan bisa memperebutkan nomor yang sama. Serialkan semuanya.
+  group: android-release
+  cancel-in-progress: false
+
+env:
+  # Bisa diganti ke versi yang dipin (mis. `eas-cli@22`) tanpa mengubah tiap step.
+  EAS_CLI: eas-cli@latest
+  EXPO_NO_TELEMETRY: '1'
+  CI: 'true'
+
+jobs:
+  verify:
+    name: Pemeriksaan kualitas
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Siapkan Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24.x'
+          cache: npm
+
+      - name: Pasang dependency dari lockfile
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Format
+        run: npm run format:check
+
+      - name: Unit & komponen test
+        run: npm test -- --ci
+
+      - name: Expo doctor
+        run: npm run doctor
+
+      - name: Bundel Android (Metro + Hermes)
+        run: npm run export:android
+
+      - name: Periksa kecocokan tag dengan versi aplikasi
+        run: |
+          if [ "${GITHUB_REF_TYPE}" != "tag" ]; then
+            echo "Ref ini bukan tag (workflow_dispatch); pemeriksaan versi dilewati."
+            exit 0
+          fi
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          APP_VERSION="$(node -p "require('./app.json').expo.version")"
+          echo "Tag: ${GITHUB_REF_NAME} → versi tag ${TAG_VERSION}; app.json version ${APP_VERSION}"
+          if [ "${TAG_VERSION}" != "${APP_VERSION}" ]; then
+            echo "::warning::Tag ${GITHUB_REF_NAME} tidak sama dengan version di app.json (${APP_VERSION}). Naikkan version di app.json sebelum menandai rilis agar label release sesuai dengan APK."
+          fi
+
+  build-apk:
+    name: Build APK (EAS Cloud)
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    outputs:
+      apk_name: ${{ steps.artifact.outputs.apk_name }}
+      apk_sha256: ${{ steps.artifact.outputs.apk_sha256 }}
+      build_id: ${{ steps.build.outputs.build_id }}
+    steps:
+      - name: Checkout commit yang ditandai
+        uses: actions/checkout@v7
+
+      - name: Siapkan Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24.x'
+          cache: npm
+
+      # EAS CLI mengevaluasi app config secara lokal sebelum mengunggah proyek, dan
+      # plugin di app.json (mis. expo-splash-screen) harus bisa di-resolve.
+      - name: Pasang dependency dari lockfile
+        run: npm ci
+
+      - name: Pastikan EXPO_TOKEN tersedia (nilai tidak dicetak)
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          if [ -z "${EXPO_TOKEN}" ]; then
+            echo "::error::Secret EXPO_TOKEN belum diatur di Settings → Secrets and variables → Actions. Buat token di halaman Access tokens akun Expo (atau robot user khusus CI), lalu simpan sebagai secret EXPO_TOKEN. Lihat docs/SETUP_GUIDE.md bagian 5."
+            exit 1
+          fi
+          echo "EXPO_TOKEN tersedia; isinya tidak ditampilkan."
+
+      - name: Verifikasi kredensial Expo
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: npx --yes "$EAS_CLI" whoami
+
+      - name: Build APK di EAS Cloud (profil production-apk)
+        id: build
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          set -o pipefail
+          RESULT_FILE="${RUNNER_TEMP}/eas-build.json"
+
+          if npx --yes "$EAS_CLI" build \
+              --platform android \
+              --profile production-apk \
+              --non-interactive --wait --json > "$RESULT_FILE"; then
+            EAS_EXIT=0
+          else
+            EAS_EXIT=$?
+          fi
+
+          # Ringkasan aman: hanya id/status/platform — tidak pernah URL artifact.
+          node scripts/eas-build-artifact.mjs "$RESULT_FILE" summary || true
+          BUILD_ID="$(node scripts/eas-build-artifact.mjs "$RESULT_FILE" id 2> /dev/null || true)"
+          if [ -n "$BUILD_ID" ]; then
+            echo "build_id=${BUILD_ID}" >> "$GITHUB_OUTPUT"
+            echo "Build EAS: https://expo.dev/accounts/maceeng/projects/rodakawan/builds/${BUILD_ID}"
+          fi
+          if [ "$EAS_EXIT" -ne 0 ]; then
+            echo "::error::EAS build gagal (exit ${EAS_EXIT}). Tidak ada artifact dan tidak ada release yang dibuat."
+            exit "$EAS_EXIT"
+          fi
+
+      - name: Unduh APK dari build ini dan verifikasi berkasnya
+        id: artifact
+        run: |
+          RESULT_FILE="${RUNNER_TEMP}/eas-build.json"
+
+          # Bentuk keluaran EAS (array vs objek, nama kolom artifact) diurus oleh
+          # `scripts/eas-build-artifact.mjs`, yang hanya menerima build berstatus
+          # `finished` dengan URL artifact https milik pemanggilan ini.
+          if ! ARTIFACT_URL="$(node scripts/eas-build-artifact.mjs "$RESULT_FILE" url)"; then
+            echo "::error::URL artifact tidak bisa diambil dari hasil build. Release dibatalkan."
+            node scripts/eas-build-artifact.mjs "$RESULT_FILE" dump || true
+            exit 1
+          fi
+
+          # Nama berkas konsisten dan aman dipakai sebagai path: garis miring pada nama
+          # ref diganti tanda hubung.
+          REF_LABEL="${GITHUB_REF_NAME//\//-}"
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            APK_NAME="RodaKawan-${REF_LABEL}.apk"
+          else
+            APK_NAME="RodaKawan-${REF_LABEL}-${GITHUB_SHA:0:7}.apk"
+          fi
+          echo "Nama berkas APK: ${APK_NAME}"
+
+          curl --fail --location --retry 3 --retry-delay 5 --silent --show-error \
+            "$ARTIFACT_URL" --output "$APK_NAME"
+
+          if [ ! -s "$APK_NAME" ]; then
+            echo "::error::Berkas APK tidak ada atau kosong setelah diunduh."
+            exit 1
+          fi
+          if [ "$(head -c 2 "$APK_NAME")" != "PK" ]; then
+            echo "::error::Berkas yang diunduh bukan APK (arsip ZIP) — kemungkinan halaman error."
+            exit 1
+          fi
+
+          APK_SIZE="$(stat -c %s "$APK_NAME")"
+          APK_SHA256="$(sha256sum "$APK_NAME" | awk '{print $1}')"
+          echo "APK ${APK_NAME} — ${APK_SIZE} bytes — sha256 ${APK_SHA256}"
+          echo "apk_name=${APK_NAME}" >> "$GITHUB_OUTPUT"
+          echo "apk_sha256=${APK_SHA256}" >> "$GITHUB_OUTPUT"
+
+      - name: Tambahkan ringkasan run
+        if: always()
+        env:
+          BUILD_ID: ${{ steps.build.outputs.build_id }}
+        run: |
+          {
+            echo "### Build APK EAS"
+            echo ""
+            echo "- Profil: \`production-apk\`"
+            echo "- Build ID: ${BUILD_ID:-(tidak tersedia)}"
+            if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+              echo "- Tag: \`${GITHUB_REF_NAME}\`"
+            else
+              echo "- Ref: \`${GITHUB_REF_NAME}\` (bukan tag — tidak ada GitHub Release)"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Unggah APK sebagai Actions artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: rodakawan-apk
+          path: ${{ steps.artifact.outputs.apk_name }}
+          retention-days: 30
+
+  release:
+    name: GitHub Release (tag v*)
+    needs: build-apk
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Hanya job ini yang boleh menulis ke repository, dan job ini tidak memegang
+    # secret Expo apa pun.
+    permissions:
+      contents: write
+    env:
+      # Job ini sengaja tidak melakukan checkout, jadi `gh` tidak bisa menebak
+      # repository dari direktori kerja; GH_REPO menyebutkannya secara eksplisit.
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: Unduh APK dari Actions artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: rodakawan-apk
+
+      - name: Verifikasi APK hasil unduhan (harus identik dengan hasil build)
+        env:
+          APK_NAME: ${{ needs.build-apk.outputs.apk_name }}
+          APK_SHA256: ${{ needs.build-apk.outputs.apk_sha256 }}
+        run: |
+          ls -l
+          if [ ! -s "${APK_NAME}" ]; then
+            echo "::error::APK ${APK_NAME} tidak ditemukan atau kosong setelah diunduh dari Actions artifact."
+            exit 1
+          fi
+          echo "${APK_SHA256}  ${APK_NAME}" | sha256sum --check --strict
+
+      - name: Buat atau perbarui GitHub Release dengan APK
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG_NAME: ${{ github.ref_name }}
+          APK_NAME: ${{ needs.build-apk.outputs.apk_name }}
+        run: |
+          if gh release view "$TAG_NAME" > /dev/null 2>&1; then
+            echo "Release ${TAG_NAME} sudah ada — mengganti aset APK (--clobber)."
+            gh release upload "$TAG_NAME" "$APK_NAME" --clobber
+          else
+            gh release create "$TAG_NAME" "$APK_NAME" \
+              --title "RodaKawan ${TAG_NAME}" \
+              --generate-notes \
+              --verify-tag
+          fi

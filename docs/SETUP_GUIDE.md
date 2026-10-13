@@ -226,63 +226,164 @@ Catatan penting:
   CI database otomatis belum ada — job `database-rls` di CI hanya menjalankan uji RLS, bukan migration.
 - Uji RLS **sudah** punya runner (`npm run db:test`, lihat 4.6) yang membaca `.env.db` otomatis.
 
-## 5. Buat cloud development build
+## 5. EAS: aktifkan project, signing, dan environment produksi
 
-Saat mulai memakai native location/background service, MapLibre, atau LiveKit, tambahkan dependency yang sesuai dan buat development build. Contoh alur EAS standar:
+Bagian ini adalah konfigurasi **sekali** milik pemilik akun Expo. Setelah selesai, rilis APK berjalan
+otomatis lewat tag Git (bagian 6) tanpa perlu mengubah apa pun lagi.
 
-```powershell
-npx expo install expo-dev-client
-npm install -g eas-cli
-```
+### 5.1 Aktifkan project EAS
 
-Jika perintah kedua tertulis tidak sesuai pada versi EAS yang digunakan, gunakan cara instalasi yang dijelaskan di dokumentasi resmi EAS. Kemudian:
-
-```powershell
-eas login
-eas build:configure
-eas build --platform android --profile development
-```
-
-Konfigurasikan profile `development` di `eas.json` dengan `developmentClient: true` dan `distribution: internal`. Contoh konfigurasi awal yang bisa disesuaikan:
-
-```json
-{
-  "build": {
-    "development": {
-      "developmentClient": true,
-      "distribution": "internal",
-      "android": { "buildType": "apk" }
-    },
-    "preview": {
-      "distribution": "internal",
-      "android": { "buildType": "apk" }
-    },
-    "production": {
-      "autoIncrement": true
-    }
-  }
-}
-```
-
-Ikuti wizard/validasi EAS untuk menyetel package name, credentials, dan opsi CLI yang kompatibel dengan versi EAS aktif.
-
-Setelah build selesai, unduh dan instal APK di perangkat Android. Untuk menjalankan JS bundler di mode development:
+`app.json` di repo ini sudah memuat `extra.eas.projectId` (`bded94f5-467b-4852-9daa-f8beecb04b82`) dan
+`owner` (`maceeng`), jadi project EAS-nya sudah terhubung ke akun/organisasi itu.
 
 ```powershell
-npx expo start --dev-client
+npx eas-cli@latest login          # masuk dengan akun pemilik project
+npx eas-cli@latest project:info   # tampilkan project yang dibaca dari app.json
 ```
 
-Catatan: command di atas adalah workflow generik; struktur proyek dan versi EAS Anda bisa menuntut penyesuaian kecil. Build native perlu diulang setelah native dependency atau konfigurasi native berubah. Perubahan TypeScript/JS biasa biasanya cukup dengan restart bundler/refresh.
+Bila `extra.eas.projectId` belum ada (project baru atau fork), jalankan `npx eas-cli@latest init`:
+perintah itu menulis `extra.eas.projectId` (dan `owner` bila akun punya beberapa organization) ke
+`app.json` — commit nilainya. `projectId` bukan rahasia; token Expo tidak boleh masuk ke `app.json`.
 
-## 6. Preview APK
+### 5.2 Android signing credentials
 
-Untuk menghasilkan APK internal yang dapat dipasang tanpa emulator, konfigurasikan profile `preview` di `eas.json` dengan `distribution: internal` dan `android.buildType: apk`. Kemudian jalankan:
+EAS mengelola keystore dari sisi server (`credentialsSource` default `remote` di `eas.json`), jadi
+keystore tidak pernah masuk repository. Keystore dibuat otomatis saat build pertama yang
+menandatangani aplikasi:
 
 ```powershell
-eas build --platform android --profile preview
+npx eas-cli@latest build --platform android --profile production-apk
 ```
 
-Build produksi untuk Google Play umumnya memakai AAB. APK internal cocok untuk pengujian/pilot terbatas; gunakan AAB ketika workflow distribusi Play Store mengharuskannya. Periksa panduan EAS APK builds untuk format konfigurasi terbaru.
+Jawab *generate a new keystore* saat diminta, lalu biarkan EAS menyimpannya. Keystore yang sama akan
+dipakai semua build berikutnya (APK maupun AAB); kehilangannya berarti aplikasi tidak bisa lagi
+memperbarui instalasi lama.
+
+- Jangan menaruh `*.jks`, `*.keystore`, `*.p12`, atau `credentials.json` di repo (sudah diabaikan
+  `.gitignore`).
+- Jangan mengirim password keystore atau service account ke workflow CI. CI hanya memakai
+  `EXPO_TOKEN`; signing terjadi di server EAS.
+- Unggah ke Google Play **tidak** ada di pipeline ini (butuh service account Play Store — pekerjaan
+  terpisah).
+
+### 5.3 Environment produksi (`EXPO_PUBLIC_*`)
+
+Profil `production-apk` memakai `environment: production`, dan profil `production` (AAB) juga jatuh ke
+environment itu (`distribution: store`). Jadi ketiga variabel publik diisi di environment
+**production**, bukan di `eas.json`:
+
+```powershell
+npx eas-cli@latest env:set --name EXPO_PUBLIC_SUPABASE_URL \
+  --value https://<ref>.supabase.co --environment production --visibility plaintext
+npx eas-cli@latest env:set --name EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY \
+  --value <publishable key> --environment production --visibility plaintext
+npx eas-cli@latest env:set --name EXPO_PUBLIC_MAP_STYLE_URL \
+  --value https://<tile provider>/style.json --environment production --visibility plaintext
+
+npx eas-cli@latest env:list --environment production   # verifikasi tanpa menampilkan nilai secret
+```
+
+- Semua nilai berprefix `EXPO_PUBLIC_` ikut masuk ke bundel aplikasi, jadi hanya nilai publik yang
+  boleh diisi. **Jangan** menaruh service role key, database password, atau token admin di sini.
+- Profil `development` dan `preview` memakai environment `development`/`preview` (ditulis eksplisit di
+  `eas.json`); isi variabel yang sama di sana bila APK dev/preview perlu menyentuh backend.
+- Bila variabel ini kosong, build tetap sukses tetapi aplikasi tampil dengan banner “konfigurasi
+  belum tersedia” dan tidak mengirim request jaringan (AUTH-13) — APK tanpa backend.
+
+### 5.4 Saat memakai native dependency baru
+
+Untuk native location/background service, MapLibre, atau LiveKit, tambahkan dependency yang sesuai lalu
+buat development build (`--profile development`, butuh `npx expo install expo-dev-client`):
+
+```powershell
+npx expo start --dev-client   # jalankan JS bundler untuk development build
+```
+
+Build native perlu diulang setelah native dependency atau konfigurasi native berubah; perubahan
+TypeScript/JS biasa biasanya cukup dengan restart bundler/refresh.
+
+## 6. APK: build manual, rilis otomatis, dan versi
+
+Profil build ada di [`eas.json`](../eas.json): `development` (APK dev client), `preview` (APK uji),
+`production-apk` (APK rilis, `environment: production`), dan `production` (AAB untuk Google Play).
+`production-apk` memakai `extends: "production"`, jadi penanganan versinya identik dengan AAB.
+
+### 6.1 Build APK manual
+
+```powershell
+npx eas-cli@latest build --platform android --profile preview        # APK uji internal
+npx eas-cli@latest build --platform android --profile production-apk # APK dengan variabel produksi
+npx eas-cli@latest build --platform android --profile development    # development build (expo-dev-client)
+```
+
+APK diunduh dari halaman build di expo.dev, lalu dipasang ke perangkat.
+
+### 6.2 Siapkan `EXPO_TOKEN` untuk CI
+
+1. Buat token di akun Expo pemilik project (`owner` di `app.json`): buka **Settings → Access tokens**,
+   atau lebih baik buat **robot user khusus CI** lalu ambil tokennya — robot user bisa dicabut tanpa
+   mengganggu akun pribadi.
+2. Di GitHub: **Settings → Secrets and variables → Actions → New repository secret** dengan nama
+   **`EXPO_TOKEN`** dan nilainya token tadi.
+3. Jangan menaruh token di `.env.local`, `app.json`, workflow, atau log. Workflow hanya memakainya
+   sebagai environment variable dan tidak pernah mencetaknya.
+
+Bila secret belum diatur, workflow gagal pada langkah pertamanya dengan pesan yang menyebut
+`EXPO_TOKEN` secara eksplisit — bukan kegagalan samar dari EAS.
+
+### 6.3 Rilis otomatis lewat tag
+
+```powershell
+# 1. Naikkan "expo.version" di app.json (mis. 0.1.0 → 0.2.0), lalu commit.
+# 2. Tandai commit itu dan dorong tag-nya.
+git tag v0.2.0
+git push origin v0.2.0
+```
+
+Setelah tag didorong, [`.github/workflows/android-release.yml`](../.github/workflows/android-release.yml)
+menjalankan tiga job:
+
+1. **`verify`** — seluruh pemeriksaan kualitas (`typecheck`, `lint`, `format:check`, `test`, `doctor`,
+   `export:android`) sebelum biaya build cloud dikeluarkan.
+2. **`build-apk`** — build di EAS Cloud dengan profil `production-apk`, lalu **artifact diambil dari
+   build yang barusan dibuat** (lewat `artifacts.applicationArchiveUrl` pada hasil `--json`), dengan
+   verifikasi berkas APK (tidak kosong, header ZIP `PK`, SHA-256 dicatat) sebelum diunggah sebagai
+   Actions artifact.
+3. **`release`** — hanya untuk ref tag: mengunduh artifact, memverifikasi SHA-256-nya sama dengan
+   hasil build, lalu membuat GitHub Release `v0.2.0` berisi `RodaKawan-v0.2.0.apk`.
+
+APK diunduh dari halaman **Releases** repository (atau dari artifacts run bila build dipicu manual).
+Tag yang diulang akan **mengganti** aset pada release yang sudah ada, bukan membuat rilis kedua.
+
+Bila build EAS gagal, URL artifact tidak ditemukan, atau berkas hasil unduhan tidak lolos
+verifikasi, workflow **gagal** dan tidak membuat release — tidak ada release sukses palsu.
+
+### 6.4 Build manual tanpa rilis (`workflow_dispatch`)
+
+**Actions → Android APK Release → Run workflow**, pilih branch, jalankan. APK dibangun dengan profil
+`production-apk` dan tersedia di bagian **Artifacts** run tersebut. Karena ref-nya branch, bukan tag,
+job `release` dilewati: tidak ada GitHub Release tanpa tag versi.
+
+### 6.5 APK vs AAB dan cara menaikkan versi
+
+| | APK (`production-apk`) | AAB (`production`) |
+|---|---|---|
+| Berkas | `.apk`, ditandatangani | `.aab` |
+| Distribusi | `internal`, dipasang manual | Google Play (`store`) |
+| Cara dapat | GitHub Release / Actions artifact | halaman build EAS → Play Console |
+
+Aturan versi (ADR-036):
+
+- **`version` di `app.json`** (mis. `0.2.0`) dinaikkan **manual** setiap siklus rilis. Ini nama versi yang
+  terlihat pengguna dan sebaiknya sama dengan tag Git.
+- **`android.versionCode`** naik **otomatis di server EAS** (`cli.appVersionSource: remote` +
+  `autoIncrement: true`), termasuk untuk AAB. Nilai `1` di `app.json` hanya dipakai sebagai titik awal
+  saat remote belum punya nomor.
+- Jangan menurunkan `version` dan jangan memakai ulang tag: setiap rilis butuh tag baru dengan angka
+  yang lebih tinggi.
+- Bila perlu menyelaraskan nomor yang sudah terlanjur dipakai (mis. saat memindahkan project), jalankan
+  `npx eas-cli@latest build:version:set -p android` secara interaktif — perintah itu juga menawarkan
+  pemindahan `appVersionSource` ke `remote` dan meminta nomor terakhir yang sudah dipakai.
 
 ## 7. Fitur native jangan diuji hanya di Expo Go
 
@@ -329,10 +430,19 @@ Job kedua (`database-rls`) menjalankan `npm run db:test` dan hanya aktif lewat
 Jangan pernah menaruh connection string atau service role key di berkas repo, log, atau dokumentasi
 publik; nilai itu hanya boleh berada di secret GitHub atau environment server.
 
+Rilis APK memakai workflow kedua,
+[`.github/workflows/android-release.yml`](../.github/workflows/android-release.yml), yang hanya berjalan
+pada push tag `v*` atau lewat **Actions → Android APK Release → Run workflow**. Workflow itu butuh
+secret `EXPO_TOKEN` (bagian 6.2) dan tidak pernah menjalankan pengujian database.
+
 ## 9. Dokumentasi resmi
 
 - Expo workflow: https://docs.expo.dev/workflow/overview/
 - Development builds: https://docs.expo.dev/develop/development-builds/introduction/
 - EAS APK: https://docs.expo.dev/build-reference/apk/
+- EAS app versions (local vs remote): https://docs.expo.dev/build-reference/app-versions/
+- EAS environment variables: https://docs.expo.dev/eas/environment-variables/manage/
+- Expo programmatic access (`EXPO_TOKEN`): https://docs.expo.dev/accounts/programmatic-access/
+- GitHub CLI `gh release create`: https://cli.github.com/manual/gh_release_create
 - Expo Location: https://docs.expo.dev/versions/latest/sdk/location/
 - Supabase RLS: https://supabase.com/docs/guides/database/postgres/row-level-security

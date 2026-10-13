@@ -22,7 +22,7 @@
 - [x] Format/lint/typecheck scripts.
 - [x] Environment config dan `.env.example` tanpa secret.
 - [x] Setup Supabase development project (project khusus RodaKawan; kedua migration diterapkan dan uji RLS lulus, ADR-035). Lihat `docs/SETUP_GUIDE.md`.
-- [ ] Setup EAS build dan APK development/preview. *(butuh akun Expo; bundel Android sudah diverifikasi lokal lewat `npm run export:android`)*
+- [ ] Setup EAS build dan APK development/preview. *(profil `production-apk` dan workflow rilis sudah ada di repo — ADR-036…038; yang tersisa hanya akun Expo + secret `EXPO_TOKEN`, jadi belum ada APK. Bundel Android sudah diverifikasi lokal lewat `npm run export:android`)*
 - [x] Error boundary/loading/empty-state primitives.
 - [x] README project berisi cara menjalankan dan aturan branch.
 
@@ -69,6 +69,9 @@ butuh akun Expo/perangkat tetap **Blocked**.
 - [x] Runner reproducibility: `npm run db:test` (membaca `DATABASE_URL` dari environment, tidak pernah
       mencetak kredensial, hanya melaporkan lulus bila notice penanda diterima server).
 - [x] CI GitHub Actions: job `quality` tanpa secret + job `database-rls` manual (`workflow_dispatch`).
+- [x] Pipeline rilis APK: profil `production-apk` (`extends: "production"`), `appVersionSource: remote`
+      + `autoIncrement` agar `versionCode` naik monoton antar-build, dan workflow `android-release.yml`
+      (verify → EAS build → verifikasi artifact → GitHub Release untuk tag `v*`) — ADR-036…038.
 - [x] Dokumentasi diselaraskan dengan kode: README, `SETUP_GUIDE.md`, `QA_TEST_PLAN.md`,
       `SECURITY_PRIVACY.md`, dan `PROJECT_DECISIONS.md`.
 - [x] Adopsi Supabase CLI (2.120.0 lewat `npx`, tidak masuk `package.json`) dan audit read-only
@@ -85,6 +88,8 @@ butuh akun Expo/perangkat tetap **Blocked**.
 - [x] Menerapkan kedua migration (`npx supabase link` + `npx supabase db push`) dan menjalankan
       `npm run db:test` sampai notice `UJI RLS PROFIL LULUS` muncul — 38 perintah, exit 0.
 - [ ] Melihat job CI benar-benar hijau di GitHub. — **Blocked** (belum ada run yang diamati).
+- [ ] Menjalankan rilis APK pertama lewat tag `v*` sampai GitHub Release berisi APK terpasang di
+      perangkat. — **Blocked** (butuh akun Expo + secret `EXPO_TOKEN` + signing credentials).
 - [ ] Uji manual AUTH-01…AUTH-14 dan PROF-01…PROF-07 di perangkat. — **Blocked** (belum ada APK).
 
 **Exit criteria:** seluruh pemeriksaan lokal tercatat beserta hasilnya; uji RLS punya cara jalan yang
@@ -175,3 +180,4 @@ reproducible; tidak ada kredensial di repo/laporan; tidak ada fitur Milestone 2 
 - Kebijakan privasi, terms, report/abuse path dan deletion flow tersedia.
 - Biaya infra, maps/tiles, notification dan audio dievaluasi dengan pilot data.
 - Build artifact dan source commit ditandai dengan release tag.
+- APK rilis dapat dipasang dari GitHub Release dan `android.versionCode`-nya lebih besar daripada rilis sebelumnya (naik otomatis lewat EAS remote version source).
