@@ -2,11 +2,16 @@ name: CI
 
 # Pemeriksaan otomatis Milestone 1.5.
 #
-# Dua job yang sengaja dipisah:
+# Tiga job yang sengaja dipisah:
 # - `quality`   : seluruh pemeriksaan yang dapat dijalankan TANPA backend. Job ini
 #                 tidak memakai satu pun secret Supabase, dan justru membuktikan
 #                 aplikasi tetap bisa di-typecheck, di-test, dan dibundel ketika
 #                 konfigurasi backend belum ada (docs/QA_TEST_PLAN.md AUTH-13).
+# - `workflows-lint`: pemeriksaan file workflow miliknya sendiri. File di
+#                 `.github/workflows/` tidak dijangkau tsc/eslint/prettier, dan
+#                 kesalahan YAML atau `${{ }}` yang salah baru terlihat saat
+#                 workflow itu berjalan — yaitu tepat pada rilis, setelah menit build
+#                 terpakai. Job ini memindahkan kegagalan itu ke pull request.
 # - `database-rls`: uji RLS terhadap database Supabase **development** nyata. Job ini
 #                 hanya berjalan lewat `workflow_dispatch` dan hanya bila secret
 #                 `DB_TEST_DATABASE_URL` sudah diatur, sehingga database produksi tidak
@@ -68,11 +73,38 @@ jobs:
       - name: Unit & komponen test
         run: npm test -- --ci
 
+      # Test script rilis (pengelompokan catatan rilis dan pemilihan rentang
+      # commit) memakai runner bawaan Node, bukan Jest: berkasnya .mjs dan
+      # sengaja menjalankan git sungguhan di repo sementara.
+      - name: Unit test script rilis (node:test)
+        run: npm run test:scripts
+
       - name: Expo doctor
         run: npm run doctor
 
       - name: Bundel Android (Metro + Hermes)
         run: npm run export:android
+
+  workflows-lint:
+    name: Lint file workflow (actionlint)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      # Container resmi actionlint sudah memuat actionlint, shellcheck, dan pyflakes
+      # (tercantum di dokumentasi usage proyek itu), sehingga `run:` block tiap job
+      # ikut diperiksa shellcheck tanpa langkah instalasi tambahan. Versinya dipin
+      # bukan `latest`: perubahan aturan lint tidak boleh memutuskan pull request
+      # yang semijauh ini belum disentuh — naikkan versinya sebagai perubahan biasa.
+      - name: Periksa sintaks YAML, ekspresi, dan shell di seluruh workflow
+        uses: docker://rhysd/actionlint:1.7.12
+        with:
+          # Jangan menambahkan `-shellcheck=""` di sini: flag itu berarti
+          # **mematikan** integrasi shellcheck. Dengan argumen minimal ini,
+          # actionlint mencari shellcheck di PATH — dan ada di dalam container.
+          args: -color=false
 
   database-rls:
     name: Uji RLS (manual, butuh database development)

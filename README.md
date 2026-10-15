@@ -63,9 +63,11 @@ menunjukkan kolom Local dan Remote sama untuk kelima versi. `npm run db:test` lu
 - **Node.js 22.13 atau lebih baru** (`engines.node` di `package.json`; CI memakai 24.x).
 - **npm** sebagai satu-satunya package manager; `package-lock.json` di-commit dan dipakai `npm ci`.
 - Untuk mencoba di HP Android: aplikasi **Expo Go** (untuk UI/prototipe) atau APK development build.
-- Android Studio **tidak** diperlukan: APK dibuat di cloud dengan EAS Build.
-- Akun **Expo** (untuk EAS) dan akun **Supabase** (untuk backend) hanya dibutuhkan pada langkah
-  build/backend, bukan untuk menjalankan aplikasi atau seluruh automated test.
+- Android Studio **tidak** wajib untuk rilis: APK dibangun di runner GitHub (`expo prebuild` +
+  Gradle, ADR-051). Build lokal tetap membutuhkan JDK 17 dan Android SDK (bagian “Build APK Android”).
+- Akun **Expo** hanya dibutuhkan untuk build EAS opsional (development client, AAB Play) — rilis APK
+  tidak memakainya sejak ADR-051. Akun **Supabase** dibutuhkan untuk backend. Menjalankan aplikasi
+  dan seluruh automated test tidak memerlukan keduanya.
 
 ## Setup di Windows
 
@@ -144,7 +146,7 @@ Hasil nyata pada commit ini (13 Oktober 2026, Node 24.18, npm 12):
 | `npm run export:android` | Exit 0, bundel Hermes `entry-*.hbc` (~3,6 MB), tidak ada JWT/service role key di dalam bundel. |
 | `npm run db:test`      | **Exit 0 — `UJI RLS PROFIL LULUS`** (88 perintah: profil, follow/privasi, detail privat kendaraan) terhadap project development, 13 Oktober 2026. |
 | `npx supabase ...`     | CLI 2.120.0 (lewat `npx`, tidak masuk `package.json`). `link` + `db push` menerapkan seluruh migration (kelima versi); jangan menaruh connection string di argumen perintah karena npm/npx mencetak ulang argumennya. |
-| `npx eas-cli build`    | **Blocked** — butuh akun Expo + secret `EXPO_TOKEN`. Profil `production-apk` dan workflow rilis sudah ada, tetapi belum ada build cloud yang dijalankan/diamati. |
+| `npx expo prebuild` + `./gradlew assembleRelease` | **Berjalan lokal sampai menghasilkan APK rilis bertanda tangan** (lihat bagian “Build APK Android”): `npm run test:scripts` juga menguji `scripts/configure-android-release.mjs`. Yang belum pernah terjadi: menjalankannya di GitHub Actions, karena itu masih memerlukan secret keystore (bagian 5.1 di [`docs/SETUP_GUIDE.md`](docs/SETUP_GUIDE.md)). |
 
 `npm test` tidak menyentuh jaringan: fungsi api menerima client sebagai argumen sehingga test
 menyuntikkan fake client dari `src/test-support/fakeSupabase.ts`; test navigasi memakai `jest.mock`
@@ -212,78 +214,134 @@ Aturan penting:
 
 ## CI dan rilis APK (GitHub Actions)
 
-Dua workflow; keduanya tidak pernah mencetak nilai secret (tidak ada `echo $SECRET`, tidak ada `env`
+Tiga workflow; semuanya tidak pernah mencetak nilai secret (tidak ada `echo $SECRET`, tidak ada `env`
 tanpa filter).
 
-- [`.github/workflows/ci.yml`](.github/workflows/ci.yml) — pemeriksaan rutin, berisi dua job:
+- [`.github/workflows/ci.yml`](.github/workflows/ci.yml) — pemeriksaan rutin, berisi tiga job:
   - **`quality`** berjalan pada push ke `main` dan setiap pull request: `npm ci`, `typecheck`, `lint`,
-    `format:check`, `npm test -- --ci`, `doctor`, dan `export:android`. Job ini **tidak memakai satu
+    `format:check`, `npm test -- --ci`, `npm run test:scripts` (test script rilis), `doctor`, dan
+    `export:android`. Job ini **tidak memakai satu
     pun secret** Supabase dan justru membuktikan aplikasi tetap bersih saat backend belum
     dikonfigurasi.
+  - **`workflows-lint`** memeriksa file workflow milik CI-nya sendiri dengan `actionlint` lewat
+    container `docker://rhysd/actionlint:1.7.12`: sintaks YAML, ekspresi `${{ }}` (konteks dan
+    referensi yang tidak ada), serta shellcheck untuk tiap blok `run:`. File workflow tidak dijangkau
+    tsc/eslint/Prettier, jadi tanpa job ini kesalahan di `.github/workflows/` baru terlihat saat
+    workflow berjalan — yaitu tepat pada rilis; dengan job ini, pull request-nya yang gagal.
   - **`database-rls`** hanya berjalan lewat **Actions → CI → Run workflow** dengan input `run_db_tests`
     dicentang, dan hanya bila secret `DB_TEST_DATABASE_URL` sudah diatur. Job ini tidak pernah berjalan
     pada push/PR biasa, sehingga database produksi tidak tersentuh.
-- [`.github/workflows/android-release.yml`](.github/workflows/android-release.yml) — rilis APK.
-  Berjalan pada push tag `v*` (mis. `v0.1.0`) dan lewat `workflow_dispatch`. Urutan job:
-  **`verify`** (pemeriksaan kualitas) → **`build-apk`** (build APK di EAS Cloud dengan profil
-  `production-apk`, lalu diunggah sebagai Actions artifact) → **`release`** (hanya untuk ref tag:
-  melampirkan APK ke GitHub Release). Tidak ada build Android cloud pada push/PR biasa.
+- [`.github/workflows/release-on-push.yml`](.github/workflows/release-on-push.yml) — rilis APK
+  **preview**, dengan dua cara memicu:
+  - **otomatis** setelah `ci.yml` sukses pada push ke `main`;
+  - **manual** lewat **Actions → Release APK (push to main or manual) → Run workflow** dengan input
+    `commit` (SHA, nama branch, atau tag) — atau `gh workflow run release-on-push.yml -f commit=<sha>`
+    — untuk merilis commit pilihan tanpa menunggu push ke `main`.
+
+  Job `plan` menyelesaikan input itu menjadi **satu SHA** yang dipakai seluruh job, memastikan SHA
+  tersebut sudah lulus CI (pada jalur manual, lewat API Actions), lalu memutuskan perlu build atau
+  tidak (`scripts/should-release.mjs`). Tag rilis berbentuk `v<versi>-build<N>` dan release-nya ditandai
+  *prerelease*. Sebelum release-nya dibuat, APK hasil build dijalankan lebih dulu di emulator Android
+  (`scripts/smoke-test-apk.mjs`) — pratinjau yang crash saat dibuka tidak terbit. Setelah itu job
+  **`prune`** memangkas rilis preview lama beserta tag-nya (`scripts/prune-preview-releases.mjs`,
+  menyimpan sepuluh terbaru) supaya halaman Releases tidak penuh oleh satu rilis untuk setiap push;
+  riwayatnya tetap ada di [`CHANGELOG.md`](CHANGELOG.md), dan rilis produksi tidak pernah disentuh.
+  Dispatch manual yang tidak membawa perubahan aplikasi apa pun **gagal** dengan pesan jelas, bukan
+  run hijau tanpa rilis (bagian 6.7 di [`docs/SETUP_GUIDE.md`](docs/SETUP_GUIDE.md)).
+- [`.github/workflows/android-release.yml`](.github/workflows/android-release.yml) — rilis APK
+  produksi, dijalankan **manual** (`workflow_dispatch` dengan input `version`). Urutan job:
+  **`verify`** (validasi versi + pemeriksaan kualitas) → **`build-apk`** (APK dibangun di runner sendiri:
+  `expo prebuild` + Gradle, lalu diunggah sebagai Actions artifact) → **`smoke-test`** (APK dipasang dan
+  dinyalakan di emulator Android) → **`release`** (setelah build sukses **dan** uji nyala lulus:
+  **membuat** tag `v<versi>` dan GitHub Release berisi APK) → **`changelog`** (mencatat rilis itu ke
+  `CHANGELOG.md`). Tidak ada build Android pada push/PR biasa: hanya `ci.yml` yang berjalan di sana.
+- [`CHANGELOG.md`](CHANGELOG.md) — riwayat permanen setiap rilis, ditulis otomatis oleh job `changelog`
+  di kedua workflow rilis: rilis produksi sebagai bagian penuh, build preview diringkas di dalam blok
+  yang bisa dibuka. Isinya sama dengan badan GitHub Release (`scripts/release-notes.mjs`), dan tag yang
+  sudah tercatat tidak pernah ditulis dua kali. Commit pencatatannya bertanda `[skip ci]`, sehingga
+  tidak ikut muncul sebagai “perubahan” di catatan rilis maupun entri berikutnya. Rinciannya di
+  [`docs/SETUP_GUIDE.md`](docs/SETUP_GUIDE.md) bagian 6.8.
 
 Status: `ci.yml` sudah berjalan di GitHub — job `quality` **hijau** pada run `38353855927` (13 Oktober
 2026, commit `0b989a0`) dan pada lima run sebelumnya. Job `database-rls` belum pernah berjalan dan
 memang hanya aktif lewat **Actions → CI → Run workflow** dengan input `run_db_tests` dicentang **dan**
 secret `DB_TEST_DATABASE_URL` sudah diatur, sehingga database development tidak tersentuh oleh
-push/PR biasa. `android-release.yml` belum pernah berjalan dan secret `EXPO_TOKEN` belum diatur.
-Konfigurasi sekali saja ada di [`docs/SETUP_GUIDE.md`](docs/SETUP_GUIDE.md) bagian 5.
+push/PR biasa. Rilis (`release-on-push.yml`, `android-release.yml`) belum pernah berjalan di GitHub:
+yang belum ada hanyalah secret keystore di [`docs/SETUP_GUIDE.md`](docs/SETUP_GUIDE.md) bagian 5.1.
+Konfigurasi sekali saja (keystore + variabel publik) ada di bagian 5 dokumen itu.
 
-## Build APK Android tanpa Android Studio
+## Build APK Android
+
+APK dibangun **di runner sendiri** (`expo prebuild` + Gradle), bukan di EAS Cloud — tanpa kuota build
+pihak ketiga dan tanpa token Expo (ADR-051). Hal yang sama bisa dijalankan di laptop:
 
 ```powershell
-npx eas-cli@latest login                                              # masuk ke akun Expo
-npx eas-cli@latest init                                              # menulis projectId EAS ke app.json (sudah ada di repo ini)
+npm ci
+npx expo prebuild --platform android --no-install
+$env:ANDROID_KEYSTORE_PATH="$PWD\rilis.jks"   # + sandi, alias, dan sandi kunci (bagian 5.1 dokumentasi)
+node scripts/configure-android-release.mjs --project android --version-code auto
+cd android; ./gradlew :app:assembleRelease      # android\app\build\outputs\apk\release\app-release.apk
+```
+
+Development client masih bisa dibangun lewat EAS bila tidak ingin memasang toolchain Android:
+
+```powershell
 npx eas-cli@latest build --platform android --profile development    # development build (expo-dev-client)
-npx eas-cli@latest build --platform android --profile preview        # APK internal untuk pengujian
-npx eas-cli@latest build --platform android --profile production-apk # APK siap pasang (variabel produksi)
 npx eas-cli@latest build --platform android --profile production     # AAB untuk Google Play
 ```
 
-Profil build ada di [`eas.json`](eas.json):
+Profil build EAS yang tersisa ada di [`eas.json`](eas.json):
 
-| Profil           | Artifact | Distribusi | Kegunaan                                                    |
-| ---------------- | -------- | ---------- | ----------------------------------------------------------- |
-| `development`    | APK      | internal   | development build (`expo-dev-client`)                       |
-| `preview`        | APK      | internal   | APK uji cepat internal                                      |
-| `production-apk` | APK      | internal   | APK untuk GitHub Release (dibangun otomatis oleh workflow)  |
-| `production`     | AAB      | store      | unggah ke Google Play                                       |
+| Profil                    | Artifact | Distribusi | Kegunaan                                              |
+| ------------------------- | -------- | ---------- | ----------------------------------------------------- |
+| `development`             | APK      | internal   | development build (`expo-dev-client`)                 |
+| `preview`                 | APK      | internal   | APK uji cepat internal (opsional; CI memakai Gradle)  |
+| `production-apk`          | APK      | internal   | APK manual; **bukan** yang terbit di halaman Releases |
+| `production`              | AAB      | store      | unggah ke Google Play                                 |
 
-`production-apk` memakai `extends: "production"`, jadi keduanya berbagi `autoIncrement` dan variabel
-`environment: production`; yang berbeda hanya format berkas dan jalur distribusi. Nama paket Android
-`com.rodakawan.app` di [`app.json`](app.json) masih sementara dan wajib diganti sebelum rilis Play
-Store bila identitas final berbeda (ADR-015).
+Nama paket Android `com.rodakawan.app` di [`app.json`](app.json) masih sementara dan wajib diganti
+sebelum rilis Play Store bila identitas final berbeda (ADR-015).
 
-Status: **Blocked** — belum ada `EXPO_TOKEN` yang diatur dan belum ada build cloud yang dijalankan,
-jadi belum ada APK. Verifikasi bundel lokal sudah dilakukan lewat `npm run export:android`.
+Status: rantai build lokalnya **sudah dibuktikan** — prebuild, tanda tangan, `assembleRelease`, dan
+`scripts/verify-apk.mjs` dijalankan di mesin pengembang dan lulus; yang belum pernah terjadi adalah
+menjalankannya di GitHub Actions, yang menunggu keempat secret keystore.
 
-### Merilis APK dari GitHub Release
+### Merilis APK lewat workflow
 
 ```powershell
-# 1. Naikkan "version" di app.json (mis. 0.1.0 → 0.2.0), lalu commit.
-# 2. Tandai commit itu dan dorong tag-nya.
-git tag v0.2.0
-git push origin v0.2.0
+# 1. Naikkan "version" di app.json (mis. 0.1.0 → 0.2.0), lalu commit dan push.
+# 2. Jalankan workflow rilis dari commit itu, dengan versi yang sama.
+gh workflow run android-release.yml --ref main -f version=0.2.0
+#    Atau: Actions → Android APK Release → Run workflow, isi input "version".
 ```
 
-Setelah tag didorong, `.github/workflows/android-release.yml` menjalankan pemeriksaan kualitas,
-membangun APK di EAS Cloud, mengunggahnya sebagai Actions artifact, dan membuat GitHub Release
-`v0.2.0` berisi `RodaKawan-v0.2.0.apk`. APK diunduh dari halaman **Releases** repository, atau dari
-artifacts run bila build dipicu manual.
+`.github/workflows/android-release.yml` memvalidasi versi, menjalankan pemeriksaan kualitas,
+membangun APK dengan Gradle di runner, dan **hanya setelah build sukses** membuat tag `v0.2.0` beserta
+GitHub Release berisi `RodaKawan-v0.2.0.apk`. APK diunduh dari halaman **Releases** repository, atau
+dari Artifacts run tersebut.
 
-- `versionCode` Android **tidak** dinaikkan manual: `appVersionSource: remote` membuat EAS
-  menaikkannya di server pada setiap build (ADR-036). Yang dinaikkan manual hanya `version`.
-- Setiap rilis butuh **tag baru**; tag yang sudah dipakai akan memperbarui aset release yang ada,
-  bukan membuat rilis kedua.
-- Build manual tanpa rilis: **Actions → Android APK Release → Run workflow** — APK hanya menjadi
-  Actions artifact, tanpa GitHub Release.
+- APK diperiksa sebelum dilampirkan: `scripts/verify-apk.mjs` memverifikasi struktur ZIP (CRC-32
+tiap entri), tanda tangan **v2/v3**, dan rantai tanda tangan **v1**, jadi berkas rusak, tanpa
+tanda tangan, atau yang diubah setelah ditandatangani tidak pernah sampai ke halaman Releases —
+baik di rilis produksi maupun di rilis preview (ADR-043). Pemeriksaan yang sama bisa dijalankan
+lokal: `node scripts/verify-apk.mjs RodaKawan-v0.2.0.apk`.
+- Unduhan juga bisa **diperiksa sendiri** sebelum dipasang: badan rilis ditutup bagian **🔒 Verifikasi
+  berkas** berisi nama berkas, ukuran, SHA-256, dan sidik jari sertifikat penandatangan, beserta
+  perintah untuk mencocokkannya (`Get-FileHash` di Windows, `sha256sum` di Linux/macOS). Bagian itu
+  ditambahkan job `release` tepat sebelum rilis terbit — SHA-256 baru diketahui setelah build selesai —
+  dan hanya ada di halaman rilis, bukan di entri `CHANGELOG.md` (ADR-049).
+- `versionCode` Android **tidak** dinaikkan manual: CI menghitungnya dari riwayat repository (jumlah
+  seluruh commit), jadi selalu naik dan tidak bergantung pada workflow mana yang berjalan lebih dulu.
+  `android.versionCode` di `app.json` menjadi lantai bila hitungan itu lebih kecil (ADR-051). Yang
+dinaikkan manual hanya `version`.
+- Tag versi **dibuat oleh workflow**, bukan didorong manusia: build yang gagal tidak meninggalkan tag
+  tanpa release, dan versi yang sama bisa dijalankan ulang setelah penyebab kegagalannya diperbaiki
+  (ADR-042).
+- Versi yang tag-nya sudah ada ditolak sebelum build dimulai — naikkan `version` di `app.json` untuk
+  rilis berikutnya, dan rilis lama tidak pernah ditimpa.
+- Build produksi **tanpa** rilis: jalankan rantai lokal di bagian “Build APK Android” (bagian 6.1 di
+  [`docs/SETUP_GUIDE.md`](docs/SETUP_GUIDE.md)) — jangan kirim APK hasil `eas build` manual ke halaman
+  Releases, karena nomor versinya dan kuncinya bukan yang dipakai rilis.
 - Rilis ini **tidak** mengunggah apa pun ke Google Play; AAB Play Store tetap dikirim terpisah dari
   profil `production`.
 
@@ -319,7 +377,12 @@ src/
   types/        # deklarasi tipe lingkungan
   utils/        # color.ts (kontras WCAG)
 assets/         # ikon & splash
-scripts/        # generate-assets.mjs, db-test.mjs (runner uji RLS)
+scripts/        # generate-assets.mjs, db-test.mjs (runner uji RLS), verify-apk.mjs (tanda
+                # tangan APK), configure-android-release.mjs (tanda tangan + nomor
+                # versi build), write-app-env.mjs (konfigurasi publik EXPO_PUBLIC_*),
+                # smoke-test-apk.mjs (uji nyala di emulator), release-notes.mjs,
+                # update-changelog.mjs, prune-preview-releases.mjs (pemangkas rilis
+                # preview lama)
 docs/           # sumber kebenaran produk
 supabase/
   migrations/   # 20261013022938_initial_schema.sql (fondasi)
@@ -368,11 +431,14 @@ Setelah `.env.local` terisi, jalankan alur ini di perangkat:
 
 ## Aturan branch dan commit
 
-- `main` harus selalu dapat dijalankan: `npm run typecheck`, `npm run lint`, dan `npm test` hijau
-  sebelum merge.
+- `main` harus selalu dapat dijalankan: `npm run typecheck`, `npm run lint`, `npm test`, dan
+  `npm run test:scripts` hijau sebelum merge.
 - Satu milestone per branch, mis. `feat/m1-auth-profil`, `chore/m1-5-verifikasi-ci`.
 - Commit mengikuti Conventional Commits (`feat:`, `fix:`, `chore:`, `docs:`), satu perubahan logis
-  per commit.
+  per commit. Perubahan yang **merusak kompatibilitas** ditandai `!` sebelum titik dua (`feat!: hapus
+  endpoint lama`) atau baris footer `BREAKING CHANGE:`; catatan rilis APK — preview maupun produksi,
+  keduanya lewat `scripts/release-notes.mjs` — menaruh penanda itu di bagian paling atas, jadi jangan
+  dipakai untuk perubahan yang sebenarnya aman (`docs/SETUP_GUIDE.md` §6.3 dan §6.7).
 - Bila keputusan teknis berubah, perbarui juga [`docs/PROJECT_DECISIONS.md`](docs/PROJECT_DECISIONS.md)
   dan dokumen terkait pada commit yang sama.
 

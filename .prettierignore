@@ -10,6 +10,7 @@ docs/
 exports/
 supabase/
 README.md
+# Ditulis workflow rilis; bentuknya ditentukan scripts/update-changelog.mjs, bukan Prettier.
+CHANGELOG.md
 
 assets/*.png
-pnpm-lock.yaml

@@ -64,13 +64,13 @@ const foundationChecklist: readonly ChecklistItem[] = [
     status: 'tindakan',
   },
   {
-    label: 'Akun Expo dan eas init',
-    detail: 'Diperlukan untuk cloud build; eas init menulis projectId ke app.json.',
+    label: 'Keystore rilis + secret repository',
+    detail: 'Keempat secret keystore di GitHub; tanpa itu rilis berhenti di langkah pertama.',
     status: 'tindakan',
   },
   {
-    label: 'Build APK development atau preview',
-    detail: 'eas build -p android --profile preview; memakai kredit/limit akun Expo.',
+    label: 'Build APK rilis (Gradle lokal)',
+    detail: 'expo prebuild + ./gradlew assembleRelease di runner; tanpa kuota build pihak ketiga.',
     status: 'tindakan',
   },
   {
@@ -121,7 +121,10 @@ const commands: readonly { label: string; command: string }[] = [
   { label: 'Lint', command: 'npm run lint' },
   { label: 'Test unit', command: 'npm test' },
   { label: 'Kesehatan project', command: 'npm run doctor' },
-  { label: 'APK internal', command: 'npx eas-cli@latest build -p android --profile preview' },
+  {
+    label: 'APK rilis lokal',
+    command: 'npx expo prebuild -p android && (cd android && ./gradlew :app:assembleRelease)',
+  },
 ];
 
 const checklistTones: Record<ChecklistStatus, BadgeTone> = {

@@ -7,7 +7,13 @@
 3. **Security/RLS:** allow + deny matrix dengan minimal dua user dan role berbeda.
 4. **E2E:** onboarding → klub → ride → tracking → hazard/chat → end ride.
 5. **Device/manual:** background location, GPS, screen lock, battery saver, Bluetooth, low memory, different Android vendors.
-6. **Release smoke:** install APK, login, critical actions, rollback/error behavior, privacy/settings.
+6. **Release smoke:** verifikasi unduhan, install APK, login, critical actions, rollback/error
+   behavior, privacy/settings.
+   Bagian pertamanya sudah otomatis: job `smoke-test` di kedua workflow rilis memasang APK hasil build
+   di emulator dan memastikan aplikasinya menyala sebelum rilis dibuat (`docs/SETUP_GUIDE.md` §6.9).
+   Sebelum memasang di perangkat fisik, cocokkan dulu SHA-256 berkas unduhan dengan bagian
+   **🔒 Verifikasi berkas** di badan rilis itu; nilai yang berbeda berarti berkasnya bukan yang dirilis
+   workflow ini, dan berkas seperti itu tidak perlu diuji lebih jauh. Sisanya tetap manual.
 
 ## 2. Test environment
 

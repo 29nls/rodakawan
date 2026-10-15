@@ -22,11 +22,11 @@
 - [x] Format/lint/typecheck scripts.
 - [x] Environment config dan `.env.example` tanpa secret.
 - [x] Setup Supabase development project (project khusus RodaKawan; seluruh migration diterapkan dan uji RLS lulus, ADR-035). Lihat `docs/SETUP_GUIDE.md`.
-- [ ] Setup EAS build dan APK development/preview. *(profil `production-apk` dan workflow rilis sudah ada di repo — ADR-036…038; yang tersisa hanya akun Expo + secret `EXPO_TOKEN`, jadi belum ada APK. Bundel Android sudah diverifikasi lokal lewat `npm run export:android`)*
+- [x] Setup alur build APK rilis tanpa cloud build: `expo prebuild` + Gradle di runner (ADR-051). *(rantai `prebuild` → `configure-android-release.mjs` → `assembleRelease` → `verify-apk.mjs` sudah dijalankan di mesin pengembang dan lulus; yang belum: menjalankannya di GitHub Actions, yang hanya menunggu keempat secret keystore — `docs/SETUP_GUIDE.md` bagian 5.1)*
 - [x] Error boundary/loading/empty-state primitives.
 - [x] README project berisi cara menjalankan dan aturan branch.
 
-**Exit criteria:** aplikasi terbuka di perangkat (bundel + Metro **sudah diverifikasi lokal**; **Tested on physical device** masih *Blocked*); CI lokal typecheck bersih; preview build bisa dipasang (belum — menunggu akun Expo).
+**Exit criteria:** aplikasi terbuka di perangkat (bundel + Metro **sudah diverifikasi lokal**; **Tested on physical device** masih *Blocked*); CI lokal typecheck bersih; preview build bisa dipasang (belum — menunggu secret keystore; akun Expo tidak lagi diperlukan sejak ADR-051).
 
 ## Milestone 1 — Auth, profil, privasi dasar
 
@@ -58,7 +58,7 @@ Kode dan skrip (implementasi):
 ## Milestone 1.5 — Verifikasi, hardening & CI
 
 Status: **Implemented · Passed locally**; lapisan database **Passed against dev backend**; langkah yang
-butuh akun Expo/perangkat tetap **Blocked**.
+butuh APK di perangkat tetap **Blocked**.
 
 - [x] Audit kode auth/profil dan kedua migration; temuan didokumentasikan dan diperbaiki.
 - [x] Audit lifecycle auto-refresh token; client kini menyelaraskan ticker **setelah** `initialize()`
@@ -68,10 +68,26 @@ butuh akun Expo/perangkat tetap **Blocked**.
       serta penolakan `INSERT`/`UPDATE` untuk peran `anon`.
 - [x] Runner reproducibility: `npm run db:test` (membaca `DATABASE_URL` dari environment, tidak pernah
       mencetak kredensial, hanya melaporkan lulus bila notice penanda diterima server).
-- [x] CI GitHub Actions: job `quality` tanpa secret + job `database-rls` manual (`workflow_dispatch`).
+- [x] CI GitHub Actions: job `quality` tanpa secret + job `database-rls` manual (`workflow_dispatch`)
+      + job `workflows-lint` (actionlint 1.7.12 + shellcheck via `docker://rhysd/actionlint`) yang
+      membuat kesalahan YAML/ekspresi di `.github/workflows/` gagal di pull request, bukan di tengah
+      rilis; kesalahannya sendiri sudah ditemukan dan diperbaiki lewat pemeriksaan itu (`runner` di
+      `env` tingkat job pada kedua workflow rilis).
 - [x] Pipeline rilis APK: profil `production-apk` (`extends: "production"`), `appVersionSource: remote`
       + `autoIncrement` agar `versionCode` naik monoton antar-build, dan workflow `android-release.yml`
-      (verify → EAS build → verifikasi artifact → GitHub Release untuk tag `v*`) — ADR-036…038.
+      (verify → EAS build → verifikasi artifact → GitHub Release) — ADR-036…038. Sejak ADR-042 rilis
+      dijalankan manual (`workflow_dispatch` + input versi) dan tag `v<versi>` dibuat workflow setelah
+      build sukses, bukan didorong lebih dulu sebagai pemicu. Sejak ADR-051 build APK-nya sendiri
+      pindah ke runner GitHub (`expo prebuild` + Gradle), `appVersionSource` kembali `local`, dan
+      profil EAS tersisa untuk build manual (development client, AAB Play).
+- [x] Verifikasi berkas APK dinaikkan dari sekadar header ZIP `PK` menjadi pemeriksaan tanda tangan
+      penuh (`scripts/verify-apk.mjs`: CRC-32 tiap entri, skema v2/v3, rantai v1) di kedua workflow
+      rilis; script diuji terhadap `apksig` (library yang dipakai AGP/EAS menandatangani), APK nyata
+      113 MB, APK hasil `jarsigner`, dan sepuluh varian berkas rusak/tanpa tanda tangan — ADR-043.
+- [x] Rilis preview bisa dijalankan **atas permintaan** (`workflow_dispatch` + input `commit`) tanpa
+      menunggu push ke `main`; commit pilihan tetap wajib punya run CI yang sukses, dan dispatch yang
+      tidak membawa perubahan aplikasi gagal dengan pesan jelas alih-alih melewati rilis diam-diam —
+      ADR-044.
 - [x] Dokumentasi diselaraskan dengan kode: README, `SETUP_GUIDE.md`, `QA_TEST_PLAN.md`,
       `SECURITY_PRIVACY.md`, dan `PROJECT_DECISIONS.md`.
 - [x] Adopsi Supabase CLI (2.120.0 lewat `npx`, tidak masuk `package.json`) dan audit read-only
@@ -92,8 +108,9 @@ butuh akun Expo/perangkat tetap **Blocked**.
       `38353855927` (13 Oktober 2026, commit `0b989a0`, ±1 menit) dan pada lima run sebelumnya.
 - [ ] Job `database-rls` hijau di CI. — **Blocked** (secret `DB_TEST_DATABASE_URL` belum diatur; job
       hanya aktif lewat `workflow_dispatch` + input `run_db_tests`, jadi belum pernah berjalan).
-- [ ] Menjalankan rilis APK pertama lewat tag `v*` sampai GitHub Release berisi APK terpasang di
-      perangkat. — **Blocked** (butuh akun Expo + secret `EXPO_TOKEN` + signing credentials).
+- [ ] Menjalankan rilis APK pertama sampai GitHub Release berisi APK terpasang di perangkat. —
+      **Blocked** (butuh keempat secret keystore untuk membangun di runner; akun Expo tidak lagi
+      diperlukan sejak ADR-051).
 - [ ] Uji manual AUTH-01…AUTH-14 dan PROF-01…PROF-07 di perangkat. — **Blocked** (belum ada APK).
 
 **Exit criteria:** seluruh pemeriksaan lokal tercatat beserta hasilnya; uji RLS punya cara jalan yang
@@ -207,4 +224,4 @@ terbuka, dengan uji allow/deny yang benar-benar dijalankan di project developmen
 - Kebijakan privasi, terms, report/abuse path dan deletion flow tersedia.
 - Biaya infra, maps/tiles, notification dan audio dievaluasi dengan pilot data.
 - Build artifact dan source commit ditandai dengan release tag.
-- APK rilis dapat dipasang dari GitHub Release dan `android.versionCode`-nya lebih besar daripada rilis sebelumnya (naik otomatis lewat EAS remote version source).
+- APK rilis dapat dipasang dari GitHub Release dan `android.versionCode`-nya lebih besar daripada rilis sebelumnya (naik otomatis dari hitungan riwayat repository — ADR-051).

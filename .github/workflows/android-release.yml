@@ -2,48 +2,155 @@ name: Android APK Release
 
 # Pipeline rilis APK Android (Milestone 1.5 → distribusi internal).
 #
+# Dijalankan **manual** (Actions → Android APK Release → Run workflow) dengan input
+# `version`, supaya manusia tetap memutuskan kapan dan versi berapa yang dirilis.
+#
 # Alur:
-#   1. `verify`    — pemeriksaan kualitas kode tanpa backend/secret, supaya build
-#                    cloud tidak dihabiskan untuk kode yang gagal typecheck/test.
-#   2. `build-apk` — build APK di EAS Cloud (profil `production-apk`), lalu unduh
-#                    artifact dari **build yang barusan dibuat** dan unggah sebagai
-#                    Actions artifact.
-#   3. `release`   — hanya bila ref-nya tag `v*`: lampirkan APK ke GitHub Release.
+#   1. `verify`    — validasi input versi, pastikan tag `v<versi>` belum ada, susun
+#                    catatan rilis, lalu pemeriksaan kualitas kode tanpa
+#                    backend/secret, supaya belasan menit build native tidak dipakai
+#                    untuk kode yang gagal typecheck/test.
+#   2. `build-apk` — membangun APK di runner ini sendiri (`npx expo prebuild` +
+#                    Gradle `assembleRelease`), pastikan berkasnya benar-benar APK
+#                    yang ditandatangani (`scripts/verify-apk.mjs`), dan unggah
+#                    sebagai Actions artifact.
+#   3. `smoke-test`— memasang APK hasil build di emulator Android dan memastikan
+#                    aplikasinya benar-benar menyala (tidak crash, layarnya di
+#                    depan) sebelum ada tag maupun release.
+#   4. `release`   — **membuat** tag `v<versi>` sekaligus GitHub Release berisi APK,
+#                    hanya setelah build sukses, berkasnya lolos verifikasi, dan
+#                    uji nyalanya lulus.
+#   5. `changelog` — mencatat rilis itu di `CHANGELOG.md` dan mendorongnya ke `main`.
 #
 # Aturan yang dipegang:
-# - Job yang memegang `EXPO_TOKEN` tidak punya izin tulis ke repository, dan job yang
-#   punya `contents: write` tidak memegang secret Expo.
-# - Nilai secret dan URL artifact EAS tidak pernah dicetak ke log.
-# - Build gagal ⇒ workflow gagal ⇒ tidak ada release palsu.
+# - Tag versi dibuat workflow ini **setelah** build sukses, bukan didorong manusia
+#   sebelum build (ADR-042). Dulu tag `v*` adalah pemicu, sehingga build yang gagal
+#   meninggalkan tag tanpa release; sekarang build yang gagal tidak meninggalkan
+#   apa pun, dan versi yang sama bisa dijalankan ulang setelah diperbaiki.
+# - Tag yang sudah ada **tidak** ditimpa: `verify` berhenti lebih dulu, jadi tidak
+#   ada rilis yang diam-diam menempel pada tag dari commit lain.
+# - Job yang memegang kunci penandatangan rilis (keystore) tidak punya izin tulis ke
+#   repository, dan job yang punya `contents: write` tidak memegang kunci itu. APK
+#   dibangun di runner sendiri, jadi tidak ada kuota build pihak ketiga yang bisa
+#   habis dan tidak ada token Expo yang perlu disimpan (ADR-051).
+# - Catatan rilis memakai format yang sama dengan rilis preview
+#   (`scripts/release-notes.mjs`, perubahan merusak di bagian paling atas) dan
+#   diserahkan ke job `release` lewat Actions artifact, bukan dihasilkan di sana,
+#   karena job itu tidak menjalankan kode dari repository.
+# - Rilis produksi juga meninggalkan jejak permanen di `CHANGELOG.md` (job
+#   `changelog`, satu commit ke `main`). Job itu checkout `main`, bukan commit yang
+#   dirilis, dan hanya menyentuh berkas changelog — tag serta release tetap dibuat
+#   job `release`.
+# - Nilai secret (keystore, sandinya, dan konfigurasi publik aplikasi) tidak pernah
+#   dicetak ke log; keystore-nya ditulis ke `RUNNER_TEMP`, di luar workspace.
+# - APK hasil build diperiksa lebih dulu: struktur ZIP (CRC-32 tiap entri), tanda
+#   tangan APK v2/v3, dan rantai tanda tangan v1. Berkas tanpa tanda tangan, rusak,
+#   atau berubah setelah ditandatangani tidak pernah sampai ke GitHub Release.
+# - Tanda tangan yang sah belum berarti aplikasinya bisa dijalankan, jadi APK itu
+#   dipasang di emulator dan dinyalakan lebih dulu (`scripts/smoke-test-apk.mjs`).
+#   Rilis berhenti bila prosesnya tidak hidup, layarnya tidak pernah menjadi
+#   aktivitas terdepan, atau logcat mencatat crash milik paket tersebut.
+# - Build gagal ⇒ workflow gagal ⇒ tidak ada tag dan tidak ada release palsu.
 
 on:
-  push:
-    tags: ['v*']
+  # Rilis produksi hanya lewat jalur manual: tidak ada pemicu push tag, karena tag
+  # versi justru dibuat workflow ini setelah build sukses (ADR-042).
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'Versi yang dirilis tanpa awalan "v" (mis. 0.2.0); harus sama dengan expo.version di app.json.'
+        required: true
+        type: string
 
 permissions:
   contents: read
 
 concurrency:
-  # Grup global, bukan per-ref: versionCode remote dinaikkan EAS saat build dimulai,
-  # jadi dua rilis bersamaan bisa memperebutkan nomor yang sama. Serialkan semuanya.
+  # Grup global, bukan per-ref: nomor versi build dihitung dari riwayat repository,
+  # dan dua rilis bersamaan dari dua branch bisa menghasilkan nomor yang sama.
+  # Serialkan semuanya.
   group: android-release
   cancel-in-progress: false
 
 env:
-  # Bisa diganti ke versi yang dipin (mis. `eas-cli@22`) tanpa mengubah tiap step.
-  EAS_CLI: eas-cli@latest
   EXPO_NO_TELEMETRY: '1'
   CI: 'true'
 
 jobs:
   verify:
-    name: Pemeriksaan kualitas
+    name: Pemeriksaan kualitas & versi
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     steps:
+      # Perlu seluruh history dan tag: langkah catatan rilis mencari tag rilis
+      # produksi sebelumnya dengan `git describe`.
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      # Dijalankan sebelum `npm ci` supaya kesalahan input gagal dalam hitungan
+      # detik, bukan setelah menit build cloud.
+      - name: Validasi versi rilis
+        id: version
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          VERSION="${INPUT_VERSION#v}"
+          if ! printf '%s' "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.-]+)?$'; then
+            echo "::error::Input version \"${INPUT_VERSION}\" bukan versi semver (contoh yang benar: 0.2.0 atau v0.2.0)."
+            exit 1
+          fi
+          APP_VERSION="$(node -p "require('./app.json').expo.version")"
+          if [ "$VERSION" != "$APP_VERSION" ]; then
+            echo "::error::Versi input (${VERSION}) tidak sama dengan expo.version di app.json (${APP_VERSION}). Naikkan \"expo.version\" di app.json, commit, lalu jalankan workflow ini dari commit itu — label rilis harus sama dengan versi di dalam APK."
+            exit 1
+          fi
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "Versi rilis: ${VERSION} — tag yang akan dibuat: v${VERSION}"
+
+      - name: Pastikan tag versi belum ada
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          TAG="v${RELEASE_VERSION}"
+          # `git ls-remote` keluar dengan status 0 walau tidak ada ref yang cocok,
+          # jadi keberadaan tag diperiksa dari isi keluarannya.
+          EXISTING="$(git ls-remote --tags origin "refs/tags/${TAG}")"
+          if [ -n "$EXISTING" ]; then
+            echo "::error::Tag ${TAG} sudah ada di remote: versi ini sudah pernah dirilis, atau rilis sebelumnya berhenti di tengah. Naikkan \"expo.version\" di app.json untuk rilis baru; bila tag itu sisa percobaan yang gagal dan belum ada release-nya, hapus dulu dengan: gh release delete ${TAG} --yes --cleanup-tag"
+            exit 1
+          fi
+          echo "Tag ${TAG} belum ada — aman dibuat setelah build sukses."
+
+      # Catatan rilis disusun di sini, bukan di job `release`: job itu sengaja tidak
+      # melakukan checkout dan tidak menjalankan kode repository karena memegang
+      # `contents: write`. Berkasnya ditaruh di `RUNNER_TEMP`, di luar workspace,
+      # supaya tidak ikut diperiksa `npm run format:check` di langkah berikutnya.
+      # Script ini tidak butuh `npm ci`: hanya memakai git dan modul bawaan Node.
+      - name: Susun catatan rilis (format sama dengan rilis preview)
+        env:
+          # Tag build preview dibuat pada setiap push ke `main`. Tanpa dikecualikan,
+          # `git describe` memilih tag terdekat di riwayat — build preview terakhir —
+          # sehingga catatan rilis versi ini hanya memuat satu-dua commit terakhir,
+          # bukan seluruh perubahan sejak rilis produksi sebelumnya.
+          TAG_EXCLUDE: 'v*-build*'
+        run: |
+          NOTES_DIR="${RUNNER_TEMP}/catatan-rilis"
+          mkdir -p "$NOTES_DIR"
+          node scripts/release-notes.mjs --tag-exclude "$TAG_EXCLUDE" > "${NOTES_DIR}/release-notes.md"
+          LINES="$(wc -l < "${NOTES_DIR}/release-notes.md")"
+          echo "Catatan rilis disusun: ${LINES} baris, diunggah sebagai Actions artifact."
+
+      - name: Unggah catatan rilis sebagai Actions artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: rodakawan-release-notes
+          path: ${{ runner.temp }}/catatan-rilis
+          retention-days: 30
 
       - name: Siapkan Node.js
         uses: actions/setup-node@v7
@@ -72,31 +179,30 @@ jobs:
       - name: Bundel Android (Metro + Hermes)
         run: npm run export:android
 
-      - name: Periksa kecocokan tag dengan versi aplikasi
-        run: |
-          if [ "${GITHUB_REF_TYPE}" != "tag" ]; then
-            echo "Ref ini bukan tag (workflow_dispatch); pemeriksaan versi dilewati."
-            exit 0
-          fi
-          TAG_VERSION="${GITHUB_REF_NAME#v}"
-          APP_VERSION="$(node -p "require('./app.json').expo.version")"
-          echo "Tag: ${GITHUB_REF_NAME} → versi tag ${TAG_VERSION}; app.json version ${APP_VERSION}"
-          if [ "${TAG_VERSION}" != "${APP_VERSION}" ]; then
-            echo "::warning::Tag ${GITHUB_REF_NAME} tidak sama dengan version di app.json (${APP_VERSION}). Naikkan version di app.json sebelum menandai rilis agar label release sesuai dengan APK."
-          fi
-
   build-apk:
-    name: Build APK (EAS Cloud)
+    name: Build APK (Gradle lokal)
     needs: verify
-    runs-on: ubuntu-latest
+    # Image dipin, bukan `ubuntu-latest`: job ini bergantung pada isi image (Android
+    # SDK, NDK, dan JDK yang tersedia di runner).
+    runs-on: ubuntu-24.04
     timeout-minutes: 90
     outputs:
       apk_name: ${{ steps.artifact.outputs.apk_name }}
       apk_sha256: ${{ steps.artifact.outputs.apk_sha256 }}
-      build_id: ${{ steps.build.outputs.build_id }}
+      apk_signer_sha256: ${{ steps.artifact.outputs.apk_signer_sha256 }}
+      version_code: ${{ steps.config.outputs.version_code }}
+    # Konteks `runner` tidak sah pada `env` tingkat job (GitHub menolaknya saat
+    # workflow dievaluasi), jadi `ANDROID_KEYSTORE_PATH` diberikan per langkah pada
+    # tiga langkah yang benar-benar memakainya — lihat Tulis keystore, Konfigurasi,
+    # dan Hapus keystore di bawah.
     steps:
       - name: Checkout commit yang ditandai
         uses: actions/checkout@v7
+        with:
+          # Nomor versi build dihitung dari seluruh riwayat repository
+          # (`--version-code auto`), jadi clone dangkal tidak cukup: hitungan yang
+          # terpotong bisa lebih kecil daripada APK yang sudah terpasang.
+          fetch-depth: 0
 
       - name: Siapkan Node.js
         uses: actions/setup-node@v7
@@ -104,111 +210,147 @@ jobs:
           node-version: '24.x'
           cache: npm
 
-      # EAS CLI mengevaluasi app config secara lokal sebelum mengunggah proyek, dan
-      # plugin di app.json (mis. expo-splash-screen) harus bisa di-resolve.
+      # JDK 17 adalah versi minimum yang didukung Android Gradle Plugin; versi
+      # bawaan image bisa berubah, dan build ini tidak boleh bergantung padanya.
+      - name: Siapkan JDK 17
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+
       - name: Pasang dependency dari lockfile
         run: npm ci
 
-      - name: Pastikan EXPO_TOKEN tersedia (nilai tidak dicetak)
+      # Dulu nilai ini datang dari environment milik EAS yang dipilih profil
+      # `production-apk` di eas.json. Build lokal tidak punya lingkungan itu, dan APK
+      # tanpa konfigurasi ini tetap terbangun — bahkan tetap lolos uji nyala — tetapi
+      # tampil dengan banner "konfigurasi belum tersedia" dan tidak menyentuh backend.
+      # Karena itu variabelnya diperiksa lebih dulu, sebelum menit build dipakai.
+      - name: Tulis konfigurasi publik aplikasi (EXPO_PUBLIC_*)
         env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          EXPO_PUBLIC_SUPABASE_URL: ${{ vars.EXPO_PUBLIC_SUPABASE_URL }}
+          EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ vars.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
+          EXPO_PUBLIC_MAP_STYLE_URL: ${{ vars.EXPO_PUBLIC_MAP_STYLE_URL }}
+        run: node scripts/write-app-env.mjs
+
+      # Gradle mengunduh NDK yang dipin proyek (RN 0.86 memakai 27.1.x, sedangkan
+      # image runner menyediakan versi lain) dan CMake untuk modul native seperti
+      # react-native-worklets. Keduanya hanya bisa diunduh otomatis bila lisensi SDK
+      # sudah diterima lebih dulu.
+      - name: Terima lisensi Android SDK
+        run: yes | "${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null
+
+      # Proyek native selalu dibuat ulang dari `app.json` (tidak di-commit), sehingga
+      # perubahan konfigurasi native tidak pernah tertinggal di repo.
+      - name: Buat proyek Android dari app.json (expo prebuild)
+        run: npx expo prebuild --platform android --no-install
+
+      # Keystore ditulis ke runner **tepat sebelum** dipakai, bukan di awal: langkah
+      # `npm ci` dan `expo prebuild` di atas menjalankan kode pihak ketiga (skrip
+      # paket dan plugin app config), dan keduanya tidak perlu bisa membaca kunci
+      # rilis. Berkasnya berada di `RUNNER_TEMP`, di luar workspace, supaya tidak
+      # mungkin ikut menjadi isi artifact mana pun.
+      - name: Tulis keystore rilis dari secret
+        env:
+          ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/keystore-rilis.jks
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
         run: |
-          if [ -z "${EXPO_TOKEN}" ]; then
-            echo "::error::Secret EXPO_TOKEN belum diatur di Settings → Secrets and variables → Actions. Buat token di halaman Access tokens akun Expo (atau robot user khusus CI), lalu simpan sebagai secret EXPO_TOKEN. Lihat docs/SETUP_GUIDE.md bagian 5."
+          if [ -z "${KEYSTORE_BASE64}" ]; then
+            echo "::error::Secret ANDROID_KEYSTORE_BASE64 belum diatur di Settings → Secrets and variables → Actions. Ekspor keystore rilis dari EAS (docs/SETUP_GUIDE.md bagian 6.1), lalu simpan berkasnya sebagai base64: base64 -w0 rilis.jks | clip"
             exit 1
           fi
-          echo "EXPO_TOKEN tersedia; isinya tidak ditampilkan."
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$ANDROID_KEYSTORE_PATH"
+          chmod 600 "$ANDROID_KEYSTORE_PATH"
+          echo "Keystore rilis ditulis ke runner ($(stat -c %s "$ANDROID_KEYSTORE_PATH") byte)."
 
-      - name: Verifikasi kredensial Expo
+      # Nomor versi build (`--version-code auto`) dihitung dari riwayat repository,
+      # bukan dari `github.run_number`: APK produksi dan APK preview memakai id paket
+      # dan kunci yang sama, jadi nomornya harus meningkat pada satu urutan yang
+      # dipakai bersama — lihat ADR-051.
+      - name: Konfigurasi tanda tangan rilis dan nomor versi
+        id: config
         env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-        run: npx --yes "$EAS_CLI" whoami
-
-      - name: Build APK di EAS Cloud (profil production-apk)
-        id: build
-        env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/keystore-rilis.jks
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           set -o pipefail
-          RESULT_FILE="${RUNNER_TEMP}/eas-build.json"
+          node scripts/configure-android-release.mjs --project android --version-code auto \
+            | tee "${RUNNER_TEMP}/konfigurasi-rilis.txt"
+          sed -n 's/^version_code=/version_code=/p' "${RUNNER_TEMP}/konfigurasi-rilis.txt" >> "$GITHUB_OUTPUT"
 
-          if npx --yes "$EAS_CLI" build \
-              --platform android \
-              --profile production-apk \
-              --non-interactive --wait --json > "$RESULT_FILE"; then
-            EAS_EXIT=0
-          else
-            EAS_EXIT=$?
-          fi
-
-          # Ringkasan aman: hanya id/status/platform — tidak pernah URL artifact.
-          node scripts/eas-build-artifact.mjs "$RESULT_FILE" summary || true
-          BUILD_ID="$(node scripts/eas-build-artifact.mjs "$RESULT_FILE" id 2> /dev/null || true)"
-          if [ -n "$BUILD_ID" ]; then
-            echo "build_id=${BUILD_ID}" >> "$GITHUB_OUTPUT"
-            echo "Build EAS: https://expo.dev/accounts/maceeng/projects/rodakawan/builds/${BUILD_ID}"
-          fi
-          if [ "$EAS_EXIT" -ne 0 ]; then
-            echo "::error::EAS build gagal (exit ${EAS_EXIT}). Tidak ada artifact dan tidak ada release yang dibuat."
-            exit "$EAS_EXIT"
-          fi
-
-      - name: Unduh APK dari build ini dan verifikasi berkasnya
-        id: artifact
+      - name: Build APK rilis dengan Gradle
         run: |
-          RESULT_FILE="${RUNNER_TEMP}/eas-build.json"
+          cd android
+          ./gradlew :app:assembleRelease --console=plain --stacktrace
 
-          # Bentuk keluaran EAS (array vs objek, nama kolom artifact) diurus oleh
-          # `scripts/eas-build-artifact.mjs`, yang hanya menerima build berstatus
-          # `finished` dengan URL artifact https milik pemanggilan ini.
-          if ! ARTIFACT_URL="$(node scripts/eas-build-artifact.mjs "$RESULT_FILE" url)"; then
-            echo "::error::URL artifact tidak bisa diambil dari hasil build. Release dibatalkan."
-            node scripts/eas-build-artifact.mjs "$RESULT_FILE" dump || true
+      - name: Siapkan APK dengan nama rilis dan verifikasi berkasnya
+        id: artifact
+        env:
+          RELEASE_VERSION: ${{ needs.verify.outputs.version }}
+        run: |
+          # `pipefail` supaya status `node scripts/verify-apk.mjs` tidak tertutup oleh
+          # `tee` saat keluarannya disimpan untuk ringkasan run.
+          set -o pipefail
+          APK_SUMBER="android/app/build/outputs/apk/release/app-release.apk"
+          if [ ! -s "$APK_SUMBER" ]; then
+            echo "::error::Gradle selesai tanpa menghasilkan ${APK_SUMBER}; tidak ada yang bisa dirilis."
             exit 1
           fi
 
-          # Nama berkas konsisten dan aman dipakai sebagai path: garis miring pada nama
-          # ref diganti tanda hubung.
-          REF_LABEL="${GITHUB_REF_NAME//\//-}"
-          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
-            APK_NAME="RodaKawan-${REF_LABEL}.apk"
-          else
-            APK_NAME="RodaKawan-${REF_LABEL}-${GITHUB_SHA:0:7}.apk"
-          fi
+          # Nama aset mengikuti **versi rilis**, bukan nama ref: rilis ini dijalankan
+          # dari branch, dan nama berkas harus sama dengan tag `v<versi>` yang dibuat
+          # job `release`.
+          APK_NAME="RodaKawan-v${RELEASE_VERSION}.apk"
           echo "Nama berkas APK: ${APK_NAME}"
+          cp "$APK_SUMBER" "$APK_NAME"
 
-          curl --fail --location --retry 3 --retry-delay 5 --silent --show-error \
-            "$ARTIFACT_URL" --output "$APK_NAME"
-
-          if [ ! -s "$APK_NAME" ]; then
-            echo "::error::Berkas APK tidak ada atau kosong setelah diunduh."
-            exit 1
-          fi
-          if [ "$(head -c 2 "$APK_NAME")" != "PK" ]; then
-            echo "::error::Berkas yang diunduh bukan APK (arsip ZIP) — kemungkinan halaman error."
+          # Verifikasi menyeluruh sebelum berkas ini boleh jadi Actions artifact:
+          # berkas kosong/bukan ZIP, entri yang CRC-nya tidak cocok, tanda tangan
+          # v2/v3 yang tidak sesuai isi, dan rantai v1 yang putus semuanya ditolak
+          # di sini — sebelum ada Actions artifact, tag, maupun release.
+          VERIFY_LOG="${RUNNER_TEMP}/apk-verifikasi.txt"
+          if ! node scripts/verify-apk.mjs "$APK_NAME" | tee "$VERIFY_LOG"; then
+            echo "::error::APK ${APK_NAME} tidak lolos verifikasi tanda tangan; tidak ada release yang dibuat."
             exit 1
           fi
 
           APK_SIZE="$(stat -c %s "$APK_NAME")"
           APK_SHA256="$(sha256sum "$APK_NAME" | awk '{print $1}')"
-          echo "APK ${APK_NAME} — ${APK_SIZE} bytes — sha256 ${APK_SHA256}"
-          echo "apk_name=${APK_NAME}" >> "$GITHUB_OUTPUT"
-          echo "apk_sha256=${APK_SHA256}" >> "$GITHUB_OUTPUT"
+          APK_SIGNER_SHA256="$(sed -n 's/^penandatangan_sha256=//p' "$VERIFY_LOG")"
+          echo "APK ${APK_NAME} — ${APK_SIZE} bytes — sha256 ${APK_SHA256} — sertifikat ${APK_SIGNER_SHA256}"
+          {
+            echo "apk_name=${APK_NAME}"
+            echo "apk_sha256=${APK_SHA256}"
+            echo "apk_signer_sha256=${APK_SIGNER_SHA256}"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Tambahkan ringkasan run
         if: always()
         env:
-          BUILD_ID: ${{ steps.build.outputs.build_id }}
+          VERSION_CODE: ${{ steps.config.outputs.version_code }}
+          RELEASE_VERSION: ${{ needs.verify.outputs.version }}
         run: |
           {
-            echo "### Build APK EAS"
+            echo "### Build APK (Gradle lokal)"
             echo ""
-            echo "- Profil: \`production-apk\`"
-            echo "- Build ID: ${BUILD_ID:-(tidak tersedia)}"
-            if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
-              echo "- Tag: \`${GITHUB_REF_NAME}\`"
-            else
-              echo "- Ref: \`${GITHUB_REF_NAME}\` (bukan tag — tidak ada GitHub Release)"
+            echo "- Versi rilis: \`${RELEASE_VERSION}\` (tag \`v${RELEASE_VERSION}\`)"
+            echo "- Nomor versi build: ${VERSION_CODE:-(tidak tersedia)}"
+            echo "- ABI: universal (keempat ABI, termasuk x86_64 untuk emulator)"
+            echo "- Commit: \`${GITHUB_SHA}\` dari \`${GITHUB_REF_NAME}\`"
+            echo ""
+            echo "Tag dan GitHub Release hanya dibuat bila build ini berhasil dan berkasnya lolos verifikasi."
+            # Hasil verifikasi tanda tangan ikut ditampilkan supaya sidik jari
+            # sertifikat yang merilis versi ini terekam di halaman run.
+            if [ -f "${RUNNER_TEMP}/apk-verifikasi.txt" ]; then
+              echo ""
+              echo "<details><summary>Verifikasi tanda tangan APK</summary>"
+              echo ""
+              echo '```'
+              sed 's/^/ /' "${RUNNER_TEMP}/apk-verifikasi.txt"
+              echo '```'
+              echo "</details>"
             fi
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -219,10 +361,114 @@ jobs:
           path: ${{ steps.artifact.outputs.apk_name }}
           retention-days: 30
 
+      # Runner GitHub dibuang setelah job selesai, jadi langkah ini bukan pembersihan
+      # yang menentukan. Ia ada supaya kunci rilis tidak menetap di runner lebih lama
+      # dari yang diperlukan — termasuk saat ada langkah berikutnya yang gagal.
+      - name: Hapus keystore dari runner
+        if: always()
+        env:
+          ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/keystore-rilis.jks
+        run: |
+          rm -f "$ANDROID_KEYSTORE_PATH"
+          echo "Keystore dihapus dari runner."
+
+  smoke-test:
+    name: Uji nyala APK di emulator
+    # Berjalan sebelum `release`: APK yang lolos verifikasi tanda tangan masih bisa
+    # mati seketika saat dijalankan, dan rilis yang tidak bisa dinyalakan lebih
+    # buruk daripada rilis yang tidak ada.
+    needs: [verify, build-apk]
+    # Image dipin, bukan `ubuntu-latest`: job ini bergantung pada isi image
+    # (akses KVM, versi Android SDK, dan versi emulator), sedangkan label
+    # `ubuntu-latest` berpindah versi Ubuntu dari waktu ke waktu. Job lain tetap
+    # memakai `ubuntu-latest` karena tidak menyentuh emulator.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - name: Checkout commit yang dirilis
+        uses: actions/checkout@v7
+
+      - name: Siapkan Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24.x'
+
+      # Emulator jauh lebih cepat dengan akselerasi perangkat keras, dan itu butuh
+      # akses baca-tulis ke `/dev/kvm`. Kekurangan aksesnya **tidak** menggagalkan
+      # rilis: emulatornya tetap bisa boot tanpa akselerasi, hanya jauh lebih lambat,
+      # sehingga keadaan itu diberi peringatan dan bukan `exit 1` — yang menentukan
+      # adalah uji nyalanya sendiri, dengan batas waktu boot di langkah berikutnya.
+      - name: Aktifkan akselerasi KVM (bila tersedia)
+        run: |
+          # Setiap perintah di sini diberi `|| echo` supaya langkah ini tidak pernah
+          # jadi penyebab gagalnya rilis.
+          if [ ! -w /dev/kvm ]; then
+            echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules || echo "::warning::Aturan udev KVM tidak bisa ditulis."
+            sudo udevadm control --reload-rules || echo "::warning::udevadm control gagal."
+            sudo udevadm trigger --name-match=kvm || echo "::warning::udevadm trigger gagal."
+          else
+            echo "Hak tulis /dev/kvm sudah ada."
+          fi
+          if [ -w /dev/kvm ]; then
+            echo "Akselerasi perangkat keras tersedia."
+          else
+            echo "::warning::/dev/kvm tidak bisa ditulis; emulator akan berjalan tanpa akselerasi dan boot-nya jauh lebih lambat."
+          fi
+          # Hanya informasi; hasilnya tidak menggerbangi apa pun.
+          "${ANDROID_HOME}/emulator/emulator" -accel-check || true
+
+      - name: Unduh APK dari Actions artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: rodakawan-apk
+
+      # Emulator dibuat dan dinyalakan oleh action ini; script di bawahnya berjalan
+      # setelah perangkatnya siap, dan `ANDROID_SERIAL` sudah menunjuk ke sana.
+      - name: Pasang APK di emulator dan pastikan aplikasinya menyala
+        uses: ReactiveCircus/android-emulator-runner@v2.38.0
+        with:
+          api-level: 36
+          target: google_apis
+          arch: x86_64
+          emulator-options: -no-window -gpu swiftshader -no-snapshot -noaudio -no-boot-anim -camera-back none
+          # Batas waktu boot sengaja longgar: emulator tanpa akselerasi butuh menit,
+          # dan sistem image-nya bisa perlu diunduh dulu di runner yang dingin.
+          emulator-boot-timeout: 900
+          disable-animations: true
+          script: node scripts/smoke-test-apk.mjs --apk "${{ needs.build-apk.outputs.apk_name }}" --timeout 90 --evidence bukti-smoke
+
+      # Bukti tetap diunggah walau ujinya gagal: tangkapan layar dan logcat adalah
+      # satu-satunya cara tahu apa yang terjadi di dalam emulator setelah run-nya
+      # selesai.
+      - name: Unggah bukti uji nyala
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: rodakawan-smoke-test
+          path: bukti-smoke
+          if-no-files-found: ignore
+          retention-days: 30
+
+      - name: Tambahkan ringkasan run
+        if: always()
+        run: |
+          {
+            echo "### Uji nyala APK di emulator"
+            echo ""
+            echo "Tag dan GitHub Release hanya dibuat bila uji ini lulus."
+            echo ""
+            if [ -f bukti-smoke/ringkasan.txt ]; then
+              echo '```'
+              cat bukti-smoke/ringkasan.txt
+              echo '```'
+            else
+              echo "Ringkasan uji tidak tersedia (lihat log langkah uji dan artifact \`rodakawan-smoke-test\`)."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
   release:
-    name: GitHub Release (tag v*)
-    needs: build-apk
-    if: github.ref_type == 'tag'
+    name: Tag versi & GitHub Release
+    needs: [verify, build-apk, smoke-test]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     # Hanya job ini yang boleh menulis ke repository, dan job ini tidak memegang
@@ -239,6 +485,18 @@ jobs:
         with:
           name: rodakawan-apk
 
+      # Catatan rilis ikut diunduh sebagai artifact karena job ini tidak menjalankan
+      # kode repository (tanpa checkout); formatnya sama dengan rilis preview.
+      - name: Unduh catatan rilis dari Actions artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: rodakawan-release-notes
+
+      # Job ini sengaja tidak menjalankan kode dari repository (tanpa checkout),
+      # justru karena ia memegang izin tulis. Jaminan tanda tangan tetap berlaku
+      # selama berkasnya **identik** dengan berkas yang sudah diverifikasi job
+      # `build-apk`: sha256 yang sama berarti tanda tangan yang sama pula. Bila
+      # hasil inipun gagal, tidak ada tag maupun release yang dibuat.
       - name: Verifikasi APK hasil unduhan (harus identik dengan hasil build)
         env:
           APK_NAME: ${{ needs.build-apk.outputs.apk_name }}
@@ -250,19 +508,163 @@ jobs:
             exit 1
           fi
           echo "${APK_SHA256}  ${APK_NAME}" | sha256sum --check --strict
+          echo "Berkas identik dengan APK yang sudah lolos verifikasi tanda tangan."
 
-      - name: Buat atau perbarui GitHub Release dengan APK
+      # SHA-256 baru diketahui setelah build, sementara catatan rilis disusun job
+      # `verify` sebelum itu (ADR-046) — jadi bagian verifikasi ini ditambahkan di
+      # sini, tepat sebelum rilis terbit, dan **hanya** ke berkas yang dipakai
+      # `gh release create`. Berkas catatan yang diunggah sebagai Actions artifact
+      # (sumber entri `CHANGELOG.md`) sengaja tidak diubah: hash artefak berguna di
+      # halaman rilis tempat berkasnya diunduh, bukan di riwayat repository.
+      #
+      # Job ini tidak menjalankan kode repository (tanpa checkout), jadi
+      # penambahannya memakai shell biasa. Isinya hanya nilai yang sudah dihitung
+      # `build-apk`, dan APK-nya di sini memang berkas yang sama — langkah
+      # verifikasi di atas sudah membandingkan sha256-nya.
+      - name: Tambahkan verifikasi berkas ke catatan rilis
+        env:
+          APK_NAME: ${{ needs.build-apk.outputs.apk_name }}
+          APK_SHA256: ${{ needs.build-apk.outputs.apk_sha256 }}
+          APK_SIGNER_SHA256: ${{ needs.build-apk.outputs.apk_signer_sha256 }}
+        run: |
+          NOTES_FILE="release-notes.md"
+          if [ ! -s "$NOTES_FILE" ]; then
+            echo "::error::Catatan rilis tidak ada atau kosong; rilis dibatalkan karena penilai APK tidak akan punya catatan apa pun untuk dibaca."
+            exit 1
+          fi
+
+          {
+            echo ""
+            echo "---"
+            echo ""
+            echo "## 🔒 Verifikasi berkas"
+            echo ""
+            echo "Cocokkan berkas yang Anda unduh dengan nilai berikut sebelum memasangnya:"
+            echo ""
+            echo "- Berkas: \`${APK_NAME}\`"
+            echo "- Ukuran: $(stat -c %s "$APK_NAME") byte"
+            echo "- SHA-256: \`${APK_SHA256}\`"
+            echo "- Sertifikat penandatangan: \`${APK_SIGNER_SHA256:-tidak tercatat}\`"
+            echo ""
+            echo "Windows (PowerShell):"
+            echo ""
+            echo '```powershell'
+            echo "Get-FileHash ${APK_NAME} -Algorithm SHA256"
+            echo '```'
+            echo ""
+            echo "Linux/macOS:"
+            echo ""
+            echo '```bash'
+            echo "sha256sum ${APK_NAME}"
+            echo '```'
+            echo ""
+            echo "Nilai yang berbeda berarti berkasnya bukan yang dihasilkan rilis ini — jangan dipasang."
+          } >> "$NOTES_FILE"
+
+          echo "Bagian verifikasi ditambahkan ke ${NOTES_FILE}."
+
+      # Langkah terakhir, dan satu-satunya yang menulis ke repository: tag versi
+      # dibuat di sini, bukan sebelumnya.
+      - name: Buat tag versi dan GitHub Release dengan APK
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG_NAME: ${{ github.ref_name }}
+          RELEASE_VERSION: ${{ needs.verify.outputs.version }}
           APK_NAME: ${{ needs.build-apk.outputs.apk_name }}
+          APK_SIGNER_SHA256: ${{ needs.build-apk.outputs.apk_signer_sha256 }}
         run: |
-          if gh release view "$TAG_NAME" > /dev/null 2>&1; then
-            echo "Release ${TAG_NAME} sudah ada — mengganti aset APK (--clobber)."
-            gh release upload "$TAG_NAME" "$APK_NAME" --clobber
-          else
-            gh release create "$TAG_NAME" "$APK_NAME" \
-              --title "RodaKawan ${TAG_NAME}" \
-              --generate-notes \
-              --verify-tag
-          fi
+          TAG="v${RELEASE_VERSION}"
+
+          # `--target` menentukan commit untuk tag yang **belum ada**: tag dibuat
+          # sebagai bagian dari pembuatan release, jadi tidak ada langkah `git tag`
+          # + `git push` yang bisa meninggalkan tag tanpa release. `--verify-tag`
+          # tidak dipakai justru karena flag itu membatalkan pembuatan tag.
+          #
+          # Catatan rilis memakai versi berkas yang diunduh dari artifact dan sudah
+          # memuat bagian "Perubahan yang Merusak" di paling atas.
+          #
+          # Catatan bila langkah ini gagal separuh jalan: `gh` membuat release
+          # sebagai **draft**, mengunggah aset, lalu menerbitkannya. Kegagalan saat
+          # mengunggah/menerbitkan meninggalkan draft release yang sudah memegang
+          # tag (bukan tag telanjang), dan itu bisa dilanjutkan tanpa build ulang:
+          #   gh release edit v<versi> --draft=false        # terbitkan
+          #   gh release delete v<versi> --yes --cleanup-tag # buang tag + draft
+          gh release create "$TAG" "$APK_NAME" \
+            --target "$GITHUB_SHA" \
+            --title "RodaKawan ${TAG}" \
+            --notes-file release-notes.md
+
+          echo "Tag ${TAG} dan GitHub Release dibuat pada commit ${GITHUB_SHA}."
+          echo "Sertifikat penandatangan APK: ${APK_SIGNER_SHA256:-tidak tercatat}"
+
+  changelog:
+    name: Catat rilis di CHANGELOG.md
+    # Setelah tag dan release-nya benar-benar ada: CHANGELOG.md mencatat rilis yang
+    # sudah terbit, bukan build yang gagal.
+    needs: [verify, build-apk, release]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Job ini menulis ke repository (satu commit ke `main`) dan tidak memegang
+    # secret Expo apa pun; `release` tetap satu-satunya job yang membuat tag.
+    permissions:
+      contents: write
+    # Grup ini dipakai workflow rilis **preview** juga, supaya dua pencatatan
+    # changelog tidak pernah mendorong ke `main` pada saat bersamaan.
+    concurrency:
+      group: changelog
+      cancel-in-progress: false
+    steps:
+      # Sengaja `main`, bukan commit yang dirilis: yang dicatat job ini hanya
+      # berkas CHANGELOG.md di atas `main`, sehingga tidak ada commit lain yang
+      # ikut terdorong ke sana.
+      - name: Checkout main
+        uses: actions/checkout@v7
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Unduh catatan rilis dari Actions artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: rodakawan-release-notes
+
+      - name: Sisipkan catatan rilis ke CHANGELOG.md lalu dorong ke main
+        env:
+          VERSION: ${{ needs.verify.outputs.version }}
+        run: |
+          # Rilis produksi ditulis sebagai bagian penuh (tanpa `--preview`);
+          # build preview yang diringkas ditulis workflow release-on-push.yml.
+          TAG="v${VERSION}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          # Percobaan ulang yang aman karena `update-changelog.mjs` idempoten:
+          # setiap percobaan dimulai dari `origin/main` terbaru dan menulis
+          # bagiannya sendiri, jadi tidak ada bagian ganda maupun konflik rebase.
+          for ATTEMPT in 1 2 3; do
+            git fetch --quiet origin main
+            git reset --hard --quiet origin/main
+            node scripts/update-changelog.mjs --tag "$TAG" --notes release-notes.md
+
+            if git diff --quiet -- CHANGELOG.md; then
+              echo "CHANGELOG.md sudah memuat ${TAG}; tidak ada commit baru."
+              exit 0
+            fi
+
+            git add CHANGELOG.md
+            # `[skip ci]`: push ini memakai GITHUB_TOKEN, yang memang tidak memicu
+            # workflow baru — penandanya menjaga sifat itu tetap benar bila kelak
+            # tokennya diganti token lain, sekaligus membuat commit pencatatan ini
+            # dilewati `scripts/release-notes.mjs` (bukan "perubahan" bagi pembaca).
+            git commit --quiet -m "docs: catat rilis ${TAG} di CHANGELOG.md [skip ci]"
+
+            if git push origin HEAD:main; then
+              echo "CHANGELOG.md diperbarui dengan ${TAG} (commit $(git rev-parse --short HEAD))."
+              exit 0
+            fi
+
+            echo "::warning::Push ke main ditolak (main bergerak); percobaan ulang ${ATTEMPT}/3."
+            sleep 3
+          done
+
+          echo "::error::CHANGELOG.md tidak bisa didorong ke main setelah 3 percobaan. Catat rilis ${TAG} secara manual (isi berkasnya bisa diunduh dari Actions artifact rodakawan-release-notes)."
+          exit 1
