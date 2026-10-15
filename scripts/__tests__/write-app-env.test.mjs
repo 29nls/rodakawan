@@ -82,14 +82,23 @@ describe('CLI write-app-env.mjs', () => {
     assert.equal(fs.existsSync(path.join(dir, '.env.local')), false);
   });
 
-  it('menganggap nilai berisi spasi saja sebagai belum diisi', (t) => {
+  it('menganggap nilai spasi EXPO_PUBLIC_MAP_STYLE_URL bukan kegagalan (variabel opsional)', (t) => {
     const dir = dirSementara(t);
     const hasil = runScript(dir, 'write-app-env.mjs', [], {
       env: { ...LENGKAP, EXPO_PUBLIC_MAP_STYLE_URL: '   ' },
     });
 
-    assert.equal(hasil.code, 1);
-    assert.match(hasil.stderr, /EXPO_PUBLIC_MAP_STYLE_URL/);
+    // Sekarang variabel opsional ini tidak menyebabkan gagal validasi;
+    // hanya Supabase yang wajib diisi.
+    assert.equal(hasil.code, 0);
+    // Tapi nilai spasi tidak ikut ditulis ke .env.local (diabaikan karena kosong)
+    assert.equal(fs.existsSync(path.join(dir, '.env.local')), true);
+    const isi = fs.readFileSync(path.join(dir, '.env.local'), 'utf8');
+    // Supabase varis tetap ikut ditulis
+    assert.equal(isi.includes(LENGKAP.EXPO_PUBLIC_SUPABASE_URL), true);
+    assert.equal(isi.includes(LENGKAP.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY), true);
+    // Map style url dengan spasi tidak ikut ditulis (filter di collectAppEnv)
+    assert.equal(isi.includes('EXPO_PUBLIC_MAP_STYLE_URL'), false);
   });
 
   it('menghormati --out', (t) => {

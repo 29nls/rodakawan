@@ -39,13 +39,19 @@ const USAGE = 'Pemakaian: node scripts/write-app-env.mjs [--out <berkas>]';
  * aplikasi, bukan apa pun yang dibawa proses pemanggil — termasuk rahasia CI yang
  * tidak ada hubungannya dengan bundel.
  *
+ * `EXPO_PUBLIC_MAP_STYLE_URL` opsional: bila tidak diisi, aplikasi tetap berjalan
+ * tanpa peta custom (lihat `src/lib/env.ts` `describeBackendStatus`, tone `neutral`,
+ * detail "Belum ada kredensial backend. Aplikasi berjalan tanpa Supabase dan tanpa
+ * peta, jadi belum ada data yang dikirim keluar perangkat."). Variabel ini tidak ikut
+ * menyebabkan gagal validasi konfigurasi.
+ *
  * Nama dan urutannya mengikuti `.env.example`, satu-satunya daftar konfigurasi
  * publik yang boleh dipakai.
  */
 export const APP_ENV_VARS = [
   'EXPO_PUBLIC_SUPABASE_URL',
   'EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY',
-  'EXPO_PUBLIC_MAP_STYLE_URL',
+  // EXPO_PUBLIC_MAP_STYLE_URL: opsional, lihat aturan di collectAppEnv.
 ];
 
 /** Isi `.env.local` untuk nilai yang sudah lengkap. */
@@ -56,27 +62,41 @@ export function appEnvFile(values) {
     '# aman untuk publik (lihat .env.example).',
     '',
   ];
-  const baris = APP_ENV_VARS.map((nama) => `${nama}=${values[nama]}`);
+  const baris = APP_ENV_VARS.map((nama) => `${nama}=${values[nama] ?? ''}`);
   return `${[...header, ...baris].join('\n')}\n`;
 }
 
 /**
- * Memeriksa nilai yang datang dari lingkungan. Ruang kosong dianggap belum diisi:
- * secret yang salah tempel menjadi spasi tetap harus menghentikan rilis, bukan
- * menghasilkan bundel tanpa backend.
+ * Memeriksa nilai yang datang dari lingkungan. Ruang kosong untuk
+ * `EXPO_PUBLIC_MAP_STYLE_URL` dianggap bukan kegagalan (variabel opsional).
+ * Hanya `EXPO_PUBLIC_SUPABASE_URL` dan `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
+ * yang wajib diisi.
  */
 export function collectAppEnv(env) {
-  const kosong = APP_ENV_VARS.filter(
-    (nama) => typeof env[nama] !== 'string' || env[nama].trim() === '',
-  );
-  if (kosong.length > 0) {
-    return fail(`Konfigurasi publik aplikasi belum lengkap: ${kosong.join(', ')} belum diisi.`, [
+  const kosongWajib = [
+    'EXPO_PUBLIC_SUPABASE_URL',
+    'EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY',
+  ].filter((nama) => typeof env[nama] !== 'string' || env[nama].trim() === '');
+  if (kosongWajib.length > 0) {
+    return fail(`Konfigurasi publik aplikasi belum lengkap: ${kosongWajib.join(', ')} belum diisi.`, [
       'Atur sebagai *variables* repository — Settings → Secrets and variables → Actions → Variables — dengan nama persis seperti di atas.',
-      'Bila dibiarkan kosong, APK-nya tetap terbangun dan tetap lolos uji nyala, tetapi tampil dengan banner "konfigurasi belum tersedia" dan tidak menyentuh backend sama sekali.',
+      'Bila `EXPO_PUBLIC_MAP_STYLE_URL` dibiarkan kosong, APK-nya tetap berjalan tanpa peta custom.',
       'Nilai contoh beserta penjelasannya: .env.example dan docs/SETUP_GUIDE.md bagian 5.3.',
     ]);
   }
-  return Object.fromEntries(APP_ENV_VARS.map((nama) => [nama, env[nama]]));
+  // Filter hanya variabel wajib ke output; opsional lewat dengan undefined
+  const result: Record<string, string> = {};
+  for (const nama of APP_ENV_VARS) {
+    if (nama === 'EXPO_PUBLIC_MAP_STYLE_URL') {
+      // opsional: tulis bila ada, skip bila tidak
+      if (typeof env[nama] === 'string' && env[nama].trim() !== '') {
+        result[nama] = env[nama].trim();
+      }
+    } else {
+      result[nama] = env[nama].trim();
+    }
+  }
+  return result;
 }
 
 function main() {
