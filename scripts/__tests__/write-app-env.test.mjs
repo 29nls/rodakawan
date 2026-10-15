@@ -39,6 +39,9 @@ function dirSementara(t) {
 describe('appEnvFile', () => {
   it('menulis tepat tiga variabel publik, tanpa yang lain', () => {
     const isi = appEnvFile({ ...LENGKAP, DATABASE_URL: 'postgres://rahasia' });
+    assert.equal(isi.includes('EXPO_PUBLIC_SUPABASE_URL'), true);
+    assert.equal(isi.includes('EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY'), true);
+    assert.equal(isi.includes('EXPO_PUBLIC_MAP_STYLE_URL'), true);
     assert.equal(APP_ENV_VARS.length, 3);
     for (const nama of APP_ENV_VARS) {
       assert.equal(isi.includes(`${nama}=${LENGKAP[nama]}`), true, `${nama} tidak tertulis`);
@@ -78,7 +81,7 @@ describe('CLI write-app-env.mjs', () => {
 
     assert.equal(hasil.code, 1);
     assert.match(hasil.stderr, /belum lengkap: EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY/);
-    assert.match(hasil.stderr, /banner "konfigurasi belum tersedia"/);
+    assert.match(hasil.stderr, /::error::Konfigurasi publik aplikasi belum lengkap/);
     assert.equal(fs.existsSync(path.join(dir, '.env.local')), false);
   });
 

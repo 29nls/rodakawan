@@ -51,7 +51,7 @@ const USAGE = 'Pemakaian: node scripts/write-app-env.mjs [--out <berkas>]';
 export const APP_ENV_VARS = [
   'EXPO_PUBLIC_SUPABASE_URL',
   'EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY',
-  // EXPO_PUBLIC_MAP_STYLE_URL: opsional, lihat aturan di collectAppEnv.
+  'EXPO_PUBLIC_MAP_STYLE_URL', // EXPO_PUBLIC_MAP_STYLE_URL: opsional, lihat aturan di collectAppEnv.
 ];
 
 /** Isi `.env.local` untuk nilai yang sudah lengkap. */
@@ -62,7 +62,9 @@ export function appEnvFile(values) {
     '# aman untuk publik (lihat .env.example).',
     '',
   ];
-  const baris = APP_ENV_VARS.map((nama) => `${nama}=${values[nama] ?? ''}`);
+  const baris = APP_ENV_VARS.filter(
+    (nama) => values[nama] !== undefined && values[nama] !== '',
+  ).map((nama) => `${nama}=${values[nama]}`);
   return `${[...header, ...baris].join('\n')}\n`;
 }
 
@@ -73,19 +75,21 @@ export function appEnvFile(values) {
  * yang wajib diisi.
  */
 export function collectAppEnv(env) {
-  const kosongWajib = [
-    'EXPO_PUBLIC_SUPABASE_URL',
-    'EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY',
-  ].filter((nama) => typeof env[nama] !== 'string' || env[nama].trim() === '');
+  const kosongWajib = ['EXPO_PUBLIC_SUPABASE_URL', 'EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY'].filter(
+    (nama) => typeof env[nama] !== 'string' || env[nama].trim() === '',
+  );
   if (kosongWajib.length > 0) {
-    return fail(`Konfigurasi publik aplikasi belum lengkap: ${kosongWajib.join(', ')} belum diisi.`, [
-      'Atur sebagai *variables* repository — Settings → Secrets and variables → Actions → Variables — dengan nama persis seperti di atas.',
-      'Bila `EXPO_PUBLIC_MAP_STYLE_URL` dibiarkan kosong, APK-nya tetap berjalan tanpa peta custom.',
-      'Nilai contoh beserta penjelasannya: .env.example dan docs/SETUP_GUIDE.md bagian 5.3.',
-    ]);
+    return fail(
+      `Konfigurasi publik aplikasi belum lengkap: ${kosongWajib.join(', ')} belum diisi.`,
+      [
+        'Atur sebagai *variables* repository — Settings → Secrets and variables → Actions → Variables — dengan nama persis seperti di atas.',
+        'Bila `EXPO_PUBLIC_MAP_STYLE_URL` dibiarkan kosong, APK-nya tetap berjalan tanpa peta custom.',
+        'Nilai contoh beserta penjelasannya: .env.example dan docs/SETUP_GUIDE.md bagian 5.3.',
+      ],
+    );
   }
   // Filter hanya variabel wajib ke output; opsional lewat dengan undefined
-  const result: Record<string, string> = {};
+  const result = {};
   for (const nama of APP_ENV_VARS) {
     if (nama === 'EXPO_PUBLIC_MAP_STYLE_URL') {
       // opsional: tulis bila ada, skip bila tidak
