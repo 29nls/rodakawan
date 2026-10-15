@@ -565,11 +565,15 @@ Aturan yang berlaku di kedua jalur:
 [`CHANGELOG.md`](../CHANGELOG.md) adalah riwayat permanen setiap rilis. Isinya ditulis otomatis oleh
 job `changelog` di kedua workflow rilis, bukan oleh manusia:
 
-- Rilis **produksi** masuk sebagai bagian penuh, mis. `## v0.2.0 — 2026-10-14`.
+- Rilis **produksi** masuk sebagai bagian penuh, judulnya bertautan ke halaman rilisnya di GitHub:
+  mis. `## [v0.2.0](https://github.com/29nls/rodakawan/releases/tag/v0.2.0) — 2026-10-14`. Dengan
+  begitu riwayat di berkas ini bisa dinavigasi langsung ke halaman rilis (APK, SHA-256, catatan
+  lengkap). Repository untuk tautannya diambil dari `--repo`, lalu `GITHUB_REPOSITORY`, lalu remote
+  `origin` (ADR-052).
 - Rilis **preview** (`v<versi>-build<N>`) diringkas di dalam blok `<details>` yang bisa dibuka, karena
   build preview dibuat pada setiap push ke `main` — bila ditulis sama panjang, versi produksi akan
   tenggelam di antara puluhan build. Entri inilah yang membuat pemangkasan rilis lama tidak
-  kehilangan apa pun (bagian 6.11).
+  kehilangan apa pun (bagian 6.11). Judul preview-nya juga bertautan, ke halaman rilis build itu.
 
 Aturan yang dipegang job itu:
 
@@ -592,8 +596,9 @@ Aturan yang dipegang job itu:
   membuat commit pencatatan ini **tidak ikut muncul** di catatan rilis berikutnya (lihat bagian 6.7)
   — kalau ikut, setiap rilis akan bercerita tentang pencatatan rilis di depannya.
 - Berkasnya ditulis mesin dan karena itu dikecualikan dari `prettier --check` (lihat `.prettierignore`).
-  Menyunting teksnya boleh, asalkan judul `## <tag> — <tanggal>` tidak diubah: itulah penanda yang
-  dipakai job untuk mengenali rilis yang sudah tercatat.
+  Menyunting teksnya boleh, asalkan judul bagiannya tidak diubah — bentuknya
+  `## [<tag>](<halaman-rilis>) — <tanggal>` (judul polos dari script versi lama pun tetap
+  dikenali). Judul itulah penanda yang dipakai job untuk mengenali rilis yang sudah tercatat.
 
 Bila branch protection melarang push langsung ke `main` (atau mewajibkan pull request), job itu gagal
 dengan pesan `::error::` dan rilisnya perlu dicatat manual:
@@ -606,6 +611,10 @@ node scripts/update-changelog.mjs --tag v0.2.0-build4 --notes catatan.md --previ
 
 Catatan rilis yang gagal diunduh dari Actions artifact `rodakawan-release-notes` bisa disimpan sebagai
 `catatan.md` untuk perintah di atas.
+
+Perintah di atas menghasilkan judul bertautan selama dijalankan dari clone yang punya remote
+`origin` (atau dengan tambahan `--repo 29nls/rodakawan`). Tanpa keduanya rilis tetap tercatat,
+hanya judulnya yang polos — dan script mencatat `::warning::` supaya itu tidak hilang diam-diam.
 
 ### 6.9 Uji nyala APK di emulator
 

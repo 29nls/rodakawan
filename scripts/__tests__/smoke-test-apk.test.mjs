@@ -460,6 +460,26 @@ describe('CLI smoke-test-apk.mjs', () => {
     assert.ok(opsiAsing.stderr.includes('Argumen tidak dikenal'), opsiAsing.stderr);
   });
 
+  it('menampilkan konten UI nyata setelah diluncurkan', (t) => {
+    const { run, dir } = harness(t);
+    const { stdout, stderr, code } = run(['--apk', APK, '--evidence', 'bukti']);
+
+    assert.equal(code, 0, stderr);
+    // Verifikasi konten UI nyata muncul setelah aplikasi startup
+    const buktiDir = path.join(dir, 'bukti');
+    const ringkasan = fs.readFileSync(path.join(buktiDir, 'ringkasan.txt'), 'utf8');
+    // Konten yang muncul ringkasan setelah diluncurkan:
+    // - id paket dan aktivitas yang sesuai yang di-release
+    assert.ok(ringkasan.includes('paket='), ringkasan);
+    assert.ok(ringkasan.includes('aktivitas='), ringkasan);
+    // Verifikasi paket dan aktivitas sesuai yang dijualankan
+    assert.ok(ringkasan.includes('paket=com.rodakawan.app'), ringkasan);
+    assert.ok(ringkasan.includes('aktivitas='), ringkasan);
+    // Tangkapan layar sebagai bukti bahwa aktivitas terlihat
+    const layar = fs.readFileSync(path.join(buktiDir, 'layar.png'), 'utf8');
+    assert.ok(layar.length > 0, 'Tangkapan layar harus ada');
+  });
+
   it('gagal dengan pesan jelas bila adb tidak bisa dijalankan', (t) => {
     const { dir } = harness(t);
     const { stderr, code } = runScript(dir, 'smoke-test-apk.mjs', ['--apk', APK], {

@@ -17,12 +17,20 @@
  * Judul di dalam catatan diturunkan satu tingkat (`## Fitur` → `### Fitur`)
  * supaya judul versi menjadi satu-satunya tingkat dua di berkas ini.
  *
+ * Judul versi dibuat sebagai tautan ke halaman rilisnya di GitHub
+ * (`## [v0.2.0](https://github.com/<owner>/<repo>/releases/tag/v0.2.0) — <tanggal>`), supaya
+ * riwayat di berkas ini bisa dinavigasi langsung ke rilisnya. Repository-nya diambil berurutan
+ * dari `--repo`, lalu `GITHUB_REPOSITORY` (otomatis ada di GitHub Actions), lalu remote `origin`.
+ * Bila ketiganya tidak ada, judul tetap ditulis tanpa tautan dan sebuah `::warning::` dicatat —\ * pencatatan rilisnya sendiri tidak pernah digagalkan oleh tautan yang gagal dibuat.
+ *
  * Pemakaian:
  *   node scripts/update-changelog.mjs --tag v0.2.0 --notes catatan.md
  *   node scripts/update-changelog.mjs --tag v0.2.0 --notes catatan.md --preview
  *   node scripts/update-changelog.mjs --tag v0.2.0 --notes catatan.md --date 2026-10-14
+ *   node scripts/update-changelog.mjs --tag v0.2.0 --notes catatan.md --repo 29nls/rodakawan
  */
 
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -31,7 +39,7 @@ import { fail, parseOptions } from './lib/cli.mjs';
 
 const USAGE =
   'Pemakaian: node scripts/update-changelog.mjs --tag <tag> --notes <berkas> ' +
-  '[--date <YYYY-MM-DD>] [--path <berkas>] [--preview]';
+  '[--date <YYYY-MM-DD>] [--path <berkas>] [--repo <owner/repo>] [--preview]';
 
 const DEFAULT_PATH = 'CHANGELOG.md';
 
@@ -50,7 +58,9 @@ Seluruh rilis APK RodaKawan, terbaru di atas. Bagian di bawah dibuat otomatis ol
 \`.github/workflows/release-on-push.yml\` dan \`.github/workflows/android-release.yml\` dari catatan
 rilis yang sama dengan halaman Releases (\`scripts/release-notes.mjs\`); jangan menyunting entri yang
 sudah ada — entri berikutnya disisipkan di atasnya. Rilis produksi tampil sebagai bagian penuh,
-sedangkan build preview (\`v<versi>-build<N>\`) diringkas di dalam blok yang bisa dibuka.
+sedangkan build preview (\`v<versi>-build<N>\`) diringkas di dalam blok yang bisa dibuka. Judul tiap
+versi adalah tautan ke halaman rilisnya di GitHub, sehingga riwayat ini bisa dinavigasi langsung
+dari berkas.
 
 `;
 
@@ -66,12 +76,71 @@ export function demoteHeadings(markdown) {
 
 /** `true` bila tag itu sudah punya bagian di berkas ini. */
 export function hasSection(content, tag) {
-  return content.split('\n').some((line) => line.startsWith(`## ${tag} —`));
+  return content
+    .split('\n')
+    .some((line) => line.startsWith(`## ${tag} —`) || line.startsWith(`## [${tag}](`));
+}
+
+/** Bentuk \`owner/repo\` yang diterima sebagai sumber tautan rilis. */
+const REPO_SHAPE = /^[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+$/;
+
+/**
+ * `owner/repo` dari URL remote GitHub, atau `null` bila bukan GitHub.
+ * Menerima bentuk https, scp-like (`git@github.com:…`), dan `ssh://git@…`;
+ * akhiran `.git` dilepas sebelum dipisah supaya nama repository tidak ikut
+ * mengandung ekstensinya.
+ */
+export function parseGitHubRepo(remoteUrl) {
+  const normalized = remoteUrl.trim().replace(/\.git\/?$/, '');
+  const match =
+    /^(?:https:\/\/github\.com\/|git@github\.com:|ssh:\/\/git@github\.com\/)([^/\s]+)\/([^/\s]+)$/.exec(
+      normalized,
+    );
+  return match ? `${match[1]}/${match[2]}` : null;
+}
+
+/** Halaman GitHub Release untuk sebuah tag. */
+export function releaseUrl(repo, tag) {
+  return `https://github.com/${repo}/releases/tag/${tag}`;
+}
+
+/**
+ * Sumber `owner/repo` untuk tautan judul: `--repo` bila diisi (nilai salah =
+ * gagal, karena itu input manusia yang salah ketik), lalu `GITHUB_REPOSITORY`,
+ * lalu remote `origin` milik checkout yang sedang berjalan. Mengembalikan
+ * `null` bila ketiganya tidak ada — bukan kegagalan, hanya judul tanpa tautan.
+ */
+function resolveRepo(optionValue) {
+  if (optionValue !== undefined) {
+    if (!REPO_SHAPE.test(optionValue)) {
+      return fail(`Nilai --repo bukan bentuk owner/repo: ${optionValue}. Contoh: 29nls/rodakawan`, [
+        USAGE,
+      ]);
+    }
+    return optionValue;
+  }
+
+  const fromEnv = (process.env.GITHUB_REPOSITORY ?? '').trim();
+  if (fromEnv !== '' && REPO_SHAPE.test(fromEnv)) return fromEnv;
+
+  try {
+    const remote = execFileSync('git', ['remote', 'get-url', 'origin'], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim();
+    const parsed = parseGitHubRepo(remote);
+    if (parsed !== null) return parsed;
+  } catch {
+    // Bukan repository git atau tanpa remote origin — lanjut ke fallback.
+  }
+
+  return null;
 }
 
 /** Satu bagian catatan rilis, siap disisipkan. */
-export function sectionFor({ tag, date, notes, preview = false }) {
-  const title = preview ? `## ${tag} — ${date} · pratinjau` : `## ${tag} — ${date}`;
+export function sectionFor({ tag, date, notes, preview = false, repo = undefined }) {
+  const label = repo === undefined ? `## ${tag}` : `## [${tag}](${releaseUrl(repo, tag)})`;
+  const title = preview ? `${label} — ${date} · pratinjau` : `${label} — ${date}`;
   const body = demoteHeadings(notes.trim());
 
   if (!preview) return `${title}\n\n${body}`;
@@ -125,6 +194,7 @@ function main() {
       '--notes': 'sebuah berkas catatan rilis',
       '--date': 'sebuah tanggal YYYY-MM-DD',
       '--path': 'sebuah berkas CHANGELOG',
+      '--repo': 'sebuah repository GitHub berbentuk owner/repo',
     },
     flags: ['--preview'],
     required: ['--tag', '--notes'],
@@ -148,7 +218,18 @@ function main() {
     return;
   }
 
-  const updated = insertSection(existing, sectionFor({ tag, date, notes, preview }));
+  const repo = resolveRepo(options['--repo']);
+  if (repo === null) {
+    console.error(
+      `::warning::Repository GitHub tidak dikenali (tanpa --repo, GITHUB_REPOSITORY, maupun ` +
+        `remote origin); judul ${tag} ditulis tanpa tautan ke halaman rilisnya.`,
+    );
+  }
+
+  const updated = insertSection(
+    existing,
+    sectionFor({ tag, date, notes, preview, repo: repo ?? undefined }),
+  );
   fs.mkdirSync(path.dirname(path.resolve(target)), { recursive: true });
   fs.writeFileSync(target, updated);
 

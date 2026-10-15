@@ -20,6 +20,8 @@ import {
   demoteHeadings,
   hasSection,
   insertSection,
+  parseGitHubRepo,
+  releaseUrl,
   sectionFor,
   todayUtc,
 } from '../update-changelog.mjs';
@@ -44,7 +46,13 @@ function workdir(t, notes = NOTES) {
 }
 
 const read = (dir, file = 'CHANGELOG.md') => fs.readFileSync(path.join(dir, file), 'utf8');
-const update = (dir, args) => runScript(dir, 'update-changelog.mjs', args);
+/**
+ * Menjalankan script dengan `GITHUB_REPOSITORY` dikosongkan, supaya hasil test
+ * identik di mesin lokal dan di runner GitHub (yang pasti punya variabel itu).
+ * Test yang menguji tautan memberinya nilai lewat argumen `env` kedua.
+ */
+const update = (dir, args, env = {}) =>
+  runScript(dir, 'update-changelog.mjs', args, { env: { GITHUB_REPOSITORY: '', ...env } });
 
 describe('fungsi pembentuk bagian', () => {
   it('menurunkan judul satu tingkat tanpa mengubah isi lain', () => {
@@ -62,6 +70,64 @@ describe('fungsi pembentuk bagian', () => {
     assert.equal(hasSection(content, 'v1.0.1'), false);
     // Awalan yang mirip tidak dianggap sama.
     assert.equal(hasSection(content, 'v1.0'), false);
+  });
+
+  it('mengenali tag yang sudah punya bagian dalam bentuk bertautan', () => {
+    const content =
+      '# Changelog\n\n## [v1.0.0](https://github.com/29nls/rodakawan/releases/tag/v1.0.0) — 2026-01-01\n\n- sesuatu\n';
+    assert.equal(hasSection(content, 'v1.0.0'), true);
+    // Bentuk bertautan juga harus menolak awalan yang mirip — pola `## [tag](`
+    // tidak boleh cocok sebagian dengan judul tag yang lebih panjang.
+    assert.equal(hasSection(content, 'v1.0'), false);
+    assert.equal(hasSection(content, 'v1.0.0-build1'), false);
+  });
+
+  it('menyusun bagian bertautan ke halaman rilis saat repository diketahui', () => {
+    const section = sectionFor({
+      tag: 'v1.0.0',
+      date: '2026-10-14',
+      notes: NOTES,
+      repo: '29nls/rodakawan',
+    });
+    assert.ok(
+      section.startsWith(
+        '## [v1.0.0](https://github.com/29nls/rodakawan/releases/tag/v1.0.0) — 2026-10-14\n\n### Fitur',
+      ),
+      section,
+    );
+
+    const preview = sectionFor({
+      tag: 'v1.0.0-build2',
+      date: '2026-10-14',
+      notes: NOTES,
+      preview: true,
+      repo: '29nls/rodakawan',
+    });
+    assert.ok(
+      preview.startsWith(
+        '## [v1.0.0-build2](https://github.com/29nls/rodakawan/releases/tag/v1.0.0-build2)' +
+          ' — 2026-10-14 · pratinjau\n',
+      ),
+      preview,
+    );
+  });
+
+  it('menyelesaikan URL remote GitHub apa pun menjadi owner/repo', () => {
+    assert.equal(parseGitHubRepo('https://github.com/29nls/rodakawan.git'), '29nls/rodakawan');
+    assert.equal(parseGitHubRepo('https://github.com/29nls/rodakawan'), '29nls/rodakawan');
+    assert.equal(parseGitHubRepo('git@github.com:29nls/rodakawan.git'), '29nls/rodakawan');
+    assert.equal(parseGitHubRepo('ssh://git@github.com/29nls/rodakawan.git'), '29nls/rodakawan');
+    // Bukan GitHub → tidak boleh menghasilkan tautan yang salah arah.
+    assert.equal(parseGitHubRepo('https://gitlab.com/29nls/rodakawan.git'), null);
+    assert.equal(parseGitHubRepo('bukan-url'), null);
+    assert.equal(parseGitHubRepo(''), null);
+  });
+
+  it('menuju halaman rilis GitHub untuk tag itu', () => {
+    assert.equal(
+      releaseUrl('29nls/rodakawan', 'v0.2.0'),
+      'https://github.com/29nls/rodakawan/releases/tag/v0.2.0',
+    );
   });
 
   it('menyusun bagian produksi tanpa blok terlipat', () => {
@@ -361,5 +427,108 @@ describe('CLI update-changelog.mjs', () => {
 
     assert.equal(code, 0, stderr);
     assert.ok(read(dir).includes('_Tidak ada perubahan tercatat sejak rilis sebelumnya._'));
+  });
+
+  it('menautkan judul ke halaman rilis dengan --repo dan tetap idempoten', (t) => {
+    const dir = workdir(t);
+    const args = [
+      '--tag',
+      'v1.0.0',
+      '--notes',
+      'catatan.md',
+      '--date',
+      '2026-10-14',
+      '--repo',
+      '29nls/rodakawan',
+    ];
+
+    const pertama = update(dir, args);
+    assert.equal(pertama.code, 0, pertama.stderr);
+    const setelah = read(dir);
+    assert.ok(
+      setelah.includes(
+        '## [v1.0.0](https://github.com/29nls/rodakawan/releases/tag/v1.0.0) — 2026-10-14\n',
+      ),
+      setelah,
+    );
+
+    // Penanda idempoten harus mengenali judul bertautan: percobaan ulang job
+    // setelah `git reset --hard origin/main` tidak boleh menggandakan bagian.
+    const kedua = update(dir, args);
+    assert.equal(kedua.code, 0, kedua.stderr);
+    assert.ok(kedua.stderr.includes('sudah memuat bagian v1.0.0'), kedua.stderr);
+    assert.equal(read(dir), setelah);
+  });
+
+  it('memakai GITHUB_REPOSITORY bila --repo tidak diisi', (t) => {
+    const dir = workdir(t);
+    const { code, stderr } = update(
+      dir,
+      ['--tag', 'v1.0.0', '--notes', 'catatan.md', '--date', '2026-10-14'],
+      { GITHUB_REPOSITORY: 'pemilik/proyek-lain' },
+    );
+
+    assert.equal(code, 0, stderr);
+    assert.ok(
+      read(dir).includes(
+        '## [v1.0.0](https://github.com/pemilik/proyek-lain/releases/tag/v1.0.0) —',
+      ),
+      read(dir),
+    );
+  });
+
+  it('memakai remote origin checkout yang sedang berjalan', (t) => {
+    const repo = createRepo(t);
+    repo.git('remote', 'add', 'origin', 'https://github.com/29nls/rodakawan.git');
+    fs.writeFileSync(path.join(repo.dir, 'catatan.md'), NOTES);
+
+    const { code, stderr } = update(repo.dir, [
+      '--tag',
+      'v1.0.0',
+      '--notes',
+      'catatan.md',
+      '--date',
+      '2026-10-14',
+    ]);
+
+    assert.equal(code, 0, stderr);
+    assert.ok(
+      fs
+        .readFileSync(path.join(repo.dir, 'CHANGELOG.md'), 'utf8')
+        .includes('## [v1.0.0](https://github.com/29nls/rodakawan/releases/tag/v1.0.0) —'),
+    );
+  });
+
+  it('tetap mencatat rilis (tanpa tautan + peringatan) bila repository tidak dikenali', (t) => {
+    const dir = workdir(t);
+    const { code, stderr } = update(dir, [
+      '--tag',
+      'v1.0.0',
+      '--notes',
+      'catatan.md',
+      '--date',
+      '2026-10-14',
+    ]);
+
+    // Pencatatan rilis tidak boleh digagalkan oleh tautan yang gagal dibuat.
+    assert.equal(code, 0, stderr);
+    assert.ok(read(dir).includes('## v1.0.0 — 2026-10-14\n'), read(dir));
+    assert.ok(stderr.includes('::warning::Repository GitHub tidak dikenali'), stderr);
+  });
+
+  it('menolak --repo yang bukan bentuk owner/repo', (t) => {
+    const dir = workdir(t);
+    const { code, stderr } = update(dir, [
+      '--tag',
+      'v1.0.0',
+      '--notes',
+      'catatan.md',
+      '--repo',
+      'https://github.com/29nls/rodakawan',
+    ]);
+
+    assert.equal(code, 1);
+    assert.ok(stderr.includes('Nilai --repo bukan bentuk owner/repo'), stderr);
+    assert.equal(fs.existsSync(path.join(dir, 'CHANGELOG.md')), false);
   });
 });
