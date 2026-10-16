@@ -43,7 +43,8 @@ dikonfigurasi di repo ini.
 npm run typecheck
 npm run lint
 npm run format:check
-npm test                 # komponen & hooks aplikasi (Jest)
+npm run deps:check       # versi dependency terhadap Expo SDK yang terpasang
+npm test                 # komponen & hooks aplikasi (Jest); menjalankan deps:check lebih dulu
 npm run test:scripts     # script rilis: pengelompokan catatan rilis & rentang commit
 npm run doctor
 npm run export:android   # verifikasi bundel Android tanpa perangkat
@@ -55,7 +56,10 @@ directori sementara untuk membuktikan parsing keluaran `git log` dan pemilihan t
 tetap dipakai untuk kode aplikasi di `src/`. Keduanya berjalan di CI.
 
 Tetap pakai satu package manager (npm) dan commit lockfile. Sebelum memasang dependency native baru,
-baca dokumentasi kompatibilitasnya dengan Expo SDK aktif lalu jalankan `npm run doctor`.
+baca dokumentasi kompatibilitasnya dengan Expo SDK aktif, lalu jalankan `npm run deps:check` lebih
+dulu — ia memakai CLI Expo yang terpasang (`expo install --check`, ±3 detik termasuk startup npm)
+dan gagal dengan daftar paket yang perlu disesuaikan; `npm run doctor` tetap dipakai sebagai pemeriksaan
+menyeluruh sebelum rilis.
 
 ## 4. Hubungkan Supabase (langkah konkret Milestone 1)
 
@@ -780,6 +784,7 @@ npx expo start
 npm run typecheck
 npm run lint
 npm run format:check
+npm run deps:check
 npm test
 npm run test:scripts
 npm run doctor

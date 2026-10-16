@@ -127,11 +127,22 @@ pernah ditampilkan di layar.
 npm run typecheck        # TypeScript strict tanpa emit
 npm run lint             # ESLint (eslint-config-expo + Prettier)
 npm run format:check     # pastikan format Prettier
-npm test                 # unit + komponen test (jest-expo)
-npm run doctor           # expo-doctor
+npm run deps:check       # versi dependency terhadap Expo SDK yang terpasang (≈3 detik)
+npm test                 # unit + komponen test (jest-expo); menjalankan deps:check lebih dulu
+npm run doctor           # expo-doctor (pemeriksaan menyeluruh)
 npm run export:android   # bundel Android (Metro + Hermes) tanpa perangkat
 npm run db:test          # uji RLS ke database development (butuh .env.db / DATABASE_URL)
 ```
+
+`npm test` menjalankan `npm run deps:check` lebih dulu (`pretest` di `package.json`), karena
+ketidakcocokan versi dependency dengan SDK adalah penyebab kegagalan yang sudah pernah mematikan
+gerbang rilis (ADR-053) dan baru terlihat di CI — di sana letaknya setelah seluruh test berjalan.
+Pemeriksaan itu memakai CLI Expo yang terpasang (`expo install --check`), jadi aturannya sama dengan
+`npm run doctor` dan tidak digandakan di repo ini. Ongkosnya ±3 detik pada mesin pengembang
+(termasuk startup npm dan Node; pemeriksaan CLI-nya sendiri ±1 detik), sedangkan `npm run doctor`
+yang menyeluruh tetap dijalankan di CI. Bila daftar versi resmi Expo tidak terjangkau
+(sedang offline), pemeriksaan melaporkan bahwa hasilnya **tidak bisa dipastikan** dengan
+`::warning::` dan tidak menggagalkan `npm test` — lulus hanya dilaporkan bila benar-benar diperiksa.
 
 Hasil nyata pada commit ini (13 Oktober 2026, Node 24.18, npm 12):
 

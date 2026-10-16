@@ -119,6 +119,7 @@ const commands: readonly { label: string; command: string }[] = [
   { label: 'Jalankan aplikasi', command: 'npx expo start' },
   { label: 'Pemeriksaan tipe', command: 'npm run typecheck' },
   { label: 'Lint', command: 'npm run lint' },
+  { label: 'Versi dependency SDK', command: 'npm run deps:check' },
   { label: 'Test unit', command: 'npm test' },
   { label: 'Kesehatan project', command: 'npm run doctor' },
   {

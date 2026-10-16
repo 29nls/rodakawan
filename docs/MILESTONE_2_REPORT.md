@@ -30,7 +30,7 @@ diganti pada migrasi ketiga dan uji itu lulus.
 | `npx jest --ci`          | LULUS — 20 suite / 222 test (sebelumnya 18 / 205)            |
 | `npm run test:scripts`   | LULUS                                                        |
 | `npm run export:android` | LULUS                                                        |
-| `npm run doctor`         | **GAGAL (pra-ada)** — patch drift `expo 57.0.29` vs `~57.0.30` dan `expo-router 57.0.27` vs `~57.0.28`; tidak ada perubahan dependensi pada pekerjaan ini |
+| `npm run doctor`         | LULUS — 21/21 pemeriksaan (sebelumnya GAGAL karena patch drift `expo 57.0.29` dan `expo-router 57.0.27`; keduanya dinaikkan ke `~57.0.30` / `~57.0.28`, lihat ADR-053) |
 
 Cakupan uji RLS baru (dua pengguna terautentikasi + anggota ketiga + `anon`):
 pembuatan klub atomik, slug bentrok, non-anggota tidak membaca klub privat,
@@ -60,7 +60,7 @@ jejak audit tidak bisa dibaca anggota biasa, dan `anon` menolak semua EXECUTE.
 - **Perangkat fisik & alur auth nyata masih BLOCKED** untuk pemilik aplikasi
   (APK `v0.1.0-build9`, SHA-256 `1eb92d04…25b`): registrasi, konfirmasi email,
   login, reset sandi, sesi, logout, edit profil, privasi lintas pengguna.
-- `npm run doctor` masih gagal karena patch drift dependensi pra-ada.
+- `npm run doctor` sudah lulus: drift patch `expo`/`expo-router` ditutup dengan menaikkan dua paket itu ke versi yang diminta SDK 57 (ADR-053). Karena itu angka pada tabel bagian 2 di atas diukur ulang **setelah** kenaikan tersebut.
 - Uji layar di sini memakai client palsu (bukan jaringan nyata); bukti jaringan nyata
   ada pada uji RLS/RPC di database development.
 
