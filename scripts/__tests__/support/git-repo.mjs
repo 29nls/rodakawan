@@ -67,12 +67,20 @@ export function createRepo(t) {
  * `env` menambahkan variabel lingkungan untuk proses itu saja — dipakai test yang
  * mengganti program `adb` dengan tiruannya, sehingga test lain dan lingkungan test
  * itu sendiri tidak terpengaruh.
+ *
+ * `unset` menghapus nama variabel dari lingkungan proses itu. Diperlukan untuk
+ * membuktikan perilaku "variabel benar-benar tidak ada": tanpa ini, variabel yang
+ * kebetulan diset di mesin penguji akan lolos ke proses anak dan hasil test
+ * bergantung pada mesin, bukan pada kode.
  */
-export function runScript(dir, relativePath, args = [], { env = {} } = {}) {
+export function runScript(dir, relativePath, args = [], { env = {}, unset = [] } = {}) {
+  const childEnv = { ...process.env, ...env };
+  for (const nama of unset) delete childEnv[nama];
+
   const result = spawnSync(process.execPath, [path.resolve(SCRIPTS_DIR, relativePath), ...args], {
     cwd: dir,
     encoding: 'utf8',
-    env: { ...process.env, ...env },
+    env: childEnv,
   });
 
   return { stdout: result.stdout ?? '', stderr: result.stderr ?? '', code: result.status };

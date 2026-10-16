@@ -54,6 +54,18 @@ export const APP_ENV_VARS = [
   'EXPO_PUBLIC_MAP_STYLE_URL', // EXPO_PUBLIC_MAP_STYLE_URL: opsional, lihat aturan di collectAppEnv.
 ];
 
+/**
+ * Pasangan `nama=nilai` yang benar-benar ditulis ke berkas, urut sesuai
+ * `APP_ENV_VARS`. Satu-satunya sumber kebenaran untuk isi berkas **dan** jumlah
+ * variabel yang dilaporkan, supaya hitungannya tidak bisa menyimpang dari isinya
+ * ketika variabel opsional (`EXPO_PUBLIC_MAP_STYLE_URL`) tidak diisi.
+ */
+export function writtenAppEnv(values) {
+  return APP_ENV_VARS.filter((nama) => values[nama] !== undefined && values[nama] !== '').map(
+    (nama) => `${nama}=${values[nama]}`,
+  );
+}
+
 /** Isi `.env.local` untuk nilai yang sudah lengkap. */
 export function appEnvFile(values) {
   const header = [
@@ -62,10 +74,7 @@ export function appEnvFile(values) {
     '# aman untuk publik (lihat .env.example).',
     '',
   ];
-  const baris = APP_ENV_VARS.filter(
-    (nama) => values[nama] !== undefined && values[nama] !== '',
-  ).map((nama) => `${nama}=${values[nama]}`);
-  return `${[...header, ...baris].join('\n')}\n`;
+  return `${[...header, ...writtenAppEnv(values)].join('\n')}\n`;
 }
 
 /**
@@ -111,13 +120,16 @@ function main() {
 
   const out = options['--out'] ?? '.env.local';
   const values = collectAppEnv(process.env);
+  const written = writtenAppEnv(values);
 
   fs.writeFileSync(out, appEnvFile(values), { mode: 0o600 });
 
+  // Dihitung dari variabel yang benar-benar ditulis, bukan panjang daftar tetap:
+  // tanpa EXPO_PUBLIC_MAP_STYLE_URL isinya dua, dan log harus mengatakan dua.
   console.error(
-    `::notice::Konfigurasi publik aplikasi ditulis ke ${out} (${APP_ENV_VARS.length} variabel; nilainya tidak dicetak).`,
+    `::notice::Konfigurasi publik aplikasi ditulis ke ${out} (${written.length} variabel; nilainya tidak dicetak).`,
   );
-  process.stdout.write(`variabel=${APP_ENV_VARS.length}\nberkas=${out}\n`);
+  process.stdout.write(`variabel=${written.length}\nberkas=${out}\n`);
 }
 
 // CLI hanya berjalan bila berkas ini dieksekusi langsung; fungsi di atas murni dan

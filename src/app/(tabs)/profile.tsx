@@ -217,6 +217,15 @@ export default function ProfileScreen() {
 
       <Card padding="none">
         <LinkRow
+          detail="Daftar kendaraan Anda. Nomor polisi dan catatan pribadi dibuka terpisah dan tetap privat."
+          href="/garage"
+          icon="bicycle-outline"
+          label="Garasi saya"
+        />
+      </Card>
+
+      <Card padding="none">
+        <LinkRow
           detail="Token desain, komponen dasar, dan status pemeriksaan."
           href="/system"
           icon="construct-outline"

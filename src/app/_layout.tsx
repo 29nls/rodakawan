@@ -50,6 +50,11 @@ function RootNavigator() {
         <Stack.Screen name="system" />
         <Stack.Screen name="profile/edit" />
         <Stack.Screen name="reset-password" />
+        {/* Milestone 2: garasi dan klub, semuanya di dalam penjaga sesi. */}
+        <Stack.Screen name="garage" />
+        <Stack.Screen name="vehicle" />
+        <Stack.Screen name="club" />
+        <Stack.Screen name="club-admin" />
       </Stack.Protected>
 
       <Stack.Protected guard={resolved && session === null}>

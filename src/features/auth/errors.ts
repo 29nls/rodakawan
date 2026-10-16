@@ -21,6 +21,11 @@ export type AppErrorCode =
   | 'username_taken'
   | 'profile_missing'
   | 'not_authorized'
+  /** Kode generik untuk tabel selain `public.profiles` (klub, garasi). */
+  | 'conflict'
+  | 'invalid_data'
+  | 'not_found'
+  | 'table_missing'
   | 'session_expired'
   | 'link_expired'
   | 'unknown';
@@ -56,6 +61,18 @@ const NETWORK_ERROR: AppError = {
 };
 
 export const NETWORK_APP_ERROR = NETWORK_ERROR;
+
+/**
+ * Update/delete tidak mengenai baris apa pun: barisnya tidak ada, bukan milik
+ * akun ini, atau policy RLS menolaknya. Dipakai bersama `mapTableError` untuk
+ * menghindari "sukses palsu" ketika 0 baris terpengaruh.
+ */
+export const ROW_NOT_APPLIED_ERROR: AppError = {
+  code: 'not_authorized',
+  message:
+    'Perubahan tidak diterapkan: data ini bukan milik akun Anda, atau sesi Anda sudah berakhir. Muat ulang lalu coba lagi.',
+  retryable: false,
+};
 
 function toErrorLike(error: unknown): ErrorLike {
   if (typeof error === 'object' && error !== null) return error as ErrorLike;
@@ -218,5 +235,108 @@ export function mapProfileError(error: unknown): AppError {
       };
     default:
       return UNKNOWN_ERROR;
+  }
+}
+
+/**
+ * Error dari PostgREST untuk tabel selain `public.profiles` (klub, garasi).
+ *
+ * Dipisahkan dari `mapProfileError` karena pesannya berbeda: benturan username
+ * pada profil dan benturan nama/alamat klub sama-sama berkode `23505`, tetapi
+ * saran perbaikannya tidak sama. Kode yang dikembalikan tetap himpunan `AppErrorCode`
+ * sehingga pemanggil dapat menanganinya secara seragam.
+ */
+export function mapTableError(error: unknown): AppError {
+  const like = toErrorLike(error);
+
+  if (isFetchFailure(like)) return NETWORK_ERROR;
+
+  switch (like.code) {
+    case '23505':
+      return {
+        code: 'conflict',
+        message:
+          'Nilai ini sudah dipakai data lain (mis. nama klub yang sudah ada). Ubah sedikit, lalu simpan lagi.',
+        retryable: false,
+      };
+    case '23503':
+      return {
+        code: 'invalid_data',
+        message:
+          'Data ini menunjuk baris yang tidak ada atau masih dipakai baris lain. Muat ulang halaman lalu coba lagi.',
+        retryable: false,
+      };
+    case '23514':
+      return {
+        code: 'invalid_data',
+        message: 'Data ditolak oleh aturan database. Periksa kembali isian Anda, lalu simpan lagi.',
+        retryable: false,
+      };
+    case '42501':
+    case 'PGRST301':
+      return {
+        code: 'not_authorized',
+        message:
+          'Database menolak perubahan ini. Kemungkinan sesi Anda sudah berakhir atau data bukan milik akun Anda; masuk kembali lalu coba lagi.',
+        retryable: false,
+      };
+    case 'PGRST116':
+      // 0 baris terpengaruh: baris tidak ada, atau bukan milik sesi ini (RLS).
+      return {
+        code: 'not_found',
+        message:
+          'Data tidak ditemukan atau bukan milik akun Anda. Muat ulang halaman, lalu coba lagi.',
+        retryable: false,
+      };
+    case 'P0002':
+      // `raise ... using errcode = 'P0002'` dari RPC: baris target tidak ada.
+      return {
+        code: 'not_found',
+        message: 'Data yang dituju tidak ada lagi di database. Muat ulang halaman, lalu coba lagi.',
+        retryable: false,
+      };
+    case '22023':
+      // Argumen ditolak RPC (mis. peran tidak dikenal, status bukan pending).
+      return {
+        code: 'invalid_data',
+        message:
+          'Permintaan ini ditolak aturan klub. Muat ulang data terbaru, lalu ulangi dengan pilihan yang tersedia.',
+        retryable: false,
+      };
+    case 'PGRST205':
+    case '42P01':
+      return {
+        code: 'table_missing',
+        message:
+          'Tabel ini belum tersedia di backend. Jalankan migration Supabase (lihat docs/SETUP_GUIDE.md) lalu coba lagi.',
+        retryable: false,
+      };
+    default:
+      return UNKNOWN_ERROR;
+  }
+}
+
+/**
+ * Error dari pemanggilan RPC (`client.rpc(...)`).
+ *
+ * Beda penting dibanding `mapTableError`: bila fungsi RPC-nya sendiri belum ada di
+ * backend, PostgREST menjawab `PGRST202` (dan PostgreSQL `42883`). Itu bukan
+ * kegagalan sementara, jadi pesannya harus menyebut migration yang belum
+ * diterapkan — bukan "terjadi kesalahan" yang menyuruh pengguna mencoba lagi.
+ */
+export function mapRpcError(error: unknown): AppError {
+  const like = toErrorLike(error);
+
+  switch (like.code) {
+    case 'PGRST202':
+    case '42883':
+      return {
+        code: 'table_missing',
+        message:
+          'Backend belum memuat fungsi keanggotaan klub. Terapkan migration Milestone 2 (20261016093000_club_membership_rpc.sql) lalu coba lagi — lihat docs/SETUP_GUIDE.md.',
+        retryable: false,
+      };
+    default:
+      return mapTableError(error);
   }
 }

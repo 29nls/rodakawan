@@ -17,7 +17,14 @@
 -- 10. pemilik profil dapat menerima permintaan (`accept_follow_request`) dan mencabut akses
 --    (DELETE), sedangkan UPDATE langsung pada `public.follows` selalu 0 baris;
 -- 11. detail privat kendaraan hanya dapat dibuat/diubah untuk kendaraan milik sendiri,
---    termasuk ketika `motorcycle_id` diubah (dijaga policy dan foreign key komposit).
+--    termasuk ketika `motorcycle_id` diubah (dijaga policy dan foreign key komposit);
+-- 12. invarian "satu kendaraan primary per pemilik" dijaga trigger dan partial unique index
+--    (Milestone 2);
+-- 13. pembuatan klub dan seluruh mutasi keanggotaan hanya lewat RPC keamanan-definer:
+--    non-anggota tidak membaca klub privat, anggota tidak menyetujui dirinya sendiri,
+--    owner terakhir tidak bisa diturunkan/dikeluarkan, klub invite_only menolak permintaan,
+--    peran admin member tidak terlihat oleh anggota biasa, dan peran `anon` tidak punya
+--    EXECUTE satu pun (Milestone 2).
 --
 -- Cakupan berkas ini lebih luas dari namanya: ia adalah rangkaian uji RLS Milestone 1/1.6
 -- untuk `public.profiles`, `public.follows`, dan `public.motorcycle_private_details`.
@@ -42,14 +49,16 @@ delete from public.profiles where id in (
   '22222222-2222-2222-2222-222222222222',
   '33333333-3333-3333-3333-333333333333',
   '44444444-4444-4444-4444-444444444444',
-  '55555555-5555-5555-5555-555555555555'
+  '55555555-5555-5555-5555-555555555555',
+  '99999999-9999-9999-9999-999999999999'
 );
 delete from auth.users where id in (
   '11111111-1111-1111-1111-111111111111',
   '22222222-2222-2222-2222-222222222222',
   '33333333-3333-3333-3333-333333333333',
   '44444444-4444-4444-4444-444444444444',
-  '55555555-5555-5555-5555-555555555555'
+  '55555555-5555-5555-5555-555555555555',
+  '99999999-9999-9999-9999-999999999999'
 );
 
 -- 0b. Paritas skema: pastikan migration Milestone 1.6 sudah diterapkan sebelum menguji.
@@ -933,9 +942,763 @@ where motorcycle_id = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
 
 reset role;
 
+-- ============================================================================
+-- 8. Milestone 2 — paritas objek keanggotaan klub di database development
+-- ============================================================================
+do $$
+declare
+  v_fungsi int;
+  v_missing text[] := array[]::text[];
+begin
+  if to_regclass('public.club_role_audit') is null then
+    v_missing := v_missing || 'tabel public.club_role_audit'::text;
+  end if;
+
+  select count(distinct p.proname) into v_fungsi
+  from pg_proc p
+  join pg_namespace n on n.oid = p.pronamespace
+  where n.nspname = 'public'
+    and p.proname in (
+      'create_club',
+      'request_club_membership',
+      'review_club_membership',
+      'set_club_member_role',
+      'remove_club_member',
+      'leave_club'
+    );
+
+  if v_fungsi <> 6 then
+    v_missing := v_missing || format('6 fungsi RPC keanggotaan klub (ditemukan %s)', v_fungsi)::text;
+  end if;
+
+  if exists (
+    select 1 from pg_policies
+    where schemaname = 'public' and tablename = 'clubs' and cmd = 'INSERT'
+  ) then
+    v_missing := v_missing || 'policy INSERT pada public.clubs (seharusnya tidak ada: lewat RPC)'::text;
+  end if;
+
+  if exists (
+    select 1 from pg_policies
+    where schemaname = 'public' and tablename = 'club_members'
+      and cmd in ('INSERT', 'UPDATE', 'DELETE', 'ALL')
+  ) then
+    v_missing := v_missing || 'policy tulis pada public.club_members (seharusnya tidak ada: lewat RPC)'::text;
+  end if;
+
+  if exists (
+    select 1 from pg_policies
+    where schemaname = 'public' and tablename = 'club_role_audit'
+      and cmd in ('INSERT', 'UPDATE', 'DELETE', 'ALL')
+  ) then
+    v_missing := v_missing || 'policy tulis pada public.club_role_audit (jejak audit tidak boleh bisa ditempa klien)'::text;
+  end if;
+
+  if array_length(v_missing, 1) is not null then
+    raise exception 'UJI GAGAL (paritas skema Milestone 2): % — terapkan migration 20261016093000_club_membership_rpc.sql lebih dulu.',
+      array_to_string(v_missing, ', ');
+  end if;
+
+  raise notice 'UJI: objek RPC keanggotaan klub tersedia dan tetap tanpa policy tulis klien';
+end;
+$$;
+
+do $$
+declare
+  v_missing text[] := array[]::text[];
+begin
+  if not exists (
+    select 1 from pg_policies
+    where schemaname = 'public' and tablename = 'club_role_audit'
+      and policyname = 'club_role_audit_select_admin'
+  ) then
+    v_missing := v_missing || 'policy club_role_audit_select_admin'::text;
+  end if;
+
+  if has_function_privilege('anon', 'public.create_club(text,text,text,text,text)', 'EXECUTE') then
+    v_missing := v_missing || 'peran anon masih boleh EXECUTE create_club'::text;
+  end if;
+
+  if has_function_privilege('anon', 'public.request_club_membership(uuid)', 'EXECUTE') then
+    v_missing := v_missing || 'peran anon masih boleh EXECUTE request_club_membership'::text;
+  end if;
+
+  if has_function_privilege('anon', 'public.review_club_membership(uuid,uuid,boolean)', 'EXECUTE') then
+    v_missing := v_missing || 'peran anon masih boleh EXECUTE review_club_membership'::text;
+  end if;
+
+  if not has_function_privilege('authenticated', 'public.create_club(text,text,text,text,text)', 'EXECUTE') then
+    v_missing := v_missing || 'authenticated tidak punya EXECUTE create_club'::text;
+  end if;
+
+  if not exists (
+    select 1 from pg_trigger t
+    where t.tgname = 'motorcycles_single_primary'
+      and t.tgrelid = 'public.motorcycles'::regclass
+      and not t.tgisinternal
+  ) then
+    v_missing := v_missing || 'trigger motorcycles_single_primary'::text;
+  end if;
+
+  if to_regclass('public.motorcycles_single_primary_idx') is null then
+    v_missing := v_missing || 'index parsial motorcycles_single_primary_idx'::text;
+  end if;
+
+  if array_length(v_missing, 1) is not null then
+    raise exception 'UJI GAGAL (paritas skema Milestone 2): % — terapkan migration 20261016093000_club_membership_rpc.sql dan 20261016094500_single_primary_vehicle.sql lebih dulu.',
+      array_to_string(v_missing, ', ');
+  end if;
+
+  raise notice 'UJI: hak eksekusi RPC benar (anon nol, authenticated ada) dan invarian primary terpasang';
+end;
+$$;
+
+-- ----------------------------------------------------------------------------
+-- 9. Invarian "satu kendaraan primary per pemilik"
+-- ----------------------------------------------------------------------------
+do $$
+declare
+  v_primary uuid;
+  v_count int;
+begin
+  insert into public.motorcycles (id, owner_id, make, model, is_primary)
+  values
+    (
+      'dddddddd-dddd-dddd-dddd-dddddddddddd',
+      '11111111-1111-1111-1111-111111111111', 'Honda', 'Vario', true
+    ),
+    (
+      'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee',
+      '11111111-1111-1111-1111-111111111111', 'Yamaha', 'NMAX', false
+    );
+
+  update public.motorcycles
+  set is_primary = true, updated_at = now()
+  where id = 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee';
+
+  select count(*) into v_count
+  from public.motorcycles
+  where owner_id = '11111111-1111-1111-1111-111111111111' and is_primary;
+
+  if v_count <> 1 then
+    raise exception 'UJI GAGAL: satu pemilik memiliki % kendaraan primary', v_count;
+  end if;
+
+  select id into v_primary
+  from public.motorcycles
+  where owner_id = '11111111-1111-1111-1111-111111111111' and is_primary;
+
+  if v_primary <> 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee' then
+    raise exception 'UJI GAGAL: primary tidak berpindah ke kendaraan yang dipilih (%)', v_primary;
+  end if;
+
+  raise notice 'UJI: trigger memindahkan status primary, bukan menumpuk dua primary';
+end;
+$$;
+
+-- 9b. Jaring terakhir: tanpa trigger, dua primary tetap ditolak partial unique index.
+do $$
+declare
+  v_state text;
+begin
+  alter table public.motorcycles disable trigger motorcycles_single_primary;
+
+  begin
+    insert into public.motorcycles (owner_id, make, model, is_primary)
+    values ('11111111-1111-1111-1111-111111111111', 'Suzuki', 'Satria', true);
+
+    alter table public.motorcycles enable trigger motorcycles_single_primary;
+    raise exception 'UJI GAGAL: database menerima dua kendaraan primary saat trigger dimatikan';
+  exception
+    when unique_violation then
+      get stacked diagnostics v_state = returned_sqlstate;
+      alter table public.motorcycles enable trigger motorcycles_single_primary;
+      raise notice 'UJI: primary ganda ditolak partial unique index (SQLSTATE %)', v_state;
+  end;
+end;
+$$;
+
+-- ----------------------------------------------------------------------------
+-- 10. Klub: pembuatan, keanggotaan, peran, dan keluar
+-- ----------------------------------------------------------------------------
+-- Tabel konteks pengujian: id klub dihasilkan RPC, sementara pengujian berikutnya
+-- berjalan dengan peran `authenticated` yang (dengan sengaja) tidak selalu boleh
+-- membaca baris klub yang bersangkutan.
+create table public.uji_m2_konteks (
+  nama text primary key,
+  club_id uuid
+);
+grant select, insert, update, delete on public.uji_m2_konteks to authenticated;
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+
+-- 10a. Pembuatan klub + owner aktif + jejak audit dalam satu transaksi.
+do $$
+declare
+  v_klub jsonb;
+  v_id uuid;
+  v_member public.club_members;
+  v_audit int;
+begin
+  v_klub := public.create_club(
+    'Uji Klub Privat',
+    'uji-klub-privat',
+    'Klub privat untuk pengujian RLS.',
+    'private',
+    'approval'
+  );
+  v_id := (v_klub ->> 'id')::uuid;
+  insert into public.uji_m2_konteks (nama, club_id) values ('privat', v_id);
+
+  if (v_klub ->> 'visibility') <> 'private' then
+    raise exception 'UJI GAGAL: klub yang dibuat bukan privat (%)', v_klub ->> 'visibility';
+  end if;
+
+  if (v_klub ->> 'created_by')::uuid <> '11111111-1111-1111-1111-111111111111' then
+    raise exception 'UJI GAGAL: created_by tidak diambil dari sesi (%), bukti klien bisa memalsukan pemilik',
+      v_klub ->> 'created_by';
+  end if;
+
+  select * into v_member
+  from public.club_members
+  where club_id = v_id and user_id = '11111111-1111-1111-1111-111111111111';
+
+  if not found or v_member.role <> 'owner' or v_member.status <> 'active' or v_member.joined_at is null then
+    raise exception 'UJI GAGAL: pembuat klub tidak menjadi owner aktif di klubnya sendiri';
+  end if;
+
+  select count(*) into v_audit
+  from public.club_role_audit where club_id = v_id and action = 'club_created';
+
+  if v_audit <> 1 then
+    raise exception 'UJI GAGAL: jejak audit pembuatan klub % baris', v_audit;
+  end if;
+
+  raise notice 'UJI: create_club membuat klub, owner aktif, dan jejak audit sekaligus';
+
+  v_klub := public.create_club('Uji Klub Publik', 'uji-klub-publik', null, 'public', 'open');
+  insert into public.uji_m2_konteks (nama, club_id) values ('publik', (v_klub ->> 'id')::uuid);
+
+  v_klub := public.create_club('Uji Klub Undangan', 'uji-klub-undangan', null, 'public', 'invite_only');
+  insert into public.uji_m2_konteks (nama, club_id) values ('undangan', (v_klub ->> 'id')::uuid);
+end;
+$$;
+
+-- 10b. Slug yang sudah dipakai tidak menimpa klub lama.
+do $$
+declare
+  v_klub jsonb;
+begin
+  v_klub := public.create_club('Uji Klub Privat', 'uji-klub-privat', null, 'private', 'approval');
+
+  if (v_klub ->> 'slug') = 'uji-klub-privat' then
+    raise exception 'UJI GAGAL: slug duplikat diterima apa adanya';
+  end if;
+
+  raise notice 'UJI: slug bentrok diberi akhiran otomatis (%)', v_klub ->> 'slug';
+end;
+$$;
+
+-- 10c. Argumen tidak sah ditolak sebelum menyentuh tabel.
 do $$
 begin
-  raise notice 'UJI RLS PROFIL LULUS: izin dan penolakan sesuai harapan (profil, follow, garasi).';
+  begin
+    perform public.create_club('X', null, null, 'public', 'open');
+    raise exception 'UJI GAGAL: nama klub satu karakter diterima';
+  exception
+    when invalid_parameter_value then
+      raise notice 'UJI: nama klub terlalu pendek ditolak (SQLSTATE 22023)';
+  end;
+
+  begin
+    perform public.create_club('Klub Uji', null, null, 'rahasia', 'open');
+    raise exception 'UJI GAGAL: visibilitas tidak dikenal diterima';
+  exception
+    when invalid_parameter_value then
+      raise notice 'UJI: visibilitas tidak dikenal ditolak (SQLSTATE 22023)';
+  end;
+end;
+$$;
+
+-- 10d. Tanpa sesi: tidak ada baca, tidak ada eksekusi.
+set local role anon;
+set local request.jwt.claims = '{"role":"anon"}';
+
+do $$
+declare
+  v_rows int;
+begin
+  select count(*) into v_rows from public.clubs;
+  if v_rows <> 0 then
+    raise exception 'UJI GAGAL: peran anon membaca % baris klub', v_rows;
+  end if;
+
+  select count(*) into v_rows from public.club_members;
+  if v_rows <> 0 then
+    raise exception 'UJI GAGAL: peran anon membaca % baris keanggotaan', v_rows;
+  end if;
+
+  select count(*) into v_rows from public.club_role_audit;
+  if v_rows <> 0 then
+    raise exception 'UJI GAGAL: peran anon membaca % baris jejak audit', v_rows;
+  end if;
+
+  begin
+    perform public.create_club('Klub Anon', 'klub-anon', null, 'public', 'open');
+    raise exception 'UJI GAGAL: peran anon dapat membuat klub';
+  exception
+    when insufficient_privilege then
+      raise notice 'UJI: anon tidak punya EXECUTE create_club (SQLSTATE 42501)';
+  end;
+
+  begin
+    perform public.request_club_membership('dddddddd-0000-0000-0000-000000000000');
+    raise exception 'UJI GAGAL: peran anon dapat mengajukan keanggotaan';
+  exception
+    when insufficient_privilege then
+      raise notice 'UJI: anon tidak punya EXECUTE request_club_membership (SQLSTATE 42501)';
+  end;
+
+  begin
+    insert into public.club_members (club_id, user_id, role, status)
+    values (
+      'dddddddd-0000-0000-0000-000000000000',
+      '11111111-1111-1111-1111-111111111111',
+      'owner',
+      'active'
+    );
+
+    raise exception 'UJI GAGAL: peran anon menulis baris keanggotaan';
+  exception
+    when insufficient_privilege then
+      raise notice 'UJI: anon tidak bisa menulis keanggotaan langsung (SQLSTATE 42501)';
+  end;
+end;
+$$;
+
+-- 10e. Non-anggota klub privat: baca ditolak, semua jalur otorisasi ditolak.
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+
+do $$
+declare
+  v_priv uuid;
+  v_pub uuid;
+  v_undang uuid;
+  v_rows int;
+  v_status text;
+begin
+  select club_id into v_priv from public.uji_m2_konteks where nama = 'privat';
+  select club_id into v_pub from public.uji_m2_konteks where nama = 'publik';
+  select club_id into v_undang from public.uji_m2_konteks where nama = 'undangan';
+
+  select count(*) into v_rows from public.clubs where id = v_priv;
+  if v_rows <> 0 then
+    raise exception 'UJI GAGAL: non-anggota membaca klub privat (% baris)', v_rows;
+  end if;
+
+  select count(*) into v_rows from public.club_members where club_id = v_priv;
+  if v_rows <> 0 then
+    raise exception 'UJI GAGAL: non-anggota membaca keanggotaan klub privat (% baris)', v_rows;
+  end if;
+
+  -- Kontrol positif: klub publik tetap terlihat.
+  select count(*) into v_rows from public.clubs where id = v_pub;
+  if v_rows <> 1 then
+    raise exception 'UJI GAGAL: klub publik tidak terbaca pengguna terautentikasi (% baris)', v_rows;
+  end if;
+
+  v_status := public.request_club_membership(v_priv);
+  if v_status <> 'pending' then
+    raise exception 'UJI GAGAL: permintaan ke klub privat berstatus %', v_status;
+  end if;
+
+  v_status := public.request_club_membership(v_priv);
+  if v_status <> 'pending' then
+    raise exception 'UJI GAGAL: permintaan ulang tidak idempoten (%)', v_status;
+  end if;
+
+  select count(*) into v_rows
+  from public.club_members
+  where club_id = v_priv and user_id = '22222222-2222-2222-2222-222222222222';
+  if v_rows <> 1 then
+    raise exception 'UJI GAGAL: permintaan ulang membuat % baris keanggotaan', v_rows;
+  end if;
+
+  select count(*) into v_rows from public.club_members where club_id = v_priv;
+  if v_rows <> 1 then
+    raise exception 'UJI GAGAL: anggota pending melihat % baris keanggotaan klub privat', v_rows;
+  end if;
+
+  begin
+    perform public.review_club_membership(v_priv, '22222222-2222-2222-2222-222222222222', true);
+    raise exception 'UJI GAGAL: anggota pending menyetujui permintaannya sendiri';
+  exception
+    when insufficient_privilege then
+      raise notice 'UJI: persetujuan permintaan oleh bukan-admin ditolak (SQLSTATE 42501)';
+  end;
+
+  begin
+    perform public.set_club_member_role(v_priv, '22222222-2222-2222-2222-222222222222', 'admin');
+    raise exception 'UJI GAGAL: anggota mempromosikan dirinya sendiri';
+  exception
+    when insufficient_privilege then
+      raise notice 'UJI: promosi peran oleh anggota ditolak (SQLSTATE 42501)';
+  end;
+
+  begin
+    perform public.remove_club_member(v_priv, '11111111-1111-1111-1111-111111111111');
+    raise exception 'UJI GAGAL: anggota mengeluarkan owner klub';
+  exception
+    when insufficient_privilege then
+      raise notice 'UJI: pengeluaran owner oleh anggota ditolak (SQLSTATE 42501)';
+  end;
+
+  select status into v_status
+  from public.club_members
+  where club_id = v_priv and user_id = '22222222-2222-2222-2222-222222222222';
+
+  if v_status <> 'pending' then
+    raise exception 'UJI GAGAL: status berubah menjadi % setelah percobaan yang ditolak', v_status;
+  end if;
+
+  begin
+    perform public.request_club_membership(v_undang);
+    raise exception 'UJI GAGAL: klub invite_only menerima permintaan gabung';
+  exception
+    when insufficient_privilege then
+      raise notice 'UJI: klub invite_only menolak permintaan gabung (SQLSTATE 42501)';
+  end;
+
+  v_status := public.request_club_membership(v_pub);
+  if v_status <> 'active' then
+    raise exception 'UJI GAGAL: klub publik/open tidak menggabungkan anggota langsung (%)', v_status;
+  end if;
+
+  select count(*) into v_rows from public.club_role_audit where club_id = v_pub;
+  if v_rows <> 0 then
+    raise exception 'UJI GAGAL: anggota biasa membaca % baris jejak audit', v_rows;
+  end if;
+
+  raise notice 'UJI: jalur keanggotaan non-anggota sesuai harapan (baca/tulis ditolak, gabung publik aktif)';
+end;
+$$;
+
+-- 10f. Owner: persetujuan, invarian owner terakhir, dan perubahan peran.
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+
+do $$
+declare
+  v_priv uuid;
+  v_rows int;
+  v_rows_updated int;
+  v_status text;
+  v_role text;
+  v_audit int;
+begin
+  select club_id into v_priv from public.uji_m2_konteks where nama = 'privat';
+
+  v_status := public.review_club_membership(v_priv, '22222222-2222-2222-2222-222222222222', true);
+  if v_status <> 'active' then
+    raise exception 'UJI GAGAL: persetujuan owner menghasilkan status %', v_status;
+  end if;
+
+  select count(*) into v_audit
+  from public.club_role_audit
+  where club_id = v_priv
+    and action = 'approve'
+    and subject_id = '22222222-2222-2222-2222-222222222222';
+
+  if v_audit <> 1 then
+    raise exception 'UJI GAGAL: jejak audit persetujuan % baris', v_audit;
+  end if;
+
+  begin
+    perform public.review_club_membership(v_priv, '22222222-2222-2222-2222-222222222222', true);
+    raise exception 'UJI GAGAL: permintaan yang sudah aktif disetujui dua kali';
+  exception
+    when invalid_parameter_value then
+      raise notice 'UJI: persetujuan ulang ditolak karena status bukan pending (SQLSTATE 22023)';
+  end;
+
+  begin
+    perform public.set_club_member_role(v_priv, '11111111-1111-1111-1111-111111111111', 'member');
+    raise exception 'UJI GAGAL: owner terakhir berhasil diturunkan';
+  exception
+    when check_violation then
+      raise notice 'UJI: owner terakhir tidak bisa diturunkan (SQLSTATE 23514)';
+  end;
+
+  begin
+    perform public.remove_club_member(v_priv, '11111111-1111-1111-1111-111111111111');
+    raise exception 'UJI GAGAL: owner berhasil mengeluarkan dirinya sendiri';
+  exception
+    when invalid_parameter_value then
+      raise notice 'UJI: mengeluarkan diri sendiri dialihkan ke aksi keluar klub (SQLSTATE 22023)';
+  end;
+
+  begin
+    perform public.leave_club(v_priv);
+    raise exception 'UJI GAGAL: owner terakhir berhasil keluar dari klub';
+  exception
+    when check_violation then
+      raise notice 'UJI: owner harus mengalihkan kepemilikan sebelum keluar (SQLSTATE 23514)';
+  end;
+
+  v_role := public.set_club_member_role(v_priv, '22222222-2222-2222-2222-222222222222', 'admin');
+  if v_role <> 'admin' then
+    raise exception 'UJI GAGAL: promosi admin menghasilkan %', v_role;
+  end if;
+
+  v_role := public.set_club_member_role(v_priv, '22222222-2222-2222-2222-222222222222', 'owner');
+  if v_role <> 'owner' then
+    raise exception 'UJI GAGAL: promosi owner menghasilkan %', v_role;
+  end if;
+
+  select count(*) into v_audit
+  from public.club_role_audit where club_id = v_priv and action = 'role_change';
+
+  if v_audit <> 2 then
+    raise exception 'UJI GAGAL: jejak audit perubahan peran % baris (harus 2)', v_audit;
+  end if;
+
+  v_role := public.set_club_member_role(v_priv, '11111111-1111-1111-1111-111111111111', 'member');
+  if v_role <> 'member' then
+    raise exception 'UJI GAGAL: penurunan peran saat owner lain tersedia menghasilkan %', v_role;
+  end if;
+
+  begin
+    perform public.set_club_member_role(v_priv, '22222222-2222-2222-2222-222222222222', 'member');
+    raise exception 'UJI GAGAL: anggota biasa mengubah peran anggota lain';
+  exception
+    when insufficient_privilege then
+      raise notice 'UJI: perubahan peran oleh (mantan owner yang kini) member ditolak (SQLSTATE 42501)';
+  end;
+
+  v_status := public.leave_club(v_priv);
+  if v_status <> 'left' then
+    raise exception 'UJI GAGAL: keluar klub menghasilkan status %', v_status;
+  end if;
+
+  -- Pembuat klub yang sudah keluar bukan lagi anggota: akses baca dan ubah harus hilang,
+  -- walaupun kolom `created_by` baris klub itu masih menunjuk padanya.
+  select count(*) into v_rows from public.clubs where id = v_priv;
+  if v_rows <> 0 then
+    raise exception 'UJI GAGAL: pembuat klub yang sudah keluar masih membaca klub privat (% baris)', v_rows;
+  end if;
+
+  update public.clubs set name = 'Uji Klub Privat (diubah mantan owner)' where id = v_priv;
+  get diagnostics v_rows_updated = row_count;
+  if v_rows_updated <> 0 then
+    raise exception 'UJI GAGAL: pembuat klub yang sudah keluar masih mengubah klub privat (% baris)', v_rows_updated;
+  end if;
+
+  raise notice 'UJI: kepemilikan, peran, dan keluar klub berperilaku sesuai aturan (termasuk hilangnya akses created_by)';
+end;
+$$;
+
+-- 10f2. Anggota ketiga: membatalkan permintaan, lalu mengajukan ulang.
+reset role;
+
+insert into auth.users (
+  id, instance_id, aud, role, email, email_confirmed_at,
+  raw_app_meta_data, raw_user_meta_data, created_at, updated_at
+) values (
+  '99999999-9999-9999-9999-999999999999',
+  '00000000-0000-0000-0000-000000000000',
+  'authenticated', 'authenticated', 'uji.m2.klub@contoh.test', now(),
+  '{"provider":"email","providers":["email"]}',
+  '{"username":"uji_user_m2","display_name":"Uji User M2"}',
+  now(), now()
+)
+on conflict (id) do nothing;
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"99999999-9999-9999-9999-999999999999","role":"authenticated"}';
+
+do $$
+declare
+  v_priv uuid;
+  v_status text;
+  v_rows int;
+begin
+  select club_id into v_priv from public.uji_m2_konteks where nama = 'privat';
+
+  v_status := public.request_club_membership(v_priv);
+  if v_status <> 'pending' then
+    raise exception 'UJI GAGAL: permintaan anggota ketiga berstatus %', v_status;
+  end if;
+
+  v_status := public.leave_club(v_priv);
+  if v_status <> 'cancelled' then
+    raise exception 'UJI GAGAL: pembatalan permintaan sendiri menghasilkan status %', v_status;
+  end if;
+
+  v_status := public.leave_club(v_priv);
+  if v_status <> 'left' then
+    raise exception 'UJI GAGAL: keluar klub berulang menghasilkan status %', v_status;
+  end if;
+
+  v_status := public.request_club_membership(v_priv);
+  select count(*) into v_rows
+  from public.club_members
+  where club_id = v_priv and user_id = '99999999-9999-9999-9999-999999999999';
+
+  if v_rows <> 1 then
+    raise exception 'UJI GAGAL: pengajuan ulang membuat % baris keanggotaan', v_rows;
+  end if;
+
+  raise notice 'UJI: permintaan bisa dibatalkan, diajukan ulang, dan tidak pernah menjadi baris ganda';
+end;
+$$;
+
+-- 10g. Owner kedua: keluarkan anggota, tinjau pengguna tak dikenal, dan baca daftar anggota.
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+
+do $$
+declare
+  v_priv uuid;
+  v_status text;
+  v_rows int;
+begin
+  select club_id into v_priv from public.uji_m2_konteks where nama = 'privat';
+
+  begin
+    perform public.leave_club(v_priv);
+    raise exception 'UJI GAGAL: owner dapat keluar tanpa mengalihkan kepemilikan';
+  exception
+    when check_violation then
+      raise notice 'UJI: owner wajib mengalihkan kepemilikan sebelum keluar (SQLSTATE 23514)';
+  end;
+
+  begin
+    perform public.review_club_membership(v_priv, '99999999-0000-0000-0000-000000000000', true);
+    raise exception 'UJI GAGAL: permintaan pengguna tak dikenal dapat disetujui';
+  exception
+    when no_data_found then
+      raise notice 'UJI: tinjauan untuk pengguna tak dikenal ditolak sebagai tidak ditemukan (SQLSTATE P0002)';
+  end;
+
+  v_status := public.review_club_membership(v_priv, '99999999-9999-9999-9999-999999999999', true);
+  if v_status <> 'active' then
+    raise exception 'UJI GAGAL: persetujuan anggota ketiga menghasilkan status %', v_status;
+  end if;
+
+  select count(*) into v_rows
+  from public.club_members
+  where club_id = v_priv and status = 'active';
+
+  if v_rows <> 2 then
+    raise exception 'UJI GAGAL: owner melihat % anggota aktif (harus 2)', v_rows;
+  end if;
+
+  -- Riwayat tetap tersimpan: baris anggota yang sudah keluar tidak dihapus.
+  select count(*) into v_rows from public.club_members where club_id = v_priv;
+  if v_rows <> 3 then
+    raise exception 'UJI GAGAL: owner membaca % baris keanggotaan (harus 3 termasuk riwayat keluar)', v_rows;
+  end if;
+
+  v_status := public.remove_club_member(v_priv, '99999999-9999-9999-9999-999999999999');
+  if v_status <> 'removed' then
+    raise exception 'UJI GAGAL: pengeluaran anggota menghasilkan status %', v_status;
+  end if;
+
+  select count(*) into v_rows
+  from public.club_members
+  where club_id = v_priv
+    and user_id = '99999999-9999-9999-9999-999999999999'
+    and status = 'removed'
+    and role = 'member';
+
+  if v_rows <> 1 then
+    raise exception 'UJI GAGAL: baris anggota yang dikeluarkan tidak berada pada status removed/member';
+  end if;
+
+  raise notice 'UJI: owner dapat menyetujui, membaca daftar anggota, dan mengeluarkan anggota';
+end;
+$$;
+
+-- 10h. Anggota yang dikeluarkan kehilangan akses dan tetap tidak bisa menaikkan peran.
+set local request.jwt.claims = '{"sub":"99999999-9999-9999-9999-999999999999","role":"authenticated"}';
+
+do $$
+declare
+  v_priv uuid;
+  v_rows int;
+  v_status text;
+begin
+  select club_id into v_priv from public.uji_m2_konteks where nama = 'privat';
+
+  select count(*) into v_rows from public.clubs where id = v_priv;
+  if v_rows <> 0 then
+    raise exception 'UJI GAGAL: anggota yang dikeluarkan masih membaca klub privat (% baris)', v_rows;
+  end if;
+
+  select count(*) into v_rows from public.club_members where club_id = v_priv;
+  if v_rows <> 1 then
+    raise exception 'UJI GAGAL: anggota yang dikeluarkan melihat % baris keanggotaan', v_rows;
+  end if;
+
+  begin
+    perform public.set_club_member_role(v_priv, '99999999-9999-9999-9999-999999999999', 'owner');
+    raise exception 'UJI GAGAL: anggota yang dikeluarkan menaikkan perannya sendiri';
+  exception
+    when insufficient_privilege then
+      raise notice 'UJI: anggota yang dikeluarkan tetap tidak bisa mengubah peran (SQLSTATE 42501)';
+  end;
+
+  v_status := public.request_club_membership(v_priv);
+  if v_status <> 'pending' then
+    raise exception 'UJI GAGAL: pengajuan ulang setelah dikeluarkan berstatus %', v_status;
+  end if;
+
+  raise notice 'UJI: anggota yang dikeluarkan kehilangan akses dan harus mengajukan ulang';
+end;
+$$;
+
+-- 10i. Penolakan permintaan: anggota tetap tanpa akses dan tanpa peran istimewa.
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+
+do $$
+declare
+  v_priv uuid;
+  v_status text;
+begin
+  select club_id into v_priv from public.uji_m2_konteks where nama = 'privat';
+
+  v_status := public.review_club_membership(v_priv, '99999999-9999-9999-9999-999999999999', false);
+  if v_status <> 'rejected' then
+    raise exception 'UJI GAGAL: penolakan permintaan menghasilkan status %', v_status;
+  end if;
+
+  begin
+    perform public.remove_club_member(v_priv, '99999999-9999-9999-9999-999999999999');
+    raise exception 'UJI GAGAL: anggota non-aktif dapat dikeluarkan seolah masih aktif';
+  exception
+    when invalid_parameter_value then
+      raise notice 'UJI: pengeluaran anggota non-aktif ditolak (SQLSTATE 22023)';
+  end;
+
+  raise notice 'UJI: penolakan permintaan tercatat dan tidak memberi akses';
+end;
+$$;
+
+reset role;
+drop table if exists public.uji_m2_konteks;
+
+do $$
+declare
+  v_audit int;
+begin
+  select count(*) into v_audit from public.club_role_audit;
+  if v_audit < 8 then
+    raise exception 'UJI GAGAL: jejak audit klub hanya % baris untuk rangkaian aksi di atas', v_audit;
+  end if;
+
+  raise notice 'UJI: jejak audit klub mencatat % perubahan (buat, gabung, setujui, tolak, peran, keluar, keluarkan)',
+    v_audit;
+  raise notice 'UJI RLS PROFIL LULUS: izin dan penolakan sesuai harapan (profil, follow, garasi, klub).';
 end;
 $$;
 

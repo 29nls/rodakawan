@@ -50,7 +50,37 @@ const mockedFetchOwnProfile = jest.mocked(fetchOwnProfile);
 const mockedSignInWithEmail = jest.mocked(signInWithEmail);
 
 const unavailableBackend = { available: false as const, reason: 'not_configured' as const };
-const fakeClient = {} as SupabaseClient<Database>;
+
+/**
+ * Client palsu minimal untuk pengujian navigasi.
+ *
+ * Layar Milestone 2 (Komunitas, Garasi) benar-benar memanggil backend, jadi client
+ * palsu ini harus bisa dirantai seperti PostgREST: `from(...).select(...).eq(...)`
+ * mengembalikan daftar kosong, dan `rpc(...)` mengembalikan status netral. Test ini
+ * tidak menguji jaringan, melainkan rute, penjaga sesi, dan judul layar.
+ */
+function createFakeClient(): SupabaseClient<Database> {
+  const builder = {
+    select: () => builder,
+    eq: () => builder,
+    order: () => builder,
+    insert: () => builder,
+    update: () => builder,
+    upsert: () => builder,
+    delete: () => builder,
+    single: async () => ({ data: null, error: null }),
+    maybeSingle: async () => ({ data: null, error: null }),
+    then: (onFulfilled?: (value: { data: unknown[]; error: null }) => unknown) =>
+      Promise.resolve({ data: [] as unknown[], error: null }).then(onFulfilled),
+  };
+
+  return {
+    from: () => builder,
+    rpc: async () => ({ data: 'pending', error: null }),
+  } as unknown as SupabaseClient<Database>;
+}
+
+const fakeClient = createFakeClient();
 
 function createSignOutSpy() {
   return jest.fn(async () => ({
@@ -128,6 +158,26 @@ describe('gerbang sesi', () => {
   });
 });
 
+describe('rute Milestone 2', () => {
+  it('membuka Garasi setelah masuk dan menampilkan keadaan kosong yang jelas', async () => {
+    mockedUseAuthSession.mockReturnValue(signedInSession());
+
+    const { app } = await renderApp('/garage');
+
+    await waitFor(() => expect(app.getPathname()).toBe('/garage'));
+    expect(screen.getByText('Kendaraan saya')).toBeTruthy();
+    await waitFor(() => expect(screen.getByText('Garasi masih kosong')).toBeTruthy());
+    expect(screen.getByText('Nomor polisi tetap privat')).toBeTruthy();
+  });
+
+  it('menolak akses langsung ke Garasi tanpa sesi', async () => {
+    const { app } = await renderApp('/garage');
+
+    await waitFor(() => expect(app.getPathname()).toBe('/sign-in'));
+    expect(screen.getByText('Masuk ke RodaKawan')).toBeTruthy();
+  });
+});
+
 describe('proteksi rute', () => {
   it('menolak akses langsung ke tab privat tanpa sesi', async () => {
     const { app } = await renderApp('/ringkasan');
@@ -174,6 +224,9 @@ describe('area aplikasi setelah masuk', () => {
     await fireEvent.press(screen.getByLabelText('Komunitas'));
     expect(app.getPathname()).toBe('/community');
     expect(screen.getByText('Klub & anggota')).toBeTruthy();
+    // Layar Komunitas Milestone 2 benar-benar mengambil data klub, bukan placeholder.
+    await waitFor(() => expect(screen.getByText('Jelajahi klub')).toBeTruthy());
+    expect(screen.getByText('Belum ada klub publik')).toBeTruthy();
 
     await fireEvent.press(screen.getByLabelText('Peringatan'));
     expect(app.getPathname()).toBe('/hazards');

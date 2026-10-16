@@ -138,6 +138,144 @@ export function createProfilesClient(result: ProfileQueryResult = {}): {
   return { client, log };
 }
 
+/* ------------------------------------------------------------- query generik */
+
+export type QueryResponse = {
+  data?: unknown;
+  error?: { code?: string; message?: string } | null;
+};
+
+export type QueryRecord = {
+  table: string;
+  op: 'select' | 'insert' | 'update' | 'upsert' | 'delete';
+  columns: string | null;
+  values: unknown;
+  onConflict: string | null;
+  filters: { column: string; value: unknown }[];
+  order: { column: string; ascending: boolean }[];
+};
+
+export type QueryLog = {
+  /** Satu entri per rantai query (per `from(...)`), urut sesuai pemanggilan. */
+  queries: QueryRecord[];
+  singleCalls: number;
+  maybeSingleCalls: number;
+};
+
+/**
+ * Client palsu serbaguna untuk tabel mana pun.
+ *
+ * Bila `responses` berupa satu objek, respons itu dipakai untuk semua query;
+ * bila berupa array, tiap query mengambil respons berikutnya (array terakhir
+ * diulang) sehingga alur berurutan seperti "baca lalu tulis" bisa diuji.
+ * Setiap rantai query tercatat di `log.queries` lengkap dengan filter dan nilainya,
+ * supaya test dapat membuktikan query selalu dibatasi pada baris milik sesi.
+ */
+export function createQueryClient(responses: QueryResponse | QueryResponse[]): {
+  client: SupabaseClient<Database>;
+  log: QueryLog;
+} {
+  const queue = Array.isArray(responses) ? [...responses] : [responses];
+
+  if (queue.length === 0) queue.push({ data: null, error: null });
+
+  function takeResponse(): { data: unknown; error: unknown } {
+    const next = queue.length > 1 ? queue.shift()! : queue[0];
+    return { data: next.data ?? null, error: next.error ?? null };
+  }
+
+  const log: QueryLog = { queries: [], singleCalls: 0, maybeSingleCalls: 0 };
+
+  function createBuilder(table: string) {
+    let op: QueryRecord['op'] = 'select';
+    let columns: string | null = null;
+    let values: unknown = null;
+    let onConflict: string | null = null;
+    let resolved = false;
+
+    const filters: QueryRecord['filters'] = [];
+    const order: QueryRecord['order'] = [];
+
+    function record(): void {
+      if (resolved) return;
+      resolved = true;
+      log.queries.push({
+        table,
+        op,
+        columns,
+        values,
+        onConflict,
+        filters: [...filters],
+        order: [...order],
+      });
+    }
+
+    function finish(): Promise<{ data: unknown; error: unknown }> {
+      record();
+      return Promise.resolve(takeResponse());
+    }
+
+    const builder = {
+      select(selected: string = '*') {
+        columns = selected;
+        return builder;
+      },
+      insert(nextValues: unknown) {
+        op = 'insert';
+        values = nextValues;
+        return builder;
+      },
+      update(nextValues: unknown) {
+        op = 'update';
+        values = nextValues;
+        return builder;
+      },
+      upsert(nextValues: unknown, options?: { onConflict?: string }) {
+        op = 'upsert';
+        values = nextValues;
+        onConflict = options?.onConflict ?? null;
+        return builder;
+      },
+      delete() {
+        op = 'delete';
+        return builder;
+      },
+      eq(column: string, value: unknown) {
+        filters.push({ column, value });
+        return builder;
+      },
+      order(column: string, options?: { ascending?: boolean }) {
+        order.push({ column, ascending: options?.ascending !== false });
+        return builder;
+      },
+      async single() {
+        log.singleCalls += 1;
+        return finish();
+      },
+      async maybeSingle() {
+        log.maybeSingleCalls += 1;
+        return finish();
+      },
+      then(
+        onFulfilled?: (value: { data: unknown; error: unknown }) => unknown,
+        onRejected?: (reason: unknown) => unknown,
+      ) {
+        return finish().then(onFulfilled, onRejected);
+      },
+    };
+
+    return builder;
+  }
+
+  const client = {
+    from(table: string) {
+      return createBuilder(table);
+    },
+  } as unknown as SupabaseClient<Database>;
+
+  return { client, log };
+}
+
 /** Profil contoh dengan bentuk kolom seperti hasil `select *`. */
 export function buildProfileRow(overrides: Partial<ProfileRow> = {}): ProfileRow {
   return {

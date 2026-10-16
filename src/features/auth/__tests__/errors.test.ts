@@ -1,4 +1,4 @@
-import { mapAuthError, mapProfileError } from '@/features/auth/errors';
+import { mapAuthError, mapProfileError, mapTableError } from '@/features/auth/errors';
 
 describe('mapAuthError', () => {
   it('mengenali kegagalan jaringan dari beberapa bentuk error', () => {
@@ -103,5 +103,40 @@ describe('mapProfileError', () => {
 
   it('memberi pesan umum untuk error tak dikenal', () => {
     expect(mapProfileError({ code: 'XX000' }).code).toBe('unknown');
+  });
+});
+
+describe('mapTableError', () => {
+  it('memetakan benturan unique menjadi conflict dengan saran yang sesuai tabel', () => {
+    const error = mapTableError({ code: '23505', message: 'duplicate key value' });
+
+    expect(error.code).toBe('conflict');
+    expect(error.retryable).toBe(false);
+    // Pesannya tidak boleh menyebut username: konflik pada klub/garasi bukan itu.
+    expect(error.message).not.toMatch(/Username/);
+  });
+
+  it('memetakan pelanggaran CHECK menjadi invalid_data', () => {
+    expect(mapTableError({ code: '23514' }).code).toBe('invalid_data');
+    expect(mapTableError({ code: '23503' }).message).toMatch(/masih dipakai|tidak ada/);
+  });
+
+  it('memetakan penolakan policy menjadi not_authorized', () => {
+    expect(mapTableError({ code: '42501' }).code).toBe('not_authorized');
+    expect(mapTableError({ code: 'PGRST301' }).code).toBe('not_authorized');
+  });
+
+  it('memetakan 0 baris terpengaruh sebagai not_found', () => {
+    expect(mapTableError({ code: 'PGRST116' }).code).toBe('not_found');
+  });
+
+  it('memetakan tabel yang belum ada ke table_missing', () => {
+    expect(mapTableError({ code: 'PGRST205' }).code).toBe('table_missing');
+    expect(mapTableError({ code: '42P01' }).message).toMatch(/migration/i);
+  });
+
+  it('memetakan kegagalan jaringan dan error tak dikenal', () => {
+    expect(mapTableError({ message: 'Network request failed' }).code).toBe('network');
+    expect(mapTableError({ code: 'XX000' }).code).toBe('unknown');
   });
 });
