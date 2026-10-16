@@ -12,10 +12,11 @@ name: CI
 #                 kesalahan YAML atau `${{ }}` yang salah baru terlihat saat
 #                 workflow itu berjalan — yaitu tepat pada rilis, setelah menit build
 #                 terpakai. Job ini memindahkan kegagalan itu ke pull request.
-# - `database-rls`: uji RLS terhadap database Supabase **development** nyata. Job ini
-#                 hanya berjalan lewat `workflow_dispatch` dan hanya bila secret
-#                 `DB_TEST_DATABASE_URL` sudah diatur, sehingga database produksi tidak
-#                 pernah tersentuh oleh push/PR biasa.
+#
+# Uji RLS terhadap database development **tidak** ada di sini: kini berdiri sendiri
+# di `.github/workflows/database-rls.yml`, karena ia satu-satunya pemeriksaan yang
+# membutuhkan secret Supabase. Memisahkannya membuat janji "workflow ini tidak
+# memakai satu pun secret" tetap bisa dibaca dari strukturnya.
 #
 # Aturan yang dipegang: workflow ini tidak pernah menampilkan nilai environment
 # (tidak ada `echo $DATABASE_URL`, tidak ada `env` tanpa filter).
@@ -25,11 +26,6 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
-    inputs:
-      run_db_tests:
-        description: 'Jalankan uji RLS terhadap database development (butuh secret DB_TEST_DATABASE_URL)'
-        type: boolean
-        default: false
 
 permissions:
   contents: read
@@ -106,35 +102,7 @@ jobs:
           # actionlint mencari shellcheck di PATH — dan ada di dalam container.
           args: -color=false
 
-  database-rls:
-    name: Uji RLS (manual, butuh database development)
-    if: github.event_name == 'workflow_dispatch' && inputs.run_db_tests == true
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-
-      - name: Siapkan Node.js
-        uses: actions/setup-node@v7
-        with:
-          node-version: '24.x'
-          cache: npm
-
-      - name: Pasang dependency dari lockfile
-        run: npm ci
-
-      - name: Pastikan secret tersedia (nilai tidak dicetak)
-        env:
-          DATABASE_URL: ${{ secrets.DB_TEST_DATABASE_URL }}
-        run: |
-          if [ -z "${DATABASE_URL}" ]; then
-            echo "::error::Secret DB_TEST_DATABASE_URL belum diatur. Uji RLS hanya boleh dijalankan terhadap database development."
-            exit 1
-          fi
-          echo "Secret tersedia; isinya tidak ditampilkan."
-
-      - name: Jalankan uji RLS profil
-        env:
-          DATABASE_URL: ${{ secrets.DB_TEST_DATABASE_URL }}
-        run: npm run db:test
+# Uji RLS terhadap database development **tidak** ada di workflow ini. Ia pindah ke
+# `.github/workflows/database-rls.yml` dengan trigger terbatas pada file database
+# (plus dispatch manual), karena butuh secret `DB_TEST_DATABASE_URL` — satu-satunya
+# secret yang tidak boleh disentuh `ci.yml`.

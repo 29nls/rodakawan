@@ -1,0 +1,118 @@
+name: Database RLS
+
+# Pemeriksaan aturan database (RLS + RPC) terhadap project Supabase **development**.
+#
+# Kenapa workflow terpisah dari `ci.yml`:
+# `ci.yml` sengaja dibuat agar job `quality` tidak pernah menyentuh secret Supabase
+# apa pun — di sana buktinya bahwa aplikasi tetap bisa diperiksa tanpa backend.
+# Workflow ini adalah kebalikannya: **satu-satunya** tujuannya menjalankan uji yang
+# membutuhkan kredensial database, jadi dipisah agar batasnya terlihat sekilas, bukan
+# tersembunyi di balik satu baris `if:`.
+#
+# Kenapa berjalan otomatis (bukan lagi hanya manual):
+# Sebelumnya job ini hanya bisa dijalankan lewat **Actions → Run workflow** dengan
+# input `run_db_tests`, sehingga perubahan migration yang melanggar aturan privasi
+# bisa lolos: pemeriksaan lain (typecheck, lint, jest) tidak tahu apa pun tentang
+# policy. Agar tetap murah dan tidak menyalahgunakan database development, trigger
+# otomatisnya **dibatasi pada file yang memang mengubah perilaku database**:
+#
+#   - `supabase/**`           — migration dan berkas uji RLS (`supabase/tests/`)
+#   - `scripts/db-test.mjs`   — runner yang membaca dan menafsirkan hasilnya
+#   - workflow ini sendiri    — perubahan aturannya harus teruji
+#
+# Aturan yang dipegang (sama seperti sebelumnya):
+# - Nilai secret **tidak pernah** dicetak: hanya dicek keberadaannya.
+# - Sebelum uji dijalankan, connection string diverifikasi menunjuk **project
+#   development** (ref `xvmcpfkkveeaevfcvfug`). Selain itu workflow berhenti,
+#   sehingga secret yang salah tempat tidak bisa menjalankan uji apa pun.
+# - Berkas uji `supabase/tests/rls_profiles_test.sql` membungkus seluruhnya dalam
+#   transaksi yang di-ROLLBACK, sehingga ulang bukan data dihapus oleh test.
+# - Pull request dari fork tidak menerima secret sama sekali, jadi jobnya dilewati
+#   (bukan digagalkan) — pembaca luar tetap mendapat seluruh pemeriksaan `ci.yml`.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/**'
+      - 'scripts/db-test.mjs'
+      - '.github/workflows/database-rls.yml'
+  pull_request:
+    paths:
+      - 'supabase/**'
+      - 'scripts/db-test.mjs'
+      - '.github/workflows/database-rls.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: database-rls-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rls:
+    name: Uji RLS terhadap database development
+    # PR dari fork tidak punya secret; jangan mengagalkan pekerjaan orang yang tidak
+    # mungkin memenuhi syarat ini.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      CI: 'true'
+      EXPO_NO_TELEMETRY: '1'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Siapkan Node.js
+        uses: actions/setup-node@v7
+        with:
+          # Sama dengan ci.yml: Node 24.x agar identik dengan pemverifikasi lokal.
+          node-version: '24.x'
+          cache: npm
+
+      - name: Pasang dependency dari lockfile
+        run: npm ci
+
+      # Gerbang keamanan: uji ini menulis (lalu di-ROLLBACK) terhadap database sungguhan,
+      # jadi targetnya harus diketahui benar **sebelum** ada satu perintah pun dijalankan
+      # terhadapnya. Ref project development adalah berkas publik di repository
+      # (tercatat di docs/MILESTONE_2_REPORT.md dan di-`.gitignore` untuk salinan lokalnya).
+      - name: Pastikan targetnya database development (nilai tidak dicetak)
+        env:
+          DATABASE_URL: ${{ secrets.DB_TEST_DATABASE_URL }}
+        run: |
+          DEV_REF="xvmcpfkkveeaevfcvfug"
+          if [ -z "${DATABASE_URL}" ]; then
+            echo "::error::Secret DB_TEST_DATABASE_URL belum diatur. Isi connection string project development (session pooler) di Settings → Secrets and variables → Actions."
+            exit 1
+          fi
+          case "${DATABASE_URL}" in
+            *"${DEV_REF}"*) echo "Secret tersedia dan menunjuk project development; isinya tidak ditampilkan." ;;
+            *)
+              echo "::error::DATABASE_URL tidak menunjuk project development (ref ${DEV_REF}). Uji ini menolak berjalan terhadap project lain."
+              exit 1
+              ;;
+          esac
+
+      # Dijalankan satu kali dan hasilnya dicetak apa adanya. Selain keluar non-nol bila
+      # asersi gagal, keluarannya harus memuat notice penanda dari server
+      # (`UJI RLS PROFIL LULUS`) — runner "hijau palsu" (mis. berkas uji terpotong)
+      # tidak bisa lolos karena `scripts/db-test.mjs` hanya melaporkan lulus bila notice
+      # itu benar-benar diterima.
+      - name: Jalankan uji RLS dan pastikan penanda lulus diterima
+        env:
+          DATABASE_URL: ${{ secrets.DB_TEST_DATABASE_URL }}
+        run: |
+          OUTPUT="$(npm run db:test 2>&1)" || STATUS=$?
+          printf '%s\n' "${OUTPUT}"
+          case "${OUTPUT}" in
+            *"UJI RLS PROFIL LULUS"*) echo "Penanda lulus diterima dari server." ;;
+            *)
+              echo "::error::Penanda lulus tidak diterima; berkas uji berhenti sebelum seluruh asersi dijalankan."
+              exit 1
+              ;;
+          esac
+          exit "${STATUS:-0}"
