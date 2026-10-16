@@ -197,16 +197,18 @@ data): dengan policy **lama**, A membuat relasi follow sendiri lalu membaca prof
 baris terbaca** (kerentanan nyata, bukan teoretis); dengan policy **baru**, percobaan yang sama → **0
 baris**, penerimaan oleh A sendiri → `false`, dan setelah B (pemilik) menerima → 1 baris.
 
+- Uji yang sama kini **juga berjalan di GitHub Actions**, bukan hanya di mesin developer:
+  [`.github/workflows/database-rls.yml`](../.github/workflows/database-rls.yml) memicunya otomatis
+  ketika file database berubah, memverifikasi connection string menunjuk project development
+  sebelum menyentuhnya, lalu menolak lulus bila notice penanda dari server tidak diterima. Run
+  pertamanya hijau: `38862870367` (16 Oktober 2026, `UJI RLS PROFIL LULUS`, `120 perintah`).
+
 Yang **masih Blocked** (butuh perangkat / alur aplikasi / akun):
 
 - PROF-06 — sisi database sudah tertutup oleh uji RLS, tetapi state "profil belum ada" di aplikasi
   belum diuji di perangkat.
 - AUTH-01 dan AUTH-04 s.d. AUTH-14 — butuh alur aplikasi terhadap backend dan/atau perangkat.
 - PROF-07 — butuh sesi nyata yang kedaluwarsa.
-- Job `database-rls` pada CI — belum pernah berjalan; job ini hanya aktif lewat `workflow_dispatch`
-  dengan input `run_db_tests` dan secret `DB_TEST_DATABASE_URL` yang belum diatur. Job `quality`
-  diamati **hijau** di GitHub pada commit yang berlaku (run `38857101603`, `a9858a9`, 16 Oktober 2026),
-  setelah run `38855099318` gagal di langkah `Expo doctor` karena drift patch `expo`/`expo-router`.
 - Alur follow dari **aplikasi** (kirim permintaan, terima permintaan) belum ada; yang terbukti baru
   aturan dan fungsi di database.
 - **GAR-01…GAR-04 dan CLUB-01…CLUB-10 lewat aplikasi di perangkat fisik** — butuh APK dari commit

@@ -251,9 +251,13 @@ tanpa filter).
     referensi yang tidak ada), serta shellcheck untuk tiap blok `run:`. File workflow tidak dijangkau
     tsc/eslint/Prettier, jadi tanpa job ini kesalahan di `.github/workflows/` baru terlihat saat
     workflow berjalan — yaitu tepat pada rilis; dengan job ini, pull request-nya yang gagal.
-  - **`database-rls`** hanya berjalan lewat **Actions → CI → Run workflow** dengan input `run_db_tests`
-    dicentang, dan hanya bila secret `DB_TEST_DATABASE_URL` sudah diatur. Job ini tidak pernah berjalan
-    pada push/PR biasa, sehingga database produksi tidak tersentuh.
+  - **Uji RLS** berjalan di workflow terpisah, [`.github/workflows/database-rls.yml`](.github/workflows/database-rls.yml),
+    karena ia satu-satunya pemeriksaan yang membutuhkan secret Supabase. Ia berjalan **otomatis**
+    ketika file database berubah (`supabase/**`, `scripts/db-test.mjs`, atau workflow-nya sendiri),
+    plus lewat **Actions → Database RLS → Run workflow**. Sebelum uji, connection string diverifikasi
+    menunjuk project development (ref `xvmcpfkkveeaevfcvfug`), sehingga secret yang salah tempat
+    tidak bisa menjalankan uji apa pun; PR dari fork dilewati karena tidak menerima secret. `ci.yml`
+    tetap bebas secret Supabase sepenuhnya.
 - [`.github/workflows/release-on-push.yml`](.github/workflows/release-on-push.yml) — rilis APK
   **preview**, dengan dua cara memicu:
   - **otomatis** setelah `ci.yml` sukses pada push ke `main`;
@@ -289,10 +293,12 @@ Status per 16 Oktober 2026: `ci.yml` **hijau pada setiap push sejak perbaikan ve
 `38857101603` (`a9858a9`), `38858837494` (`95ec43a`), dan `38860337113` (`ab3a9a8`), semuanya job
 `quality` tanpa secret. Run `38855099318` pada `1ef13a8` sebelumnya **gagal** di langkah `Expo doctor`
 karena `expo` 57.0.29 (diminta `~57.0.30`) dan `expo-router` 57.0.27 (diminta `~57.0.28`);
-perbaikan versinya ada di `a9858a9` (ADR-053, ADR-054). Job `database-rls` memang hanya
-aktif lewat **Actions → CI → Run workflow** dengan input `run_db_tests` dicentang **dan** secret
-`DB_TEST_DATABASE_URL` sudah diatur, sehingga database development tidak tersentuh oleh push/PR
-biasa; uji RLS yang sama dijalankan lokal lewat `npm run db:test`.
+perbaikan versinya ada di `a9858a9` (ADR-053, ADR-054).
+
+Uji RLS kini berjalan **di GitHub Actions**, bukan hanya lokal: run `38862870367` (16 Oktober 2026,
+commit `21e49d1`, dipicu otomatis oleh perubahan `.github/workflows/database-rls.yml`) memuat
+`UJI RLS PROFIL LULUS` dan `120 perintah selesai dijalankan` dari server, dengan secret
+`DB_TEST_DATABASE_URL` terpasang (ADR-055). Workflow `ci.yml` tetap bebas secret Supabase.
 
 Kedua alur rilis **sudah berjalan di GitHub**: `v0.1.0-build9` (15 Oktober 2026, commit `7639ba9`)
 terbit sebagai APK preview bertanda tangan, dan setiap push ke `main` yang mengubah isi aplikasi

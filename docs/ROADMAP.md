@@ -68,11 +68,12 @@ butuh APK di perangkat tetap **Blocked**.
       serta penolakan `INSERT`/`UPDATE` untuk peran `anon`.
 - [x] Runner reproducibility: `npm run db:test` (membaca `DATABASE_URL` dari environment, tidak pernah
       mencetak kredensial, hanya melaporkan lulus bila notice penanda diterima server).
-- [x] CI GitHub Actions: job `quality` tanpa secret + job `database-rls` manual (`workflow_dispatch`)
-      + job `workflows-lint` (actionlint 1.7.12 + shellcheck via `docker://rhysd/actionlint`) yang
-      membuat kesalahan YAML/ekspresi di `.github/workflows/` gagal di pull request, bukan di tengah
-      rilis; kesalahannya sendiri sudah ditemukan dan diperbaiki lewat pemeriksaan itu (`runner` di
-      `env` tingkat job pada kedua workflow rilis).
+- [x] CI GitHub Actions: job `quality` tanpa secret + job `workflows-lint` (actionlint 1.7.12 +
+      shellcheck via `docker://rhysd/actionlint`) yang membuat kesalahan YAML/ekspresi di
+      `.github/workflows/` gagal di pull request, bukan di tengah rilis; kesalahannya sendiri sudah
+      ditemukan dan diperbaiki lewat pemeriksaan itu (`runner` di `env` tingkat job pada kedua
+      workflow rilis). Uji RLS berdiri di workflow terpisah (`database-rls.yml`) karena membutuhkan
+      secret Supabase — ADR-055.
 - [x] Pipeline rilis APK: profil `production-apk` (`extends: "production"`), `appVersionSource: remote`
       + `autoIncrement` agar `versionCode` naik monoton antar-build, dan workflow `android-release.yml`
       (verify → EAS build → verifikasi artifact → GitHub Release) — ADR-036…038. Sejak ADR-042 rilis
@@ -106,8 +107,10 @@ butuh APK di perangkat tetap **Blocked**.
       migration Milestone 1.6).
 - [x] CI `ci.yml` benar-benar berjalan di GitHub: job `quality` (tanpa secret) hijau pada run
       `38353855927` (13 Oktober 2026, commit `0b989a0`, ±1 menit) dan pada lima run sebelumnya.
-- [ ] Job `database-rls` hijau di CI. — **Blocked** (secret `DB_TEST_DATABASE_URL` belum diatur; job
-      hanya aktif lewat `workflow_dispatch` + input `run_db_tests`, jadi belum pernah berjalan).
+- [x] Uji RLS hijau di GitHub Actions (sebelumnya: **Blocked**). — Secret `DB_TEST_DATABASE_URL`
+      sudah terpasang dan uji kini punya workflow sendiri (`database-rls.yml`) yang berjalan otomatis
+      ketika file database berubah; run pertama hijau pada 16 Oktober 2026 (`38862870367`, notice
+      `UJI RLS PROFIL LULUS`, 120 perintah).
 - [ ] Menjalankan rilis APK pertama sampai GitHub Release berisi APK terpasang di perangkat. —
       **Blocked** (butuh keempat secret keystore untuk membangun di runner; akun Expo tidak lagi
       diperlukan sejak ADR-051).

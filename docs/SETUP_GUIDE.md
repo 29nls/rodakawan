@@ -811,13 +811,23 @@ Prettier, jadi tanpa job ini kesalahan di `.github/workflows/` baru terlihat ket
 berjalan — yaitu tepat pada rilis, setelah menit build terpakai; dengan job ini, pull request-nya
 yang gagal lebih dulu. Naikkan versi container sebagai perubahan biasa, bukan diam-diam.
 
-Job ketiga (`database-rls`) menjalankan `npm run db:test` dan hanya aktif lewat
-**Actions → CI → Run workflow** dengan input `run_db_tests` dicentang. Sebelum mengaktifkannya:
+Uji RLS berdiri di workflow terpisah (`.github/workflows/database-rls.yml`) karena ia satu-satunya
+pemeriksaan yang membutuhkan secret Supabase; `ci.yml` sengaja bebas secret sepenuhnya. Caranya:
 
-1. Buat repository **development** khusus pengujian (jangan produksi).
-2. Tambahkan secret **`DB_TEST_DATABASE_URL`** di **Settings → Secrets and variables → Actions**.
-   Nilainya adalah connection string PostgreSQL project development dengan `?sslmode=require`.
-3. Jalankan workflow secara manual dan periksa bahwa langkah uji lulus.
+- **Otomatis** — setiap push/PR yang mengubah `supabase/**`, `scripts/db-test.mjs`, atau workflow
+  itu sendiri.
+- **Manual** — **Actions → Database RLS → Run workflow**.
+- Sebelum satu perintah pun menyentuh database, workflow memverifikasi connection string menunjuk
+  project **development** (ref `xvmcpfkkveeaevfcvfug`); selain itu ia berhenti, sehingga secret yang
+  salah tempat tidak bisa menjalankan uji apa pun. PR dari fork dilewati karena tidak menerima secret.
+- Keluarannya harus memuat notice `UJI RLS PROFIL LULUS`; tanpa notice itu workflow dianggap gagal,
+  sehingga berkas uji yang terpotong tidak bisa menghasilkan "hijau palsu".
+
+Secret **`DB_TEST_DATABASE_URL`** sudah terpasang di **Settings → Secrets and variables → Actions**;
+nilainya adalah connection string PostgreSQL project development dengan `?sslmode=require`, sama
+seperti `.env.db` lokal. Ganti nilainya di sana bila password database development dirotasi —
+mengubah `.env.db` lokal saja tidak berdampak apa-apa pada CI. Untuk memeriksanya tanpa mencetak
+nilai: `gh secret list`.
 
 Jangan pernah menaruh connection string atau service role key di berkas repo, log, atau dokumentasi
 publik; nilai itu hanya boleh berada di secret GitHub atau environment server.
