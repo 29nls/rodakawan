@@ -8,6 +8,22 @@ sedangkan build preview (`v<versi>-build<N>`) diringkas di dalam blok yang bisa 
 versi adalah tautan ke halaman rilisnya di GitHub, sehingga riwayat ini bisa dinavigasi langsung
 dari berkas.
 
+## [v0.1.0-build11](https://github.com/29nls/rodakawan/releases/tag/v0.1.0-build11) — 2026-10-16 · pratinjau
+
+<details>
+<summary>Catatan rilis pratinjau</summary>
+
+### Fitur
+
+- update Expo SDK dependencies and add version check script (`a9858a9`)
+- implement Milestone 2 garage and club membership with verifiable RLS (`cf818be`)
+
+### Perubahan lain
+
+- lampirkan checklist uji perangkat fisik pada laporan Milestone 2 (`1ef13a8`)
+
+</details>
+
 ## [v0.1.0-build9](https://github.com/29nls/rodakawan/releases/tag/v0.1.0-build9) — 2026-10-15 · pratinjau
 
 <details>
