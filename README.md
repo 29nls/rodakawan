@@ -296,9 +296,15 @@ biasa; uji RLS yang sama dijalankan lokal lewat `npm run db:test`.
 Kedua alur rilis **sudah berjalan di GitHub**: `v0.1.0-build9` (15 Oktober 2026, commit `7639ba9`)
 terbit sebagai APK preview bertanda tangan, dan setiap push ke `main` yang mengubah isi aplikasi
 memicu rilis preview berikutnya. Isi keempat secret keystore dan tiga variabel publik ada di bagian 5
-[`docs/SETUP_GUIDE.md`](docs/SETUP_GUIDE.md). Perlu dipahami: build preview `v0.1.0-build9` dibuat
-**sebelum** Milestone 2, jadi ia bukan bukti fitur garasi/klub — bukti Milestone 2 berada pada
-commit `cf818be` ke atas.
+[`docs/SETUP_GUIDE.md`](docs/SETUP_GUIDE.md).
+
+APK preview yang **memuat** Milestone 2 adalah
+[v0.1.0-build11](https://github.com/29nls/rodakawan/releases/tag/v0.1.0-build11) (16 Oktober 2026):
+tag-nya menunjuk `a9858a9` dan catatan rilisnya memuat `cf818be`, sedangkan `v0.1.0-build9` dibuat
+**sebelum** garasi dan klub ada sehingga ia **bukan** bukti fitur ini. SHA-256 berkasnya ada di bagian
+**🔒 Verifikasi berkas** pada badan rilis. Push yang hanya mengubah dokumentasi melewatkan **seluruh**
+job build, uji nyala, dan tag (terverifikasi pada run `38859004932`), jadi dokumentasi tidak memakan
+menit build.
 
 ## Build APK Android
 

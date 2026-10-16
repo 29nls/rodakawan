@@ -76,9 +76,18 @@ jejak audit tidak bisa dibaca anggota biasa, dan `anon` menolak semua EXECUTE.
 Milik pemilik aplikasi; tidak boleh ditandai lulus berdasarkan uji unit atau smoke
 test emulator.
 
-**Pakai APK yang dibangun dari commit Milestone 2**, yaitu build preview yang dipicu CI hijau
-`a9858a9` (tag `v0.1.0-build<N>` terbaru di halaman Releases). Catat nama, ukuran, dan SHA-256 dari
-bagian **🔒 Verifikasi berkas** pada badan rilis, lalu cocokkan dengan berkas yang diunduh.
+**Pakai APK yang dibangun dari commit Milestone 2:
+[v0.1.0-build11](https://github.com/29nls/rodakawan/releases/tag/v0.1.0-build11)** (pratinjau,
+terbit 16 Oktober 2026 06:10 UTC). Tag-nya menunjuk `a9858a9` dan catatan rilisnya memuat commit
+implementasi Milestone 2 (`cf818be`), jadi **build inilah yang pertama bisa membuktikan fitur garasi
+dan klub** — build preview sebelumnya tidak memuatnya.
+
+- Berkas: `app-preview.apk` · 105.350.425 byte
+- SHA-256: `4417798e7596db33dd92c497583a09a79c2d8a091ae002211794602687ee2d48`
+- Sertifikat penandatangan: `3ea8bb4745b638be8fddf71e15edd9786d45aac65c0384b87be8fa2c32b3b14d`
+
+APK ini **sudah** melewati uji nyala otomatis di emulator (job smoke test hijau). Yang belum, dan tidak
+bisa digantikan oleh uji itu: dijalankan manusia di HP fisik dengan dua akun nyata.
 
 `v0.1.0-build9` ([tautan](https://github.com/29nls/rodakawan/releases/tag/v0.1.0-build9), SHA-256
 `1eb92d0472aa389ab364aeadafbffbc7c51dc2eafdcf31aff6f42ce38211bc5b`) **tidak boleh** dipakai untuk
