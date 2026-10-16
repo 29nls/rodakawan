@@ -285,10 +285,11 @@ tanpa filter).
   tidak ikut muncul sebagai “perubahan” di catatan rilis maupun entri berikutnya. Rinciannya di
   [`docs/SETUP_GUIDE.md`](docs/SETUP_GUIDE.md) bagian 6.8.
 
-Status per 16 Oktober 2026: `ci.yml` **hijau** pada commit yang sedang berlaku — run `38857101603`
-(`main` @ `a9858a9`, job `quality`, 1m52s). Run `38855099318` pada `1ef13a8` sebelumnya **gagal** di
-langkah `Expo doctor` karena `expo` 57.0.29 (diminta `~57.0.30`) dan `expo-router` 57.0.27 (diminta
-`~57.0.28`); perbaikan versinya ada di `a9858a9` (ADR-053, ADR-054). Job `database-rls` memang hanya
+Status per 16 Oktober 2026: `ci.yml` **hijau pada setiap push sejak perbaikan versi** — run
+`38857101603` (`a9858a9`), `38858837494` (`95ec43a`), dan `38860337113` (`ab3a9a8`), semuanya job
+`quality` tanpa secret. Run `38855099318` pada `1ef13a8` sebelumnya **gagal** di langkah `Expo doctor`
+karena `expo` 57.0.29 (diminta `~57.0.30`) dan `expo-router` 57.0.27 (diminta `~57.0.28`);
+perbaikan versinya ada di `a9858a9` (ADR-053, ADR-054). Job `database-rls` memang hanya
 aktif lewat **Actions → CI → Run workflow** dengan input `run_db_tests` dicentang **dan** secret
 `DB_TEST_DATABASE_URL` sudah diatur, sehingga database development tidak tersentuh oleh push/PR
 biasa; uji RLS yang sama dijalankan lokal lewat `npm run db:test`.
