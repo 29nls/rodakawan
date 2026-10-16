@@ -149,17 +149,21 @@ Yang **sudah otomatis** (`npm test`, jaringan dimatikan; client Supabase diganti
 | `src/features/auth/__tests__/session.test.tsx` | State `loading`/`ready`, perubahan session, pembersihan saat logout. |
 | `src/lib/__tests__/supabaseClient.test.ts` | Konfigurasi auth client (PKCE, persist session, satu instance) dan lifecycle auto-refresh mengikuti `AppState` (aktif, background, perpindahan status, pembersihan listener, promise yang gagal). |
 | `src/__tests__/navigation.test.tsx` | Rute asli: gerbang awal, alur auth, area privat, dan tidak ada redirect loop. |
+| `src/features/garage/__tests__/*.test.ts` | Validasi kendaraan (selaras CHECK constraint) dan API garasi: tambah, ubah, jadikan utama, hapus, pemetaan galat. |
+| `src/features/clubs/__tests__/*.test.ts` | Validasi klub, jelajah/buat klub, dan alur keanggotaan lewat RPC (ajukan, batalkan, tinjau, peran, keluarkan, keluar). |
 | `src/components/ui/__tests__/*` | Perilaku dasar komponen yang dipakai form (tombol, field). |
 
-Hasil terakhir dijalankan (13 Oktober 2026, Node 24.18): `npm test -- --ci` → **15 suite, 164 test
-lulus**; `npm run typecheck`, `npm run lint`, `npm run format:check`, `npm run doctor` (21/21), dan
-`npm run export:android` semuanya exit 0.
+Hasil terakhir dijalankan (16 Oktober 2026, Node 24.18, commit `a9858a9`, setelah `npm ci`):
+`npm test -- --ci` → **20 suite, 222 test lulus**; `npm run test:scripts` → **172 test lulus**;
+`npm run deps:check`, `npm run typecheck`, `npm run lint`, `npm run format:check`, `npm run doctor`
+(21/21), dan `npm run export:android` semuanya exit 0.
 
 Yang **sudah diverifikasi terhadap dev backend** (13 Oktober 2026, project development khusus
 RodaKawan — ADR-035; diperluas pada Milestone 1.6):
 
 - `supabase/tests/rls_profiles_test.sql` — `npm run db:test` mencetak notice `UJI RLS PROFIL LULUS`
-  (**88 perintah**, exit 0) pada database development yang memuat kelima migration.
+  (**120 perintah**, exit 0) pada database development yang memuat kedelapan migration; dijalankan
+  ulang 16 Oktober 2026 dengan hasil yang sama.
   - **Profil — PROF-01…PROF-05.** Bootstrap trigger membuat profil dengan username yang dinormalkan,
     A tidak dapat membaca profil privat B maupun mengubah baris B (0 baris, `INSERT` ditolak),
     username duplikat ditolak unique constraint, format salah ditolak CHECK, `anon` tidak melihat
@@ -176,6 +180,18 @@ RodaKawan — ADR-035; diperluas pada Milestone 1.6):
   - **Paritas skema.** Blok pertama berkas uji gagal dengan pesan eksplisit bila migration Milestone
     1.6 belum diterapkan (kolom `follows.status`, fungsi `accept_follow_request`, trigger
     `follows_set_status`, foreign key komposit, dan tidak adanya policy `UPDATE` pada `follows`).
+  - **Garasi — GAR-04 (Milestone 2).** Hanya boleh ada satu kendaraan utama per pengguna
+    (partial unique index `motorcycles_single_primary_idx` + trigger penjaga), termasuk saat
+    kendaraan utama dihapus atau dipindahkan.
+  - **Klub — CLUB-01…CLUB-10 (Milestone 2).** Pembuatan klub menjadikan pembuatnya owner dan slug
+    bentrok ditolak; non-anggota tidak membaca klub privat; anggota `pending` tidak dapat menyetujui
+    dirinya sendiri; klub `invite_only` menolak pengajuan; owner terakhir tidak bisa diturunkan atau
+    dikeluarkan; hanya owner yang mengubah peran; pengguna tak dikenal ditolak `P0002`; owner wajib
+    mengalihkan kepemilikan sebelum keluar (`23514`); pengeluaran anggota non-aktif ditolak (`22023`);
+    anggota yang dikeluarkan **langsung kehilangan akses** dan harus mengajukan ulang, begitu pula
+    pembuat klub yang sudah bukan anggota (temuan keamanan yang ditutup); permintaan bisa
+    dibatalkan/diajukan ulang tanpa baris ganda; jejak `club_role_audit` mencatat 19 perubahan dan
+    **tidak bisa dibaca anggota biasa**; dan `anon` ditolak pada seluruh EXECUTE RPC klub.
 - Demonstrasi sebelum/sesudah pada project development (satu transaksi `ROLLBACK`, tidak meninggalkan
 data): dengan policy **lama**, A membuat relasi follow sendiri lalu membaca profil privat B → **1
 baris terbaca** (kerentanan nyata, bukan teoretis); dengan policy **baru**, percobaan yang sama → **0
@@ -188,10 +204,17 @@ Yang **masih Blocked** (butuh perangkat / alur aplikasi / akun):
 - AUTH-01 dan AUTH-04 s.d. AUTH-14 — butuh alur aplikasi terhadap backend dan/atau perangkat.
 - PROF-07 — butuh sesi nyata yang kedaluwarsa.
 - Job `database-rls` pada CI — belum pernah berjalan; job ini hanya aktif lewat `workflow_dispatch`
-  dengan input `run_db_tests` dan secret `DB_TEST_DATABASE_URL` yang belum diatur. Job `quality` sudah
-  diamati **hijau** di GitHub (run `38353855927`, 13 Oktober 2026).
+  dengan input `run_db_tests` dan secret `DB_TEST_DATABASE_URL` yang belum diatur. Job `quality`
+  diamati **hijau** di GitHub pada commit yang berlaku (run `38857101603`, `a9858a9`, 16 Oktober 2026),
+  setelah run `38855099318` gagal di langkah `Expo doctor` karena drift patch `expo`/`expo-router`.
 - Alur follow dari **aplikasi** (kirim permintaan, terima permintaan) belum ada; yang terbukti baru
   aturan dan fungsi di database.
+- **GAR-01…GAR-04 dan CLUB-01…CLUB-10 lewat aplikasi di perangkat fisik** — butuh APK dari commit
+  Milestone 2 (`cf818be`/`a9858a9`) dan dua akun nyata. Aturan di database sudah lulus; yang belum
+  dibuktikan adalah alur layarnya (bagian 5 `docs/MILESTONE_2_REPORT.md` memuat checklist-nya).
+- **Unggah foto kendaraan dan logo klub — tidak ada yang bisa diuji.** Supabase Storage sengaja belum
+  disiapkan (0 bucket, 0 policy di project development) dan tidak ada tombol unggah, jadi statusnya
+  **belum diimplementasikan**, bukan gagal.
 
 Aturan pelaporan: jangan mencatat AUTH/PROF sebagai lulus pada tabel di atas bila hanya test lokal yang
 dijalankan. Tandai "lulus (unit)" atau "belum dijalankan". Runner `db:test` hanya melaporkan lulus bila

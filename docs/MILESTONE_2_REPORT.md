@@ -1,7 +1,13 @@
 # Laporan Milestone 2 — Garasi & Klub
 
-Status: **diterapkan dan diuji terhadap database development**. Tanggal: 2026-10-16.
-Basis: `main` @ `1b1b029` (+ perubahan yang belum di-commit pada laporan ini).
+Status: **Implemented · Passed locally · Passed against dev backend**; **Tested on physical device**
+masih **Blocked**. Tanggal: 2026-10-16 (seluruh status di bawah diverifikasi ulang pada tanggal ini,
+bukan dikutip dari laporan sebelumnya).
+
+Basis: `main` @ `a9858a9` — implementasinya ada di `cf818be` (garasi + klub), `1ef13a8` (checklist
+perangkat), dan `a9858a9` (perbaikan versi Expo). Ketiganya **sudah di-push** ke `origin/main`.
+CI pada `a9858a9` **hijau** (run `38857101603`), setelah run `38855099318` pada `1ef13a8` **gagal** di
+langkah `Expo doctor` — akar masalah dan perbaikannya di ADR-053/ADR-054.
 
 ## 1. Migrasi (aditif, tidak mengubah migrasi lama)
 
@@ -57,9 +63,10 @@ jejak audit tidak bisa dibaca anggota biasa, dan `anon` menolak semua EXECUTE.
 
 - **Foto belum bisa diunggah**: tidak ada bucket/policy Storage dan tidak ada tombol
   unggah palsu; kolom `photo_path`/`logo_path` dibiarkan kosong dan disebut apa adanya.
-- **Perangkat fisik & alur auth nyata masih BLOCKED** untuk pemilik aplikasi
-  (APK `v0.1.0-build9`, SHA-256 `1eb92d04…25b`): registrasi, konfirmasi email,
-  login, reset sandi, sesi, logout, edit profil, privasi lintas pengguna.
+- **Perangkat fisik & alur auth nyata masih BLOCKED** untuk pemilik aplikasi: registrasi,
+  konfirmasi email, login, reset sandi, sesi, logout, edit profil, privasi lintas pengguna,
+  serta seluruh alur garasi/klub lewat layar. Yang dipakai harus APK dari commit Milestone 2 —
+  `v0.1.0-build9` dibuat dari `7639ba9` dan **tidak memuat** fitur ini (bagian 5).
 - `npm run doctor` sudah lulus: drift patch `expo`/`expo-router` ditutup dengan menaikkan dua paket itu ke versi yang diminta SDK 57 (ADR-053). Karena itu angka pada tabel bagian 2 di atas diukur ulang **setelah** kenaikan tersebut.
 - Uji layar di sini memakai client palsu (bukan jaringan nyata); bukti jaringan nyata
   ada pada uji RLS/RPC di database development.
@@ -67,8 +74,16 @@ jejak audit tidak bisa dibaca anggota biasa, dan `anon` menolak semua EXECUTE.
 ## 5. Checklist uji perangkat fisik & auth nyata (BELUM dijalankan)
 
 Milik pemilik aplikasi; tidak boleh ditandai lulus berdasarkan uji unit atau smoke
-test emulator. APK: [v0.1.0-build9](https://github.com/29nls/rodakawan/releases/tag/v0.1.0-build9),
-SHA-256 `1eb92d0472aa389ab364aeadafbffbc7c51dc2eafdcf31aff6f42ce38211bc5b`.
+test emulator.
+
+**Pakai APK yang dibangun dari commit Milestone 2**, yaitu build preview yang dipicu CI hijau
+`a9858a9` (tag `v0.1.0-build<N>` terbaru di halaman Releases). Catat nama, ukuran, dan SHA-256 dari
+bagian **🔒 Verifikasi berkas** pada badan rilis, lalu cocokkan dengan berkas yang diunduh.
+
+`v0.1.0-build9` ([tautan](https://github.com/29nls/rodakawan/releases/tag/v0.1.0-build9), SHA-256
+`1eb92d0472aa389ab364aeadafbffbc7c51dc2eafdcf31aff6f42ce38211bc5b`) **tidak boleh** dipakai untuk
+membuktikan fitur Milestone 2: build itu berasal dari commit `7639ba9` (15 Oktober), **sebelum**
+garasi dan klub ada — ia hanya membuktikan alur Milestone 1.
 
 | # | Langkah | Bukti yang harus dicatat |
 | - | ------- | ------------------------ |
@@ -84,3 +99,5 @@ SHA-256 `1eb92d0472aa389ab364aeadafbffbc7c51dc2eafdcf31aff6f42ce38211bc5b`.
 | 10 | Klub: buat klub, ajukan gabung dari akun kedua, setujui/tolak | status anggota berubah sesuai aturan |
 | 11 | Klub: klub privat tidak muncul di jelajah akun non-anggota | daftar hanya berisi klub publik |
 | 12 | Privasi lintas pengguna: akun B membuka kendaraan/klub akun A | ditolak dengan pesan jelas, bukan data kosong yang membingungkan |
+| 13 | Klub: ubah peran anggota dan keluarkan anggota dari akun owner | peran berubah, anggota yang dikeluarkan kehilangan akses, owner terakhir tidak bisa diturunkan |
+| 14 | Putuskan jaringan (mode pesawat) saat membuka garasi/klub, lalu sambungkan kembali | pesan galat jelas, tombol coba lagi bekerja, data benar setelah pulih |

@@ -221,8 +221,9 @@ Catatan penting:
 - **Jangan** menyimpan `DATABASE_URL` di `.env.local`: berkas itu berisi variabel `EXPO_PUBLIC_*` yang
   ikut masuk ke bundle aplikasi. Untuk CI, simpan sebagai secret repository (`DB_TEST_DATABASE_URL`).
 - Status saat ini: **LULUS** pada project development khusus RodaKawan (ADR-035): notice
-  `UJI RLS PROFIL LULUS` diterima dan 88 perintah selesai tanpa error (13 Oktober 2026, kelima
-  migration diterapkan). Sebelumnya uji ini **belum pernah
+  `UJI RLS PROFIL LULUS` diterima dan **120 perintah** selesai tanpa error (13 Oktober 2026 dengan
+  88 perintah; diperluas oleh garasi/klub Milestone 2 dan dijalankan ulang 16 Oktober 2026;
+  **kedelapan** migration diterapkan). Sebelumnya uji ini **belum pernah
   lulus**: pada project lama yang dipakai bersama aplikasi lain, `bootstrap_profile()` gagal
   `42703 column "display_name" of relation "profiles" does not exist` karena `public.profiles` di sana
   bukan tabel buatan migration (ADR-033). Pesan itu berguna sebagai gejala khas schema drift: lihat

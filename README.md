@@ -31,7 +31,10 @@ Istilah status dipakai konsisten di seluruh dokumentasi:
 | Milestone 1: profil sendiri + username unik       | Ya          | Ya             | **Blocked** | **Blocked**     |
 | Milestone 1: RLS `public.profiles`                | Ya          | Ya             | **Ya** (uji RLS LULUS) | —    |
 | Milestone 1.6: privasi follow + detail privat kendaraan | Ya    | Ya             | **Ya** (uji RLS LULUS) | —    |
-| Milestone 2+: garasi, klub, perjalanan, lokasi, chat, hazard, feed, musik | **Belum** | — | — | — |
+| Milestone 2: garasi (CRUD, kendaraan utama, detail privat nomor polisi) | Ya | Ya | **Ya** (uji RLS LULUS, 120 perintah) | **Blocked** (APK belum diuji di HP) |
+| Milestone 2: klub (buat, gabung, peran, keluarkan, jejak audit) | Ya | Ya | **Ya** (uji RLS LULUS) | **Blocked** |
+| Milestone 2: foto kendaraan & logo klub (Supabase Storage) | **Belum** — belum ada bucket maupun policy; tidak ada tombol unggah palsu | — | — | — |
+| Milestone 2+: perjalanan, lokasi, chat, hazard, feed, musik | **Belum** | — | — | — |
 
 **Blocked** yang tersisa berarti: alur aplikasi belum pernah dijalankan terhadap project development
 nyata, dan aplikasi belum pernah dipasang di HP fisik. Project Supabase development **sudah ada**
@@ -40,8 +43,15 @@ sejak 13 Oktober 2026, kelima migration sudah diterapkan, uji RLS `public.profil
 uji allow/deny (ADR-039, ADR-040). Semua langkah yang dapat dijalankan tanpa backend sudah dijalankan
 — lihat [Perintah pengujian](#perintah-pengujian).
 
-Fitur Milestone 2 ke atas sengaja **tidak** ditampilkan sebagai tombol yang berfungsi: aksi seperti
-"Buat perjalanan" tampil dalam keadaan nonaktif.
+Layar Milestone 2 (garasi dan klub) sepenuhnya **berfungsi**: seluruh aksinya memanggil service
+yang menembak tabel/RPC Supabase, dan setiap mutasi punya uji RLS allow/deny terhadap database
+development. Yang sengaja **tidak** ditampilkan sebagai tombol berfungsi adalah fitur perjalanan ke
+atas (mis. "Buat perjalanan"), karena belum dibangun.
+
+Satu bagian Milestone 2 yang memang belum ada: **unggah foto kendaraan dan logo klub**. Supabase
+Storage belum disiapkan (tidak ada bucket maupun policy-nya — diperiksa langsung ke project
+development), jadi kolom `photo_path`/`logo_path` sengaja dibiarkan kosong dan layarnya menyatakan
+belum tersedia alih-alih menampilkan tombol yang tidak melakukan apa-apa.
 
 **Konteks database (13 Oktober 2026).** Project Supabase yang sebelumnya terkonfigurasi di `.env`
 **bukan** database bersih: tabel `public.profiles` sudah ada dalam bentuk yang berbeda (hanya `id`,
@@ -144,7 +154,7 @@ yang menyeluruh tetap dijalankan di CI. Bila daftar versi resmi Expo tidak terja
 (sedang offline), pemeriksaan melaporkan bahwa hasilnya **tidak bisa dipastikan** dengan
 `::warning::` dan tidak menggagalkan `npm test` — lulus hanya dilaporkan bila benar-benar diperiksa.
 
-Hasil nyata pada commit ini (13 Oktober 2026, Node 24.18, npm 12):
+Hasil nyata pada commit ini (`a9858a9`, 16 Oktober 2026, Node 24.18, npm 12):
 
 | Perintah               | Hasil                                                        |
 | ---------------------- | ------------------------------------------------------------ |
@@ -152,12 +162,14 @@ Hasil nyata pada commit ini (13 Oktober 2026, Node 24.18, npm 12):
 | `npm run typecheck`    | Exit 0 (juga lulus tanpa folder `.expo` — tidak perlu dev server dulu). |
 | `npm run lint`         | Exit 0.                                                       |
 | `npm run format:check` | Exit 0.                                                       |
-| `npm test`             | **15 suite, 164 test lulus**, exit 0.                         |
-| `npm run doctor`       | 21/21 pemeriksaan lulus.                                      |
+| `npm run deps:check`   | Exit 0 — versi dependency cocok dengan Expo SDK 57.0.30 (ADR-054). |
+| `npm test`             | **20 suite, 222 test lulus**, exit 0 (dijalankan setelah `npm ci`). |
+| `npm run test:scripts` | **172 test lulus**, exit 0.                                   |
+| `npm run doctor`       | 21/21 pemeriksaan lulus (sebelum perbaikan versi: 20/21, exit 1). |
 | `npm run export:android` | Exit 0, bundel Hermes `entry-*.hbc` (~3,6 MB), tidak ada JWT/service role key di dalam bundel. |
-| `npm run db:test`      | **Exit 0 — `UJI RLS PROFIL LULUS`** (88 perintah: profil, follow/privasi, detail privat kendaraan) terhadap project development, 13 Oktober 2026. |
-| `npx supabase ...`     | CLI 2.120.0 (lewat `npx`, tidak masuk `package.json`). `link` + `db push` menerapkan seluruh migration (kelima versi); jangan menaruh connection string di argumen perintah karena npm/npx mencetak ulang argumennya. |
-| `npx expo prebuild` + `./gradlew assembleRelease` | **Berjalan lokal sampai menghasilkan APK rilis bertanda tangan** (lihat bagian “Build APK Android”): `npm run test:scripts` juga menguji `scripts/configure-android-release.mjs`. Yang belum pernah terjadi: menjalankannya di GitHub Actions, karena itu masih memerlukan secret keystore (bagian 5.1 di [`docs/SETUP_GUIDE.md`](docs/SETUP_GUIDE.md)). |
+| `npm run db:test`      | **Exit 0 — `UJI RLS PROFIL LULUS`** (120 perintah: profil, follow/privasi, detail privat kendaraan, garasi, klub) terhadap project development, diverifikasi ulang 16 Oktober 2026. |
+| `npx supabase ...`     | CLI 2.120.0 (lewat `npx`, tidak masuk `package.json`). `link` + `db push` menerapkan seluruh migration (kedelapan versi; `npx supabase migration list` 16 Oktober 2026 menunjukkan kolom Local dan Remote sama untuk kedelapannya); jangan menaruh connection string di argumen perintah karena npm/npx mencetak ulang argumennya. |
+| `npx expo prebuild` + `./gradlew assembleRelease` | **Berjalan lokal maupun di GitHub Actions**: rantai yang sama menghasilkan APK bertanda tangan `v0.1.0-build9` (15 Oktober 2026) dan build preview berikutnya untuk setiap push yang mengubah isi aplikasi. `npm run test:scripts` juga menguji `scripts/configure-android-release.mjs`. |
 
 `npm test` tidak menyentuh jaringan: fungsi api menerima client sebagai argumen sehingga test
 menyuntikkan fake client dari `src/test-support/fakeSupabase.ts`; test navigasi memakai `jest.mock`
@@ -218,9 +230,9 @@ Aturan penting:
   masuk ke bundle aplikasi). Isi langsung di shell untuk satu perintah.
 - Runner hanya melaporkan lulus bila notice penanda benar-benar diterima dari server, sehingga
   "hijau palsu" (mis. berkas uji terpotong) tidak bisa lolos.
-- Status saat ini: **Passed against dev backend** (13 Oktober 2026) — `npm run db:test` mencetak
-  `UJI RLS PROFIL LULUS`, 88 perintah selesai, exit 0, pada database development yang sudah memuat
-  kelima migration. Jalur kegagalan runner juga sudah diuji sebelumnya (tanpa `DATABASE_URL`, host
+- Status saat ini: **Passed against dev backend** (diverifikasi ulang 16 Oktober 2026) — `npm run db:test`
+  mencetak `UJI RLS PROFIL LULUS`, 120 perintah selesai, exit 0, pada database development yang sudah
+  memuat kedelapan migration (termasuk garasi dan klub Milestone 2). Jalur kegagalan runner juga sudah diuji sebelumnya (tanpa `DATABASE_URL`, host
   tidak terjangkau, berkas tanpa penanda lulus). Jalankan ulang setiap kali policy/RPC berubah.
 
 ## CI dan rilis APK (GitHub Actions)
@@ -273,13 +285,20 @@ tanpa filter).
   tidak ikut muncul sebagai “perubahan” di catatan rilis maupun entri berikutnya. Rinciannya di
   [`docs/SETUP_GUIDE.md`](docs/SETUP_GUIDE.md) bagian 6.8.
 
-Status: `ci.yml` sudah berjalan di GitHub — job `quality` **hijau** pada run `38353855927` (13 Oktober
-2026, commit `0b989a0`) dan pada lima run sebelumnya. Job `database-rls` belum pernah berjalan dan
-memang hanya aktif lewat **Actions → CI → Run workflow** dengan input `run_db_tests` dicentang **dan**
-secret `DB_TEST_DATABASE_URL` sudah diatur, sehingga database development tidak tersentuh oleh
-push/PR biasa. Rilis (`release-on-push.yml`, `android-release.yml`) belum pernah berjalan di GitHub:
-yang belum ada hanyalah secret keystore di [`docs/SETUP_GUIDE.md`](docs/SETUP_GUIDE.md) bagian 5.1.
-Konfigurasi sekali saja (keystore + variabel publik) ada di bagian 5 dokumen itu.
+Status per 16 Oktober 2026: `ci.yml` **hijau** pada commit yang sedang berlaku — run `38857101603`
+(`main` @ `a9858a9`, job `quality`, 1m52s). Run `38855099318` pada `1ef13a8` sebelumnya **gagal** di
+langkah `Expo doctor` karena `expo` 57.0.29 (diminta `~57.0.30`) dan `expo-router` 57.0.27 (diminta
+`~57.0.28`); perbaikan versinya ada di `a9858a9` (ADR-053, ADR-054). Job `database-rls` memang hanya
+aktif lewat **Actions → CI → Run workflow** dengan input `run_db_tests` dicentang **dan** secret
+`DB_TEST_DATABASE_URL` sudah diatur, sehingga database development tidak tersentuh oleh push/PR
+biasa; uji RLS yang sama dijalankan lokal lewat `npm run db:test`.
+
+Kedua alur rilis **sudah berjalan di GitHub**: `v0.1.0-build9` (15 Oktober 2026, commit `7639ba9`)
+terbit sebagai APK preview bertanda tangan, dan setiap push ke `main` yang mengubah isi aplikasi
+memicu rilis preview berikutnya. Isi keempat secret keystore dan tiga variabel publik ada di bagian 5
+[`docs/SETUP_GUIDE.md`](docs/SETUP_GUIDE.md). Perlu dipahami: build preview `v0.1.0-build9` dibuat
+**sebelum** Milestone 2, jadi ia bukan bukti fitur garasi/klub — bukti Milestone 2 berada pada
+commit `cf818be` ke atas.
 
 ## Build APK Android
 

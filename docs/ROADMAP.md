@@ -141,15 +141,26 @@ terbuka, dengan uji allow/deny yang benar-benar dijalankan di project developmen
 
 ## Milestone 2 — Garasi dan klub
 
-- [ ] CRUD kendaraan; pisahkan detail sensitif.
-- [ ] Buat/temukan klub.
-- [ ] Join request, approval dan role.
-- [ ] Storage foto dengan policy.
-- [ ] UI anggota/owner/admin.
+Status: **Implemented · Passed locally · Passed against dev backend** (migration ke-6 sampai ke-8
+diterapkan, uji RLS LULUS dengan 120 perintah, diverifikasi ulang 16 Oktober 2026); **Tested on
+physical device** masih **Blocked**. Commit: `cf818be` (implementasi garasi + klub), `1ef13a8`
+(checklist uji perangkat), `a9858a9` (perbaikan versi Expo; CI hijau).
 
-**Exit criteria:** non-member tidak bisa membaca detail klub privat atau mengubah anggota; plat privat hanya terlihat owner.
+- [x] CRUD kendaraan; pisahkan detail sensitif. (`src/app/garage.tsx`, `src/app/vehicle.tsx`, `src/features/garage/api.ts`)
+- [x] Buat/temukan klub. (`src/app/(tabs)/community.tsx`, `src/app/club.tsx`, RPC `create_club`)
+- [x] Join request, approval dan role. (RPC `request_club_membership`, `review_club_membership`, `set_club_member_role`, `remove_club_member`, `leave_club` + tabel `club_role_audit`)
+- [ ] Storage foto dengan policy. **Belum, dan tidak dibuat setengah-setengah**: project development tidak memuat bucket maupun policy `storage` (diperiksa langsung: 0 bucket, 0 policy), tidak ada tombol unggah palsu, dan layar garasi/kendaraan menyatakan fitur ini belum tersedia.
+- [x] UI anggota/owner/admin. (`src/app/club-admin.tsx`)
+
+**Exit criteria:** non-member tidak bisa membaca detail klub privat atau mengubah anggota; plat privat
+hanya terlihat owner. — **terpenuhi di lapisan database** (uji RLS allow/deny, `npm run db:test` exit 0);
+verifikasi lewat aplikasi di perangkat fisik menyusul (bagian 5 `docs/MILESTONE_2_REPORT.md`).
 
 ## Milestone 3 — Perjalanan dan live location
+
+Rencana rinci, termasuk yang sengaja **di luar** lingkup, ada di
+[`docs/MILESTONE_3_PLAN.md`](MILESTONE_3_PLAN.md). Milestone ini **belum dimulai** dan tidak boleh
+dimulai sebelum gerbang penerimaan Milestone 2 lulus.
 
 - [ ] Create/join/leave ride.
 - [ ] State machine planned/active/completed/cancelled.
