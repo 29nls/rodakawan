@@ -63,3 +63,24 @@ jejak audit tidak bisa dibaca anggota biasa, dan `anon` menolak semua EXECUTE.
 - `npm run doctor` masih gagal karena patch drift dependensi pra-ada.
 - Uji layar di sini memakai client palsu (bukan jaringan nyata); bukti jaringan nyata
   ada pada uji RLS/RPC di database development.
+
+## 5. Checklist uji perangkat fisik & auth nyata (BELUM dijalankan)
+
+Milik pemilik aplikasi; tidak boleh ditandai lulus berdasarkan uji unit atau smoke
+test emulator. APK: [v0.1.0-build9](https://github.com/29nls/rodakawan/releases/tag/v0.1.0-build9),
+SHA-256 `1eb92d0472aa389ab364aeadafbffbc7c51dc2eafdcf31aff6f42ce38211bc5b`.
+
+| # | Langkah | Bukti yang harus dicatat |
+| - | ------- | ------------------------ |
+| 1 | Registrasi akun baru di perangkat fisik | email + waktu, layar sukses |
+| 2 | Konfirmasi email / callback tautan masuk | tautan diterima dan mendarat di layar masuk |
+| 3 | Masuk dengan akun terkonfirmasi | sesi aktif setelah aplikasi dibuka ulang |
+| 4 | Masuk dengan sandi salah | pesan galat, tidak ada sesi |
+| 5 | Reset sandi dari email | sandi baru bisa dipakai untuk masuk |
+| 6 | Keluar dari akun | kembali ke layar masuk, sesi tidak pulih |
+| 7 | Edit profil (username, nama tampilan, bio, kota) | tersimpan dan terbaca kembali |
+| 8 | Garasi: tambah, jadikan utama, edit, hapus | perubahan bertahan setelah aplikasi dibuka ulang |
+| 9 | Garasi: isi nomor polisi lalu buka profil publik akun lain | plat tidak pernah terlihat pengguna lain |
+| 10 | Klub: buat klub, ajukan gabung dari akun kedua, setujui/tolak | status anggota berubah sesuai aturan |
+| 11 | Klub: klub privat tidak muncul di jelajah akun non-anggota | daftar hanya berisi klub publik |
+| 12 | Privasi lintas pengguna: akun B membuka kendaraan/klub akun A | ditolak dengan pesan jelas, bukan data kosong yang membingungkan |
