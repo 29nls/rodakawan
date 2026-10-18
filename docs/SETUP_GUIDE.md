@@ -82,12 +82,19 @@ Bagian ini adalah urutan yang sudah disesuaikan dengan kode di repo. Project dev
 
 ### 4.3 Jalankan migration
 
-Ada dua migration, dan urutannya penting:
+Repository ini sekarang memuat **dua belas** migration. Dua yang pertama adalah **sejarah penyiapan
+awal** dan urutannya penting:
 
 1. `supabase/migrations/20261013022938_initial_schema.sql` — skema fondasi (migration awal).
 2. `supabase/migrations/20261013023038_auth_profile_bootstrap.sql` — bootstrap profil, constraint
    username, dan trigger `updated_at`. Migration ini idempotent (`create or replace`,
    `drop trigger if exists`) sehingga aman dijalankan ulang dan tidak menghapus data.
+
+Sepuluh migration berikutnya bersifat aditif (privasi follow, detail privat kendaraan, keanggotaan
+klub, kendaraan utama, akses perjalanan, tiga bucket Storage, dan pagar policy). Jangan menyunting
+migration yang sudah diterapkan ke remote; tambahkan migration baru. Jumlah pastinya bisa diperiksa
+dengan `ls supabase/migrations` atau `npx supabase migration list` — jangan menganggap angka di
+dokumentasi lama masih berlaku.
 
 **Penting:** migration awal memakai `create table if not exists`. Bila tabel `profiles` sudah ada di
 database dengan bentuk yang berbeda, tabel itu **dilewati diam-diam** lalu migration gagal di policy

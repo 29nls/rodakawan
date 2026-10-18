@@ -167,15 +167,22 @@ Yang **sudah otomatis** (`npm test`, jaringan dimatikan; client Supabase diganti
 | `src/features/clubs/__tests__/*.test.ts` | Validasi klub, jelajah/buat klub, dan alur keanggotaan lewat RPC (ajukan, batalkan, tinjau, peran, keluarkan, keluar). |
 | `src/components/ui/__tests__/*` | Perilaku dasar komponen yang dipakai form (tombol, field). |
 
-Hasil terakhir dijalankan (17 Oktober 2026, Node 24.18, setelah `npm ci`):
-`npm test -- --ci` → **23 suite, 250 test lulus**; `npm run test:scripts` → **172 test lulus**;
-(diperbarui 18 Oktober 2026 setelah penambahan test kompresi foto, pembersihan Storage, dan foto
-profil: `npm test -- --ci` → **27 suite, 316 test lulus**, termasuk 14 test kompresi foto, 18 test
-pembersihan objek yatim, dan 17 test foto profil (12 API + 5 komponen layar); `npm run test:scripts` → **228 dari 229 test lulus** — satu-satunya kegagalan adalah
-asersi baris pertama `CHANGELOG.md` di checkout Windows yang memakai `core.autocrlf=true`, lihat
-catatan pada tabel hasil di README);
-`npm run deps:check`, `npm run typecheck`, `npm run lint`, `npm run format:check`, `npm run doctor`
-(21/21), dan `npm run export:android` semuanya exit 0.
+Hasil terakhir dijalankan (19 Oktober 2026, Node 24.18.1, npm 12.0.2, setelah `npm ci` dari
+`package-lock.json`):
+`npm test -- --ci` → **27 suite, 316 test lulus** (termasuk 14 test kompresi foto, 18 test
+pembersihan objek yatim, dan 17 test foto profil: 12 API + 5 komponen layar); `npm run test:scripts`
+→ **236 test lulus, exit 0**;
+`npm run deps:check`, `npm run typecheck`, `npm run lint`, `npm run format:check`, dan
+`npm run export:android` semuanya exit 0. `npm run doctor` **tidak dapat dipastikan**: 20 dari 21
+pemeriksaan berjalan, pemeriksaan skema config gagal `EAI_AGAIN exp.host` karena DNS lingkungan ini
+(dua percobaan). Riwayat sebelumnya: 23 suite/250 test dan 172 test script (17 Oktober 2026).
+
+**Kegagalan Windows yang sudah diperbaiki (19 Oktober 2026).** Sebelumnya `npm run test:scripts`
+melaporkan 228/229 (lalu 234/235) karena asersi baris pertama `CHANGELOG.md` membandingkan CRLF di
+disk (`core.autocrlf=true`) dengan `HEADER` ber-LF. Perbaikannya **bukan** menonaktifkan asersi atau
+mengubah `core.autocrlf`, melainkan menyeragamkan akhir baris di batas perbandingan
+(`normalizeLineEndings`), ditambah test regresi untuk input LF/CRLF/CR dan test bahwa judul yang
+diubah tetap ditolak (ADR-063). Versi sekarang: **236/236 lulus**.
 
 Yang **sudah diverifikasi terhadap dev backend** (13 Oktober 2026, project development khusus
 RodaKawan — ADR-035; diperluas pada Milestone 1.6):
@@ -270,8 +277,10 @@ baris**, penerimaan oleh A sendiri → `false`, dan setelah B (pemilik) menerima
 - Uji yang sama kini **juga berjalan di GitHub Actions**, bukan hanya di mesin developer:
   [`.github/workflows/database-rls.yml`](../.github/workflows/database-rls.yml) memicunya otomatis
   ketika file database berubah, memverifikasi connection string menunjuk project development
-  sebelum menyentuhnya, lalu menolak lulus bila notice penanda dari server tidak diterima. Run
-  pertamanya hijau: `38862870367` (16 Oktober 2026, `UJI RLS PROFIL LULUS`, `120 perintah`).
+  sebelum menyentuhnya, lalu menolak lulus bila notice penanda dari server tidak diterima. Pada
+  commit `749424c` run **#4** hijau: kedua notice diterima (171 + 17 perintah). Run **#3** pada
+  `575b166` sempat gagal di langkah `gen types` yang tidak punya target; penyebab dan perbaikannya
+  ada di ADR-061.
 
 Yang **masih Blocked** (butuh perangkat / alur aplikasi / akun):
 
@@ -282,24 +291,25 @@ Yang **masih Blocked** (butuh perangkat / alur aplikasi / akun):
 - Alur follow dari **aplikasi** (kirim permintaan, terima permintaan) belum ada; yang terbukti baru
   aturan dan fungsi di database.
 - **GAR-01…GAR-04 dan CLUB-01…CLUB-10 lewat aplikasi di perangkat fisik** — butuh APK dari commit
-  Milestone 2 (`cf818be`/`a9858a9`) dan dua akun nyata. Aturan di database sudah lulus; yang belum
-  dibuktikan adalah alur layarnya (bagian 5 `docs/MILESTONE_2_REPORT.md` memuat checklist-nya).
+  Milestone 2 (`749424c`, rilis `v0.1.0-build19`) dan dua akun nyata. Aturan di database sudah lulus;
+  yang belum dibuktikan adalah alur layarnya (bagian 5 `docs/MILESTONE_2_REPORT.md` memuat
+  checklist-nya).
   Bukti tiap langkah direkam otomatis oleh `node scripts/device-checklist.mjs` (tangkapan layar,
   hierarki UI, logcat, identitas perangkat dan APK); penilaian langkah tetap dilakukan manusia.
 - **GAR-05 / CLUB-11 lewat aplikasi di perangkat** — logika unggah/ganti/hapus, kompresi otomatis
   (14 test unit: batas dimensi + penghematan luas piksel, pemilihan format, ambang lewati, dan fallback),
   pembersihan objek yatim (18 test unit), policy Storage
   (`npm run db:test` bagian 13), serta jalur HTTP nyata (`npm run storage:test`) sudah lulus, tetapi
-  alur galeri → perkecil → unggah → signed URL dari **perangkat fisik** belum dijalankan. Butuh APK
-  baru karena `expo-image-picker`, `expo-file-system`, dan `expo-image-manipulator` adalah modul
-  native. Yang harus dibuktikan manual: izin galeri muncul hanya saat tombol ditekan, foto HEIC
+  alur galeri → perkecil → unggah → signed URL dari **perangkat fisik** belum dijalankan.
+  `v0.1.0-build19` **sudah memuat** modul native itu (diperiksa di `classes*.dex` dan bundel JS),
+  jadi tidak perlu build baru hanya untuk mendapatkannya. Yang harus dibuktikan manual: izin galeri muncul hanya saat tombol ditekan, foto HEIC
   iPhone terkonversi/diterima, foto 12 MP benar-benar turun ukurannya sebelum diunggah (kuota
   Storage hemat) dan hasilnya tetap tajam — termasuk foto potret yang tinggi, foto PNG berlogo
   transparan yang tidak berubah menjadi latar hitam, EXIF lokasi tidak ikut terunggah, pesan batas
   ukuran hanya muncul bila kompresi gagal, foto lama hilang setelah ganti, dan akun kedua tidak bisa
   membuka foto kendaraan akun pertama.
 - **PROF-10 lewat aplikasi di perangkat** — unggah/ganti/hapus foto profil dari tab Profil belum
-  dijalankan di perangkat fisik (butuh APK baru karena modul native yang sama). Aturan bucket,
+  dijalankan di perangkat fisik (modul native yang sama sudah ada di `v0.1.0-build19`). Aturan bucket,
   kebijakan owner-only, dan jalur HTTP-nya sudah lulus (`npm run db:test` bagian 13 dan
   `npm run storage:test` langkah 15–23); yang perlu dibuktikan manual: foto dari galeri muncul di
   kartu setelah unggah, foto lama hilang dari bucket setelah diganti, tombol hapus bekerja,

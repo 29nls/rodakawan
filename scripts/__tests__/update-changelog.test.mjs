@@ -20,6 +20,7 @@ import {
   demoteHeadings,
   hasSection,
   insertSection,
+  normalizeLineEndings,
   parseGitHubRepo,
   releaseUrl,
   sectionFor,
@@ -178,13 +179,52 @@ describe('fungsi pembentuk bagian', () => {
 });
 
 describe('berkas di repository', () => {
-  it('CHANGELOG.md yang di-commit dimulai dengan judul dari script', () => {
-    const repoRoot = path.resolve(import.meta.dirname, '..', '..');
-    const content = fs.readFileSync(path.join(repoRoot, 'CHANGELOG.md'), 'utf8');
+  const readCommittedChangelog = () =>
+    normalizeLineEndings(
+      fs.readFileSync(path.resolve(import.meta.dirname, '..', '..', 'CHANGELOG.md'), 'utf8'),
+    );
 
+  it('CHANGELOG.md yang di-commit dimulai dengan judul dari script', () => {
+    const content = readCommittedChangelog();
+
+    // Baris pertama diperiksa terpisah supaya kegagalannya menunjuk ke judul,
+    // bukan ke isi berkas yang panjang.
+    assert.equal(
+      content.split('\n')[0],
+      HEADER.split('\n')[0],
+      'baris pertama CHANGELOG.md bukan judul dari script',
+    );
     // Judulnya harus sama dengan yang ditulis script, supaya berkas hasil rilis
     // pertama tidak berbeda bentuk dari berkas yang sudah di-commit.
     assert.ok(content.startsWith(HEADER), 'judul CHANGELOG.md tidak sama dengan HEADER di script');
+  });
+
+  it('perbandingan judul tidak bergantung pada akhir baris checkout', () => {
+    // Checkout Windows dengan core.autocrlf=true menyimpan CRLF di disk,
+    // sedangkan HEADER di script memakai LF. Keduanya harus dinilai sama,
+    // termasuk CR tunggal dari berkas lama.
+    const sample = `${HEADER}## v1.0.0 — 2026-01-01\n\n- sesuatu\n`;
+
+    for (const [label, lineEnding] of [
+      ['LF', '\n'],
+      ['CRLF', '\r\n'],
+      ['CR', '\r'],
+    ]) {
+      const onDisk = sample.replaceAll('\n', lineEnding);
+      assert.equal(
+        normalizeLineEndings(onDisk).startsWith(HEADER),
+        true,
+        `judul harus cocok untuk akhir baris ${label}`,
+      );
+    }
+
+    // Penyeragaman tidak boleh meloloskan judul yang memang berbeda.
+    const wrongHeader = sample.replace('Seluruh rilis APK RodaKawan', 'Seluruh rilis');
+    assert.equal(
+      normalizeLineEndings(wrongHeader).startsWith(HEADER),
+      false,
+      'judul yang diubah tetap harus ditolak',
+    );
   });
 });
 

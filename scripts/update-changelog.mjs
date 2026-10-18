@@ -64,6 +64,19 @@ dari berkas.
 
 `;
 
+/**
+ * Menyeragamkan akhir baris menjadi `\n` **untuk perbandingan** saja.
+ *
+ * Berkas di checkout Windows dengan `core.autocrlf=true` berisi CRLF di disk,
+ * sedangkan `HEADER` di sini memakai LF. Tanpa penyeragaman, perbandingan judul
+ * bergantung pada setelan Git mesin, bukan pada isi berkas yang di-commit.
+ * Fungsi ini tidak dipakai saat menulis: isi berkas tidak pernah ditulis ulang
+ * hanya karena akhir barisnya berbeda.
+ */
+export function normalizeLineEndings(text) {
+  return text.replace(/\r\n?/g, '\n');
+}
+
 /** Tanggal UTC hari ini, bentuk `YYYY-MM-DD`. */
 export function todayUtc(now = new Date()) {
   return now.toISOString().slice(0, 10);

@@ -33,15 +33,16 @@ Istilah status dipakai konsisten di seluruh dokumentasi:
 | Milestone 1.6: privasi follow + detail privat kendaraan | Ya    | Ya             | **Ya** (uji RLS LULUS) | —    |
 | Milestone 2: garasi (CRUD, kendaraan utama, detail privat nomor polisi) | Ya | Ya | **Ya** (uji RLS LULUS, 171 perintah) | **Blocked** (APK belum diuji di HP) |
 | Milestone 2: klub (buat, gabung, peran, keluarkan, jejak audit) | Ya | Ya | **Ya** (uji RLS LULUS) | **Blocked** |
-| Milestone 2: foto kendaraan & logo klub (Supabase Storage) | Ya — bucket privat, unggah/ganti/hapus, foto diperkecil + dikompres otomatis di perangkat, objek yatim disapu otomatis | Ya (75 unit test) | **Ya** (uji Storage RLS LULUS + uji HTTP LULUS) | **Blocked** (perlu APK baru untuk modul native) |
+| Milestone 2: foto kendaraan & logo klub (Supabase Storage) | Ya — bucket privat, unggah/ganti/hapus, foto diperkecil + dikompres otomatis di perangkat, objek yatim disapu otomatis | Ya (75 unit test) | **Ya** (uji Storage RLS LULUS + uji HTTP LULUS) | **Blocked** (belum dijalankan di HP; build19 sudah memuat modul native) |
 | Milestone 2: foto profil (avatar) | Ya — bucket privat owner-only, unggah/ganti/hapus dari tab Profil, foto diperkecil otomatis | Ya (17 unit test) | **Ya** (uji HTTP Storage LULUS) | **Blocked** (uji perangkat) |
 | Milestone 2+: perjalanan, lokasi, chat, hazard, feed, musik | **Belum** | — | — | — |
 
 **Blocked** yang tersisa berarti: alur aplikasi belum pernah dijalankan terhadap project development
 nyata, dan aplikasi belum pernah dipasang di HP fisik. Project Supabase development **sudah ada**
-sejak 13 Oktober 2026, kelima migration sudah diterapkan, uji RLS `public.profiles` sudah lulus
+sejak 13 Oktober 2026, **seluruh dua belas** migration sudah diterapkan, uji RLS sudah lulus
 (ADR-035), dan lubang privasi follow serta integritas detail privat kendaraan sudah diperbaiki dengan
-uji allow/deny (ADR-039, ADR-040). Semua langkah yang dapat dijalankan tanpa backend sudah dijalankan
+uji allow/deny (ADR-039, ADR-040). Dua migration pertama adalah sejarah penyiapan awal; jumlah itu
+tidak lagi menggambarkan keadaan sekarang. Semua langkah yang dapat dijalankan tanpa backend sudah dijalankan
 — lihat [Perintah pengujian](#perintah-pengujian).
 
 Layar Milestone 2 (garasi dan klub) sepenuhnya **berfungsi**: seluruh aksinya memanggil service
@@ -66,9 +67,11 @@ pernah memblokir unggahan — berkas asli dipakai dan batas bucket tetap berlaku
 Storage dan waktu unggah jauh lebih hemat, dan blok metadata asli (EXIF) tidak ikut tersalin
 karena berkasnya ditulis ulang (perlu dikonfirmasi di perangkat — checklist GAR-05/CLUB-11). Aturan Storage diuji di database
 (`npm run db:test` bagian 13) dan lewat HTTP API Storage dengan akun uji sementara
-(`npm run storage:test`: unggah, signed URL, penolakan lintas pengguna, lalu pembersihan penuh);
-yang belum terbukti adalah unggahan nyata dari perangkat fisik karena modul native baru
-(`expo-image-picker`, `expo-file-system`) memerlukan APK yang dibangun ulang.
+(`npm run storage:test`: unggah, signed URL, penolakan lintas pengguna, lalu pembersihan penuh).
+Modul native yang dipakai (`expo-image-picker`, `expo-file-system`, `expo-image-manipulator`) **sudah
+ada di APK `v0.1.0-build19`** — diperiksa di `classes*.dex` dan bundel JS berkas rilis itu; yang
+belum terbukti adalah pemakaian nyata di perangkat fisik (izin galeri, hasil kompresi, signed URL
+setelah aplikasi dibuka ulang).
 
 **Konteks database (13 Oktober 2026).** Project Supabase yang sebelumnya terkonfigurasi di `.env`
 **bukan** database bersih: tabel `public.profiles` sudah ada dalam bentuk yang berbeda (hanya `id`,
@@ -77,11 +80,12 @@ yang belum terbukti adalah unggahan nyata dari perangkat fisik karena modul nati
 menyebut `is_private`, migration **tidak** dijalankan di project tersebut. Keputusan: memakai project
 development baru yang bersih. Audit lengkap ada di `docs/PROJECT_DECISIONS.md` (ADR-033).
 
-**Tindak lanjut (13 Oktober 2026).** Project development bersih sudah dibuat dan dihubungkan lewat
-`.env` (URL + publishable key) dan `.env.db` (session pooler, `sslmode=require`). Kelima migration
-diterapkan dengan `npx supabase link` + `npx supabase db push`; `npx supabase migration list`
-menunjukkan kolom Local dan Remote sama untuk kelima versi. `npm run db:test` lulus dengan notice
-`UJI RLS PROFIL LULUS`. Project lama tidak disentuh sama sekali (ADR-035).
+**Tindak lanjut (13 Oktober 2026, diperluas sampai 18 Oktober).** Project development bersih sudah
+dibuat dan dihubungkan lewat `.env` (URL + publishable key) dan `.env.db` (session pooler,
+`sslmode=require`). Seluruh **dua belas** migration diterapkan dengan `npx supabase link` +
+`npx supabase db push`; `npx supabase migration list` menunjukkan kolom Local dan Remote sama untuk
+keduabelasnya. Dua migration pertama adalah fondasi awal; sepuluh sisanya ditambahkan per milestone.
+`npm run db:test` lulus dengan kedua notice. Project lama tidak disentuh sama sekali (ADR-035).
 
 ---
 
@@ -89,6 +93,8 @@ menunjukkan kolom Local dan Remote sama untuk kelima versi. `npm run db:test` lu
 
 - **Node.js 22.13 atau lebih baru** (`engines.node` di `package.json`; CI memakai 24.x).
 - **npm** sebagai satu-satunya package manager; `package-lock.json` di-commit dan dipakai `npm ci`.
+  Field `packageManager` pnpm lama sudah dihapus karena tidak ada `pnpm-lock.yaml` dan seluruh CI
+  memakai npm (ADR-062).
 - Untuk mencoba di HP Android: aplikasi **Expo Go** (untuk UI/prototipe) atau APK development build.
 - Android Studio **tidak** wajib untuk rilis: APK dibangun di runner GitHub (`expo prebuild` +
   Gradle, ADR-051). Build lokal tetap membutuhkan JDK 17 dan Android SDK (bagian “Build APK Android”).
@@ -202,24 +208,24 @@ yang menyeluruh tetap dijalankan di CI. Bila daftar versi resmi Expo tidak terja
 (sedang offline), pemeriksaan melaporkan bahwa hasilnya **tidak bisa dipastikan** dengan
 `::warning::` dan tidak menggagalkan `npm test` — lulus hanya dilaporkan bila benar-benar diperiksa.
 
-Hasil nyata pada commit ini (`a9858a9`, 16 Oktober 2026, Node 24.18, npm 12):
+Hasil nyata pada commit `749424c` (19 Oktober 2026, Node 24.18.1, npm 12.0.2):
 
 | Perintah               | Hasil                                                        |
 | ---------------------- | ------------------------------------------------------------ |
-| `npm ci`               | Exit 0, 1.076 paket terpasang dari lockfile.                 |
+| `npm ci`               | Exit 0, 1.082 paket terpasang dari `package-lock.json` (lockfile v3). |
 | `npm run typecheck`    | Exit 0 (juga lulus tanpa folder `.expo` — tidak perlu dev server dulu). |
 | `npm run lint`         | Exit 0.                                                       |
 | `npm run format:check` | Exit 0.                                                       |
 | `npm run deps:check`   | Exit 0 — versi dependency cocok dengan Expo SDK 57.0.30 (ADR-054). |
-| `npm test`             | **27 suite, 316 test lulus**, exit 0 (dijalankan setelah `npm ci`; sebelumnya 23 suite/250 test, kini termasuk 14 test kompresi foto, 18 test pembersihan objek yatim Storage, dan 17 test foto profil: 12 API + 5 komponen layar). Diverifikasi ulang 18 Oktober 2026. |
-| `npm run test:scripts` | **234 dari 235 test lulus** (exit 1), diverifikasi ulang 18 Oktober 2026. Satu-satunya kegagalan adalah asersi baris pertama `CHANGELOG.md` di `scripts/__tests__/update-changelog.test.mjs`: checkout Windows di mesin ini memakai `core.autocrlf=true` sehingga berkas itu ada di disk dengan CRLF sementara `HEADER` di script memakai LF — berkas dan scriptnya sendiri identik dengan `HEAD`, jadi ini bukan akibat perubahan kode. Di runner Linux (tanpa autocrlf) berkasnya LF dan asersinya lulus; perbaikannya adalah `.gitattributes` yang memaksa `CHANGELOG.md` berakhir LF. |
-| `npm run doctor`       | 21/21 pemeriksaan lulus (sebelum perbaikan versi: 20/21, exit 1). |
-| `npm run export:android` | Exit 0, bundel Hermes `entry-*.hbc` (~3,6 MB), tidak ada JWT/service role key di dalam bundel. |
-| `npm run db:test`      | **Exit 0 — dua berkas, dua notice** (18 Oktober 2026): `UJI RLS PROFIL LULUS` (171 perintah: profil, follow/privasi, detail privat kendaraan, garasi, klub, konten klub, perjalanan, Storage foto/logo/avatar) dan `UJI POLICY OWNER-GUARD LULUS` (17 perintah: 18 policy wadah diperiksa, detektor diuji-diri) terhadap project development. |
+| `npm test`             | **27 suite, 316 test lulus**, exit 0 (dijalankan setelah `npm ci`; sebelumnya 23 suite/250 test, kini termasuk 14 test kompresi foto, 18 test pembersihan objek yatim Storage, dan 17 test foto profil: 12 API + 5 komponen layar). Diverifikasi ulang 19 Oktober 2026. |
+| `npm run test:scripts` | **236 test lulus, exit 0** (19 Oktober 2026). Sebelumnya 235 test dengan satu kegagalan di checkout Windows: asersi baris pertama `CHANGELOG.md` membandingkan CRLF di disk dengan `HEADER` ber-LF. Kini akhir baris diseragamkan di batas perbandingan (`normalizeLineEndings`, ADR-063) dan ada test regresi untuk LF/CRLF/CR; asersi judul tetap ketat, file Git tidak diubah, dan `core.autocrlf` tidak disentuh. |
+| `npm run doctor`       | **Tidak dapat dipastikan** (19 Oktober 2026): 20 dari 21 pemeriksaan berjalan, pemeriksaan skema config gagal `TypeError: fetch failed` / `EAI_AGAIN exp.host` karena DNS lingkungan ini. Dua percobaan memberi hasil sama; bukan temuan proyek. Jalankan ulang di CI atau jaringan yang menjangkau `exp.host`. |
+| `npm run export:android` | Exit 0, bundel Hermes `entry-*.hbc` 3,8 MB. |
+| `npm run db:test`      | **Exit 0 — dua berkas, dua notice** (diulang 19 Oktober 2026): `UJI RLS PROFIL LULUS` (171 perintah: profil, follow/privasi, detail privat kendaraan, garasi, klub, konten klub, perjalanan, Storage foto/logo/avatar) dan `UJI POLICY OWNER-GUARD LULUS` (17 perintah: 18 policy wadah diperiksa, detektor diuji-diri) terhadap project development. |
 | `npm run db:types:check` | Exit 0 — `database.generated.ts` (653 baris, Supabase CLI 2.121.0) sama dengan skema project development, diverifikasi ulang 18 Oktober 2026 **tanpa link project maupun access token** (target dioper lewat `--db-url`, ADR-061). Skenario CI direproduksi lokal dengan memindahkan `supabase/.temp` (tautan CLI) — sebelumnya exit 1 dengan `Must specify one of --local, --linked, --project-id, or --db-url`. Drift yang disengaja terdeteksi (exit 1) dan menampilkan baris pertama yang berbeda. |
 | `npm run storage:test` | **Exit 0 — `UJI INTEGRASI STORAGE LULUS`** (27 langkah: unggah sebagai pemilik untuk foto kendaraan **dan** foto profil, signed URL + unduhan SHA-256, delapan penolakan lintas pengguna/anon, hapus oleh pemilik, verifikasi nol sisa) terhadap project development, 18 Oktober 2026. Dijalankan tiga kali berturut-turut tanpa sisa (satu di antaranya menyapu objek yatim yang sengaja ditinggalkan run terputus), dan sekali dengan publishable key salah (exit 1, data uji tetap dibersihkan). |
 | `npx supabase ...`     | CLI 2.121.0 (lewat `npx`, tidak masuk `package.json`). `link` + `db push` menerapkan seluruh migration (dua belas versi; `npx supabase migration list` 18 Oktober 2026 menunjukkan kolom Local dan Remote sama untuk kedua belasnya). Pada umumnya jangan menaruh connection string di argumen perintah karena npm/npx mencetak ulang baris perintahnya; pengecualian tunggal adalah `npm run db:types` (ADR-061) yang mengoperkannya sebagai `--db-url` karena itulah satu-satunya cara mengarahkan `gen types` tanpa access token mesin — perintah itu menyetel `npm_config_loglevel=error` supaya `npx` tidak mencetak ulang argumennya dan menyunting seluruh keluaran sebelum dicetak, dan keduanya diuji di `scripts/__tests__/db-types.test.mjs`. |
-| `npx expo prebuild` + `./gradlew assembleRelease` | **Berjalan lokal maupun di GitHub Actions**: rantai yang sama menghasilkan APK bertanda tangan `v0.1.0-build9` (15 Oktober 2026) dan build preview berikutnya untuk setiap push yang mengubah isi aplikasi. `npm run test:scripts` juga menguji `scripts/configure-android-release.mjs`. |
+| `npx expo prebuild` + `./gradlew assembleRelease` | **Berjalan lokal maupun di GitHub Actions**: Release APK run **#19** (18 Oktober 2026, commit `749424c`) menerbitkan `v0.1.0-build19` berisi `app-preview.apk` bertanda tangan. `npm run test:scripts` juga menguji `scripts/configure-android-release.mjs`. |
 
 `npm test` tidak menyentuh jaringan: fungsi api menerima client sebagai argumen sehingga test
 menyuntikkan fake client dari `src/test-support/fakeSupabase.ts`; test navigasi memakai `jest.mock`
@@ -438,29 +444,28 @@ tanpa filter).
   tidak ikut muncul sebagai “perubahan” di catatan rilis maupun entri berikutnya. Rinciannya di
   [`docs/SETUP_GUIDE.md`](docs/SETUP_GUIDE.md) bagian 6.8.
 
-Status per 16 Oktober 2026: `ci.yml` **hijau pada setiap push sejak perbaikan versi** — run
-`38857101603` (`a9858a9`), `38858837494` (`95ec43a`), dan `38860337113` (`ab3a9a8`), semuanya job
-`quality` tanpa secret. Run `38855099318` pada `1ef13a8` sebelumnya **gagal** di langkah `Expo doctor`
-karena `expo` 57.0.29 (diminta `~57.0.30`) dan `expo-router` 57.0.27 (diminta `~57.0.28`);
-perbaikan versinya ada di `a9858a9` (ADR-053, ADR-054).
+Status per 19 Oktober 2026 pada commit `749424c`: CI **#26** hijau, Database RLS **#4** hijau, dan
+Release APK **#19** sukses. Ketiganya berjalan pada commit yang sama dengan tag `v0.1.0-build19`.
+Satu-satunya commit setelah tag itu di `origin/main` adalah `ee0a0bd` (mencatat rilis di
+`CHANGELOG.md`, `[skip ci]`), jadi tidak ada kode aplikasi yang lebih baru daripada APK tersebut.
 
-Uji RLS kini berjalan **di GitHub Actions**, bukan hanya lokal: run `38862870367` (16 Oktober 2026,
-commit `21e49d1`, dipicu otomatis oleh perubahan `.github/workflows/database-rls.yml`) memuat
-`UJI RLS PROFIL LULUS` dan `120 perintah selesai dijalankan` dari server, dengan secret
-`DB_TEST_DATABASE_URL` terpasang (ADR-055). Workflow `ci.yml` tetap bebas secret Supabase.
+Uji RLS berjalan **di GitHub Actions**, bukan hanya lokal: workflow `database-rls` memverifikasi
+connection string menunjuk project development sebelum menyentuh database, lalu menolak lulus bila
+notice penanda dari server tidak diterima. Run **#3** pada `575b166` sempat **gagal** di langkah
+terakhir (`gen types` tanpa target, ADR-061); perbaikannya ada di `ca2461c` dan run **#4** hijau.
+Workflow `ci.yml` tetap bebas secret Supabase.
 
-Kedua alur rilis **sudah berjalan di GitHub**: `v0.1.0-build9` (15 Oktober 2026, commit `7639ba9`)
-terbit sebagai APK preview bertanda tangan, dan setiap push ke `main` yang mengubah isi aplikasi
-memicu rilis preview berikutnya. Isi keempat secret keystore dan tiga variabel publik ada di bagian 5
-[`docs/SETUP_GUIDE.md`](docs/SETUP_GUIDE.md).
-
-APK preview yang **memuat** Milestone 2 adalah
-[v0.1.0-build11](https://github.com/29nls/rodakawan/releases/tag/v0.1.0-build11) (16 Oktober 2026):
-tag-nya menunjuk `a9858a9` dan catatan rilisnya memuat `cf818be`, sedangkan `v0.1.0-build9` dibuat
-**sebelum** garasi dan klub ada sehingga ia **bukan** bukti fitur ini. SHA-256 berkasnya ada di bagian
-**🔒 Verifikasi berkas** pada badan rilis. Push yang hanya mengubah dokumentasi melewatkan **seluruh**
-job build, uji nyala, dan tag (terverifikasi pada run `38859004932`), jadi dokumentasi tidak memakan
-menit build.
+Kedua alur rilis **sudah berjalan di GitHub**. APK preview terbaru yang **memuat** Milestone 2 adalah
+[v0.1.0-build19](https://github.com/29nls/rodakawan/releases/tag/v0.1.0-build19) (18 Oktober 2026,
+commit `749424c`): `app-preview.apk`, 105.904.027 byte, SHA-256
+`775a3309fce38416fe04222652031282047f0197bb149da8520b13e73d42b3d9`, sertifikat
+`3ea8bb4745b638be8fddf71e15edd9786d45aac65c0384b87be8fa2c32b3b14d`. Berkas itu sudah diunduh ulang
+dan diverifikasi lokal: SHA-256 dan ukurannya sama dengan metadata rilis, tanda tangan v2 sah, dan
+`classes*.dex` memuat modul `expo.modules.imagepicker`, `expo.modules.imagemanipulator`, serta
+`expo.modules.filesystem`. `v0.1.0-build9` (commit `7639ba9`) dibuat **sebelum** garasi dan klub ada,
+sehingga ia **bukan** bukti fitur Milestone 2. Push yang hanya mengubah dokumentasi melewatkan
+**seluruh** job build, uji nyala, dan tag, jadi dokumentasi tidak memakan menit build. Isi keempat
+secret keystore dan tiga variabel publik ada di bagian 5 [`docs/SETUP_GUIDE.md`](docs/SETUP_GUIDE.md).
 
 ## Build APK Android
 
@@ -494,9 +499,9 @@ Profil build EAS yang tersisa ada di [`eas.json`](eas.json):
 Nama paket Android `com.rodakawan.app` di [`app.json`](app.json) masih sementara dan wajib diganti
 sebelum rilis Play Store bila identitas final berbeda (ADR-015).
 
-Status: rantai build lokalnya **sudah dibuktikan** — prebuild, tanda tangan, `assembleRelease`, dan
-`scripts/verify-apk.mjs` dijalankan di mesin pengembang dan lulus; yang belum pernah terjadi adalah
-menjalankannya di GitHub Actions, yang menunggu keempat secret keystore.
+Status: rantai build **sudah terbukti di GitHub Actions** — Release APK run #19 (18 Oktober 2026)
+menjalankan prebuild, Gradle, verifikasi tanda tangan, uji nyala di emulator, dan penerbitan
+`v0.1.0-build19`. Yang belum terbukti adalah pemasangan dan pemakaian APK itu di HP fisik pemilik.
 
 ### Merilis APK lewat workflow
 
@@ -562,6 +567,9 @@ src/
   features/
     auth/       # api.ts, session.tsx, errors.ts, validation.ts, redirect.ts, linkParams.ts, components/
     profile/    # api.ts, useProfile.ts, validation.ts, components/
+    garage/     # api.ts + validation.ts (CRUD kendaraan, kendaraan utama)
+    clubs/      # api.ts + validation.ts (RPC keanggotaan, jelajah klub)
+    media/      # photos.ts, picker.ts, imageCompression.ts, photoCleanup.ts, components/
   hooks/        # useAppStatus
   lib/          # env.ts (konfigurasi publik + validasi), supabase/client.ts, crypto/webcrypto.ts
   services/     # appInfo.ts (metadata build)
@@ -580,8 +588,9 @@ scripts/        # generate-assets.mjs, db-test.mjs (runner uji RLS), verify-apk.
                 # preview lama)
 docs/           # sumber kebenaran produk
 supabase/
-  migrations/   # 20261013022938_initial_schema.sql (fondasi)
-                # 20261013023038_auth_profile_bootstrap.sql (bootstrap profil + constraint)
+  migrations/   # dua belas migration: dua berkas fondasi awal
+                # (20261013022938_initial_schema.sql, 20261013023038_auth_profile_bootstrap.sql)
+                # + sepuluh migration aditif (privasi, klub, garasi, Storage)
   tests/        # rls_profiles_test.sql (uji RLS dua akun + kontrol positif)
                 # rls_policy_guard_test.sql (pagar policy wadah: kepemilikan tanpa penjaga)
 .github/

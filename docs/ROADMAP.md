@@ -111,10 +111,11 @@ butuh APK di perangkat tetap **Blocked**.
       sudah terpasang dan uji kini punya workflow sendiri (`database-rls.yml`) yang berjalan otomatis
       ketika file database berubah; run pertama hijau pada 16 Oktober 2026 (`38862870367`, notice
       `UJI RLS PROFIL LULUS`, 120 perintah).
-- [ ] Menjalankan rilis APK pertama sampai GitHub Release berisi APK terpasang di perangkat. —
-      **Blocked** (butuh keempat secret keystore untuk membangun di runner; akun Expo tidak lagi
-      diperlukan sejak ADR-051).
-- [ ] Uji manual AUTH-01…AUTH-14 dan PROF-01…PROF-07 di perangkat. — **Blocked** (belum ada APK).
+- [x] Menjalankan rilis APK pertama sampai GitHub Release berisi APK. — `v0.1.0-build9` (15 Oktober
+      2026) terbit; `v0.1.0-build19` (18 Oktober 2026, `749424c`) adalah build terbaru yang memuat
+      Milestone 2.
+- [ ] Uji manual AUTH-01…AUTH-14 dan PROF-01…PROF-07 di perangkat. — **Blocked** (APK tersedia, tetapi
+      belum dijalankan di HP fisik; lihat bagian 5 `MILESTONE_2_REPORT.md`).
 
 **Exit criteria:** seluruh pemeriksaan lokal tercatat beserta hasilnya; uji RLS punya cara jalan yang
 reproducible; tidak ada kredensial di repo/laporan; tidak ada fitur Milestone 2 yang dimulai.
@@ -145,6 +146,8 @@ Status: **Implemented · Passed locally · Passed against dev backend** (13 Okto
       layar daftar permintaan, dan apakah follow ke profil publik juga perlu persetujuan.
 - [ ] Rate limit permintaan follow dan penolakan permintaan dari akun yang diblokir (belum ada;
       `user_blocks` hanya terlihat oleh pihak yang memblokir, jadi butuh helper tersendiri).
+- [ ] UI persetujuan follow (daftar permintaan masuk) — aturan database sudah ada, layarnya belum.
+      Ini tidak memblokir Milestone 3; masuk ke pekerjaan sosial (Milestone 6).
 
 **Exit criteria:** setiap temuan keamanan pada audit policy ditutup atau dilaporkan sebagai risiko
 terbuka, dengan uji allow/deny yang benar-benar dijalankan di project development.
@@ -152,9 +155,13 @@ terbuka, dengan uji allow/deny yang benar-benar dijalankan di project developmen
 ## Milestone 2 — Garasi dan klub
 
 Status: **Implemented · Passed locally · Passed against dev backend** (dua belas migration diterapkan,
-uji RLS LULUS dengan 171 perintah termasuk Storage foto/logo/avatar dan foto profil, diverifikasi ulang 18 Oktober 2026);
-**Tested on physical device** masih **Blocked** (APK dengan modul native baru belum dibangun). Commit: `cf818be` (implementasi garasi + klub), `1ef13a8`
-(checklist uji perangkat), `a9858a9` (perbaikan versi Expo; CI hijau).
+uji RLS LULUS dengan 171 + 17 perintah termasuk Storage foto/logo/avatar dan foto profil, diverifikasi
+ulang 19 Oktober 2026); **Tested on physical device** masih **Blocked** — bukan karena APK-nya belum
+ada, tetapi karena belum dijalankan manusia di HP. Basis: `749424c` = tag `v0.1.0-build19`
+(`app-preview.apk`, 105.904.027 byte, SHA-256 `775a3309…b3d9`); implementasi `cf818be`, checklist
+perangkat `1ef13a8`, perbaikan versi Expo `a9858a9`, perbaikan generator tipe `ca2461c`. CI #26,
+Database RLS #4, dan Release APK #19 hijau pada commit yang sama. Setelah tag hanya ada commit
+dokumentasi `ee0a0bd`.
 
 - [x] CRUD kendaraan; pisahkan detail sensitif. (`src/app/garage.tsx`, `src/app/vehicle.tsx`, `src/features/garage/api.ts`)
 - [x] Buat/temukan klub. (`src/app/(tabs)/community.tsx`, `src/app/club.tsx`, RPC `create_club`)
@@ -166,6 +173,11 @@ uji RLS LULUS dengan 171 perintah termasuk Storage foto/logo/avatar dan foto pro
   17 test unit (12 API + 5 komponen) + 9 langkah HTTP Storage + asersi RLS (ADR-059). Foto profil sengaja hanya terlihat pemiliknya sampai
   kebijakan visibilitas avatar ada.
 - [x] UI anggota/owner/admin. (`src/app/club-admin.tsx`)
+- [ ] Sapuan objek yatim untuk **logo klub** dan **avatar** (foto kendaraan sudah; dua bucket lain
+      masih best-effort saat ganti/hapus). Optimasi kuota, bukan celah keamanan — tidak memblokir
+      Milestone 3.
+- [ ] Kebijakan visibilitas avatar (saat ini owner-only). Butuh keputusan produk + policy `SELECT`
+      baru; jangan dilonggarkan tanpa keputusan itu.
 
 **Exit criteria:** non-member tidak bisa membaca detail klub privat atau mengubah anggota; plat privat
 hanya terlihat owner. — **terpenuhi di lapisan database** (uji RLS allow/deny, `npm run db:test` exit 0);
@@ -177,16 +189,23 @@ Rencana rinci, termasuk yang sengaja **di luar** lingkup, ada di
 [`docs/MILESTONE_3_PLAN.md`](MILESTONE_3_PLAN.md). Milestone ini **belum dimulai** dan tidak boleh
 dimulai sebelum gerbang penerimaan Milestone 2 lulus.
 
+Gerbang tambahan sebelum layar peta: **penyedia peta/tile belum dipilih** (ADR-009/ADR-064). Opsi,
+lisensi, kuota, privasi, dan syarat offline ada di
+[`docs/MAP_PROVIDER_DECISION.md`](MAP_PROVIDER_DECISION.md); jangan menambahkan dependency peta
+sebelum keputusan itu dicatat.
+
 - [ ] Create/join/leave ride.
-- [ ] State machine planned/active/completed/cancelled.
-- [ ] Permission explainer dan location sharing control.
+- [ ] State machine planned/active/completed/cancelled, ditegakkan di database.
+- [ ] Permission explainer dan location sharing control (opt-in per ride).
 - [ ] Development build dengan background location.
 - [ ] Private Realtime channel dan last-known location.
-- [ ] Map markers + stale/offline indicators.
-- [ ] Stop task saat keluar/ride berakhir.
-- [ ] Test battery/network/vendor.
+- [ ] Map markers + stale/offline indicators (setelah provider dipilih).
+- [ ] Stop task saat keluar/opt-out/ride berakhir.
+- [ ] Test baterai/network pada perjalanan 30 menit di perangkat fisik.
 
-**Exit criteria:** anggota sah melihat update lokasi; non-member ditolak; izin ditolak/GPS mati/network drop dijelaskan; tracking tidak berjalan tanpa ride aktif dan opt-in.
+**Exit criteria:** anggota sah melihat update lokasi; non-member dan `anon` ditolak; menolak berbagi
+tetap bisa ikut; izin ditolak/GPS mati/network drop dijelaskan; status final tidak bisa kembali
+aktif; tracking tidak berjalan tanpa ride aktif dan opt-in.
 
 ## Milestone 4 — Hazard reports dan convoy chat
 
@@ -239,6 +258,21 @@ dimulai sebelum gerbang penerimaan Milestone 2 lulus.
 - [ ] Playback controls + audio focus.
 - [ ] Background playback sesuai konfigurasi yang diizinkan.
 - [ ] Uji transisi voice ↔ music, panggilan sistem dan lock screen.
+
+## Utang produk dan keputusan terbuka (per 19 Oktober 2026)
+
+| Item | Status | Memblokir Milestone 3? | Pemilik keputusan |
+| --- | --- | --- | --- |
+| Uji perangkat fisik Milestone 2 | **Blocked** — APK `v0.1.0-build19` siap, belum dijalankan | **Ya** — gerbang masuk seluruh M3 | Pemilik aplikasi |
+| Penyedia peta/tile | **Belum diputuskan** (ADR-009, ADR-064) | **Ya**, hanya untuk langkah marker/peta; skema & RPC ride tidak | Pemilik produk + engineering |
+| UI persetujuan follow (daftar permintaan) | Belum ada; aturan database sudah | Tidak — pekerjaan sosial (M6) | Pemilik produk |
+| Rate limit follow + penolakan permintaan dari akun terblokir | Belum ada | Tidak — hardening sosial (M6) | Engineering |
+| Sapuan objek yatim logo klub & avatar | Belum ada; foto kendaraan sudah | Tidak — optimasi kuota | Engineering |
+| Visibilitas avatar | Owner-only sampai kebijakan ada | Tidak | Pemilik produk + security |
+
+Aturan: jangan melonggarkan policy, menampilkan avatar ke publik, atau membuka foto kendaraan tanpa
+keputusan produk/keamanan yang tercatat. Item yang tidak memblokir M3 tetap dilacak di sini supaya
+tidak hilang saat fokus pindah ke perjalanan.
 
 ## Kriteria siap rilis umum
 
