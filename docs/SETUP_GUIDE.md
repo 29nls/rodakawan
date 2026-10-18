@@ -43,7 +43,8 @@ dikonfigurasi di repo ini.
 npm run typecheck
 npm run lint
 npm run format:check
-npm run deps:check       # versi dependency terhadap Expo SDK yang terpasang
+npm run deps:check       # TypeScript editor = CI + versi dependency terhadap Expo SDK
+npm run check:editor-ts  # hanya pemeriksaan TypeScript editor (lokal, tanpa jaringan)
 npm test                 # komponen & hooks aplikasi (Jest); menjalankan deps:check lebih dulu
 npm run test:scripts     # script rilis: pengelompokan catatan rilis & rentang commit
 npm run doctor
@@ -57,8 +58,10 @@ tetap dipakai untuk kode aplikasi di `src/`. Keduanya berjalan di CI.
 
 Tetap pakai satu package manager (npm) dan commit lockfile. Sebelum memasang dependency native baru,
 baca dokumentasi kompatibilitasnya dengan Expo SDK aktif, lalu jalankan `npm run deps:check` lebih
-dulu — ia memakai CLI Expo yang terpasang (`expo install --check`, ±3 detik termasuk startup npm)
-dan gagal dengan daftar paket yang perlu disesuaikan; `npm run doctor` tetap dipakai sebagai pemeriksaan
+dulu — ia menjalankan dua pemeriksaan: `check:editor-ts` (lokal, tanpa jaringan: `.vscode/settings.json`
+harus menunjuk `node_modules/typescript/lib`, versinya memenuhi `devDependencies.typescript`, dan sama
+dengan lockfile) lalu CLI Expo yang terpasang (`expo install --check`, ±3 detik termasuk startup npm)
+yang gagal dengan daftar paket yang perlu disesuaikan; `npm run doctor` tetap dipakai sebagai pemeriksaan
 menyeluruh sebelum rilis.
 
 ## 4. Hubungkan Supabase (langkah konkret Milestone 1)
@@ -204,14 +207,55 @@ Di Bash/Git Bash:
 DATABASE_URL="postgresql://..." npm run db:test
 ```
 
-Runner hanya melaporkan lulus bila notice `UJI RLS PROFIL LULUS` benar-benar diterima dari server.
-Password tidak pernah dicetak; hanya `user@host:port/database` yang ditampilkan. Jalankan
-`npm run db:test -- --help` untuk melihat opsi.
+Runner menjalankan **dua** berkas uji secara berurutan, dan hanya melaporkan lulus bila notice
+penanda dari **masing-masing** benar-benar diterima dari server:
 
-**Cara 2 — SQL Editor.** Tempel seluruh isi
-[`supabase/tests/rls_profiles_test.sql`](../supabase/tests/rls_profiles_test.sql) ke SQL Editor →
-**Run**. Hasil lulus ditandai notice `UJI RLS PROFIL LULUS`; bila ada masalah, pesan menyebutkan
-asersi mana yang gagal.
+| Berkas | Isi | Notice |
+| --- | --- | --- |
+| `supabase/tests/rls_profiles_test.sql` | Izin/penolakan per tabel, RPC, dan Storage | `UJI RLS PROFIL LULUS` |
+| `supabase/tests/rls_policy_guard_test.sql` | Pagar katalog: policy wadah yang memberi akses lewat kolom kepemilikan tanpa penjaga keanggotaan (ADR-060) | `UJI POLICY OWNER-GUARD LULUS` |
+
+Password tidak pernah dicetak; hanya `user@host:port/database` yang ditampilkan. Untuk menjalankan
+satu berkas saja saat mengembangkan (mis. yang sedang Anda ubah):
+
+```powershell
+npm run db:test -- --file supabase/tests/rls_policy_guard_test.sql
+```
+
+**Menambah berkas uji baru:** letakkan di `supabase/tests/`, tulis asersinya dalam satu transaksi dan
+akhiri dengan `ROLLBACK`, lalu cantumkan direktif notice di baris awal:
+
+```sql
+-- db:test notice: UJI NAMA PEMERIKSAAN LULUS
+```
+
+Tambahkan berkas itu ke `DEFAULT_TEST_FILES` di [`scripts/db-test.mjs`](../scripts/db-test.mjs);
+berkas tanpa direktif notice ditolak runner sebelum satu perintah pun dijalankan ke database, dan
+workflow `database-rls.yml` memeriksa kedua notice yang ada saat ini.
+
+`npm run db:test -- --help` menampilkan daftar berkas dan opsinya.
+
+**Uji jalur HTTP Storage — `npm run storage:test`.** Runner ini melengkapi `db:test` dengan alur yang
+benar-benar dipakai aplikasi, dan memakai `DATABASE_URL` yang sama plus URL/publishable key publik
+dari `.env.local`:
+
+```powershell
+npm run storage:test   # memuat .env.local dan .env.db otomatis
+```
+
+Tanpa `service_role`: dua akun uji sementara dibuat lewat SQL (kata sandi acak per run), sign-in lewat
+GoTrue password grant, lalu runner membuktikan unggah foto kendaraan, signed URL yang isinya identik
+(SHA-256), penolakan lintas pengguna/`anon`, dan hapus oleh pemilik. Data uji selalu dibersihkan
+(objek lewat Storage API, akun beserta baris turunannya) dan runner hanya mencetak
+`UJI INTEGRASI STORAGE LULUS` bila tidak ada sisa; sisa run yang terputus disapu otomatis di run
+berikutnya. `npm run storage:test -- --help` menampilkan ringkasannya.
+
+**Cara 2 — SQL Editor.** Tempel seluruh isi berkas uji yang ingin diperiksa (mis.
+[`supabase/tests/rls_profiles_test.sql`](../supabase/tests/rls_profiles_test.sql) atau
+[`supabase/tests/rls_policy_guard_test.sql`](../supabase/tests/rls_policy_guard_test.sql)) ke SQL
+Editor → **Run**. Hasil lulus ditandai notice pada direktif berkas itu (`UJI RLS PROFIL LULUS` /
+`UJI POLICY OWNER-GUARD LULUS`); bila ada masalah, pesan menyebutkan asersi mana yang gagal — untuk
+pagar policy, pesannya mendaftar `tabel.policy` beserta ekspresi yang melanggar.
 
 Catatan penting:
 
@@ -221,15 +265,35 @@ Catatan penting:
 - **Jangan** menyimpan `DATABASE_URL` di `.env.local`: berkas itu berisi variabel `EXPO_PUBLIC_*` yang
   ikut masuk ke bundle aplikasi. Untuk CI, simpan sebagai secret repository (`DB_TEST_DATABASE_URL`).
 - Status saat ini: **LULUS** pada project development khusus RodaKawan (ADR-035): notice
-  `UJI RLS PROFIL LULUS` diterima dan **120 perintah** selesai tanpa error (13 Oktober 2026 dengan
-  88 perintah; diperluas oleh garasi/klub Milestone 2 dan dijalankan ulang 16 Oktober 2026;
-  **kedelapan** migration diterapkan). Sebelumnya uji ini **belum pernah
+  `UJI RLS PROFIL LULUS` diterima dan **171 perintah** selesai tanpa error (13 Oktober 2026 dengan
+  88 perintah; diperluas oleh garasi/klub Milestone 2, audit policy, Storage foto/logo, dan foto
+  profil; dijalankan ulang 18 Oktober 2026 dengan **dua belas** migration diterapkan). Sebelumnya uji ini **belum pernah
   lulus**: pada project lama yang dipakai bersama aplikasi lain, `bootstrap_profile()` gagal
   `42703 column "display_name" of relation "profiles" does not exist` karena `public.profiles` di sana
   bukan tabel buatan migration (ADR-033). Pesan itu berguna sebagai gejala khas schema drift: lihat
   juga langkah verifikasi di bagian 4.3 dan `docs/QA_TEST_PLAN.md` bagian 9.
 
-### 4.7 Uji manual alur autentikasi
+### 4.7 Generate tipe database
+
+`src/lib/supabase/database.generated.ts` adalah hasil `supabase gen types` dan satu-satunya sumber
+bentuk tabel, kolom, dan signature RPC. Jangan mengubah berkas itu dengan tangan;
+`src/lib/supabase/database.types.ts` hanya menambahkan union nilai yang dijaga `CHECK` constraint dan
+bentuk balik RPC yang dikurasi.
+
+Setelah migration diterapkan ke project development (4.3), jalankan:
+
+```bash
+npm run db:types          # tulis ulang database.generated.ts dari skema
+npm run typecheck         # pastikan layar dan service API masih cocok
+npm run db:types:check    # sama dengan langkah CI; gagal bila tipe tertinggal
+```
+
+Perintah ini memakai `DATABASE_URL` dari `.env.db` yang sama dengan `npm run db:test` (4.6), jadi
+connection string tidak perlu diketik. CLI Supabase dipin ke versi tertentu dan hanya membaca
+katalog skema — tidak ada data yang diubah. Bila `db:types:check` gagal, jalankan `npm run db:types`,
+tinjau diff-nya, lalu commit hasilnya; berkas generated tidak boleh disunting manual.
+
+### 4.8 Uji manual alur autentikasi
 
 1. `npx expo start` lalu buka aplikasi di perangkat.
 2. Daftar akun baru → ikuti alur konfirmasi sesuai pengaturan 4.4 → masuk.
@@ -238,9 +302,34 @@ Catatan penting:
 5. Logout → pastikan layar privat tidak bisa dibuka kembali.
 6. **Lupa password** → selesaikan tautan reset dari email.
 
-### 4.8 Hal yang belum ada di Milestone 1
+### 4.9 Hal yang belum ada di Milestone 1
 
-- Bucket Storage dan policy avatar (Milestone 2). Karena itu tidak ada tombol upload foto profil.
+- **Foto kendaraan, logo klub, dan foto profil sudah ada** lewat bucket privat `vehicle-photos`,
+  `club-logos`, dan `avatars` (migration `20261017120000_private_photo_storage.sql`, perbaikan
+  `20261017121000_club_logo_policy_qualified_name.sql`, lalu
+  `20261018120000_profile_avatar_storage.sql`). Foto profil diatur dari tab **Profil** (unggah, ganti,
+  hapus) dan hanya bisa dibaca akun pemiliknya.
+- Fitur foto memakai modul native (`expo-image-picker`, `expo-file-system`, dan `expo-image-manipulator`
+  untuk memperkecil foto); setelah menarik perubahan ini, bangun ulang development client/APK.
+  Expo Go memuat ketiga modul, tetapi build mandiri yang lama tidak.
+- Foto diperkecil otomatis sebelum diunggah (sisi terpanjang 1600 px untuk kendaraan, 512 px untuk
+  logo klub; JPEG/WEBP dikompres ulang 0.7) supaya kuota Storage dan waktu unggah hemat. Foto yang
+  sudah kecil dan tidak perlu diperkecil diunggah apa adanya, dan bila langkah kompresi gagal,
+  berkas asli tetap diunggah — pesan batas ukuran baru muncul bila berkas itu tetap melebihi batas
+  bucket (5 MB kendaraan, 2 MB logo).
+- **Objek foto yatim dibersihkan oleh aplikasi, jadi tidak perlu aksi manual.** Setiap kali layar
+  Garasi memuat daftar kendaraan, aplikasi menyapu folder `vehicle-photos/<user_id>/` dengan sesi
+  pemilik: objek yang tidak lagi dirujuk `photo_path` **dan** berumur lebih dari 1 jam dihapus dalam
+  satu panggilan. Hal yang sama terjadi setelah sebuah kendaraan dihapus. Karena itu daftar kendaraan
+  yang dipakai sapuan harus lengkap — jangan memanggil `sweepOrphanVehiclePhotos` dari layar detail
+  kendaraan dengan satu path saja, karena foto kendaraan lain akan dianggap yatim. Untuk melihat
+  hasilnya: buka Garasi, lalu periksa **Storage → vehicle-photos** di dashboard; folder kendaraan yang
+  sudah dihapus hilang sendiri, bukan lewat SQL manual (Supabase menolak `delete from storage.objects`
+  langsung, dan `service_role` tidak boleh disimpan di repo ini).
+- Verifikasi cepat di dashboard: **Storage → Buckets** harus menampilkan tiga bucket dengan status
+  *Private*; **Storage → Policies** harus berisi policy `vehicle_photos_*`, `club_logos_*`, dan
+  `avatars_*`. Jangan mengubahnya menjadi publik — foto kendaraan dan foto profil hanya untuk
+  pemilik, dan logo klub memakai signed URL.
 - Edge Function, private Realtime channel, push notification, dan peta.
 - Riwayat migration di project: CLI sudah dipakai untuk menerapkan seluruh migration (bagian 4.3).
   CI database otomatis belum ada — job `database-rls` di CI hanya menjalankan uji RLS, bukan migration.

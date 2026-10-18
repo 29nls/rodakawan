@@ -31,9 +31,10 @@ Istilah status dipakai konsisten di seluruh dokumentasi:
 | Milestone 1: profil sendiri + username unik       | Ya          | Ya             | **Blocked** | **Blocked**     |
 | Milestone 1: RLS `public.profiles`                | Ya          | Ya             | **Ya** (uji RLS LULUS) | —    |
 | Milestone 1.6: privasi follow + detail privat kendaraan | Ya    | Ya             | **Ya** (uji RLS LULUS) | —    |
-| Milestone 2: garasi (CRUD, kendaraan utama, detail privat nomor polisi) | Ya | Ya | **Ya** (uji RLS LULUS, 120 perintah) | **Blocked** (APK belum diuji di HP) |
+| Milestone 2: garasi (CRUD, kendaraan utama, detail privat nomor polisi) | Ya | Ya | **Ya** (uji RLS LULUS, 171 perintah) | **Blocked** (APK belum diuji di HP) |
 | Milestone 2: klub (buat, gabung, peran, keluarkan, jejak audit) | Ya | Ya | **Ya** (uji RLS LULUS) | **Blocked** |
-| Milestone 2: foto kendaraan & logo klub (Supabase Storage) | **Belum** — belum ada bucket maupun policy; tidak ada tombol unggah palsu | — | — | — |
+| Milestone 2: foto kendaraan & logo klub (Supabase Storage) | Ya — bucket privat, unggah/ganti/hapus, foto diperkecil + dikompres otomatis di perangkat, objek yatim disapu otomatis | Ya (75 unit test) | **Ya** (uji Storage RLS LULUS + uji HTTP LULUS) | **Blocked** (perlu APK baru untuk modul native) |
+| Milestone 2: foto profil (avatar) | Ya — bucket privat owner-only, unggah/ganti/hapus dari tab Profil, foto diperkecil otomatis | Ya (17 unit test) | **Ya** (uji HTTP Storage LULUS) | **Blocked** (uji perangkat) |
 | Milestone 2+: perjalanan, lokasi, chat, hazard, feed, musik | **Belum** | — | — | — |
 
 **Blocked** yang tersisa berarti: alur aplikasi belum pernah dijalankan terhadap project development
@@ -48,10 +49,26 @@ yang menembak tabel/RPC Supabase, dan setiap mutasi punya uji RLS allow/deny ter
 development. Yang sengaja **tidak** ditampilkan sebagai tombol berfungsi adalah fitur perjalanan ke
 atas (mis. "Buat perjalanan"), karena belum dibangun.
 
-Satu bagian Milestone 2 yang memang belum ada: **unggah foto kendaraan dan logo klub**. Supabase
-Storage belum disiapkan (tidak ada bucket maupun policy-nya — diperiksa langsung ke project
-development), jadi kolom `photo_path`/`logo_path` sengaja dibiarkan kosong dan layarnya menyatakan
-belum tersedia alih-alih menampilkan tombol yang tidak melakukan apa-apa.
+**Unggah foto kendaraan, logo klub, dan foto profil sudah berfungsi.** `vehicle-photos`,
+`club-logos`, dan `avatars` adalah bucket privat: foto kendaraan dan foto profil hanya bisa dibaca
+pemiliknya, logo klub dibaca anggota aktif (atau pengunjung klub publik) dan hanya ditulis
+owner/admin. Path memuat pemilik/klub dan dijaga CHECK (`photo_path`, `logo_path`, `avatar_url`),
+sedangkan tampilan memakai signed URL berumur 1 jam. Unggah/ganti/hapus tersedia di layar detail
+kendaraan, dashboard admin klub, dan tab Profil. Dashboard admin klub memakai rute sendiri (`/club-admin?id=…`,
+terpisah dari tab) dengan form ubah klub, daftar anggota aktif beserta perannya, permintaan yang
+menunggu keputusan, dan riwayat permintaan yang ditolak/dikeluarkan.
+
+**Foto diperkecil dan dikompres di perangkat sebelum diunggah.** Foto galeri 12 MP (4000×3000,
+2–5 MB) turun ke sisi terpanjang 1600 px (kendaraan) atau 512 px (logo klub dan foto profil) dan
+JPEG/WEBP ditulis ulang pada kualitas 0.7; formatnya dipertahankan (PNG tetap PNG) supaya transparansi tidak hilang.
+Foto kecil yang tidak perlu diproses tidak disentuh sama sekali, dan kegagalan manipulasi tidak
+pernah memblokir unggahan — berkas asli dipakai dan batas bucket tetap berlaku. Hasilnya: kuota
+Storage dan waktu unggah jauh lebih hemat, dan blok metadata asli (EXIF) tidak ikut tersalin
+karena berkasnya ditulis ulang (perlu dikonfirmasi di perangkat — checklist GAR-05/CLUB-11). Aturan Storage diuji di database
+(`npm run db:test` bagian 13) dan lewat HTTP API Storage dengan akun uji sementara
+(`npm run storage:test`: unggah, signed URL, penolakan lintas pengguna, lalu pembersihan penuh);
+yang belum terbukti adalah unggahan nyata dari perangkat fisik karena modul native baru
+(`expo-image-picker`, `expo-file-system`) memerlukan APK yang dibangun ulang.
 
 **Konteks database (13 Oktober 2026).** Project Supabase yang sebelumnya terkonfigurasi di `.env`
 **bukan** database bersih: tabel `public.profiles` sudah ada dalam bentuk yang berbeda (hanya `id`,
@@ -78,6 +95,30 @@ menunjukkan kolom Local dan Remote sama untuk kelima versi. `npm run db:test` lu
 - Akun **Expo** hanya dibutuhkan untuk build EAS opsional (development client, AAB Play) — rilis APK
   tidak memakainya sejak ADR-051. Akun **Supabase** dibutuhkan untuk backend. Menjalankan aplikasi
   dan seluruh automated test tidak memerlukan keduanya.
+
+## Editor (VS Code)
+
+`.vscode/settings.json` di repo ini mengarahkan IntelliSense ke TypeScript yang terpasang di repo,
+bukan versi bawaan VS Code, dan menyalakan prompt untuk memakainya:
+
+```json
+{
+  "js/ts.tsdk.path": "node_modules/typescript/lib",
+  "js/ts.tsdk.promptToUseWorkspaceVersion": true
+}
+```
+
+Setelah `npm ci`, buka berkas `.ts`/`.tsx`. VS Code menawarkan **Use Workspace Version**; bila
+prompt-nya tidak muncul, klik nomor versi TypeScript di status bar lalu pilih **Use Workspace
+Version**. Pilihan itu disimpan VS Code per workspace, bukan di repo, jadi cukup sekali per mesin —
+status bar harus menampilkan versi yang sama dengan `npx tsc -v`.
+
+`npm run check:editor-ts` menjaga sisi repo-nya: path harus menunjuk `node_modules/typescript/lib`
+di repo ini, versinya harus memenuhi `devDependencies.typescript`, dan versi terpasang harus sama
+dengan `package-lock.json` yang dipakai `npm ci` di CI. Pemeriksaan itu ikut berjalan lewat
+`npm run deps:check` dan `npm test`, jadi pengaturan editor yang menyimpang menggagalkan CI — bukan
+ditemukan setelah berbulan-bulan berbeda pendapat dengan `tsc`. Editor lain: arahkan language server
+TypeScript-nya ke `node_modules/typescript/lib` yang sama.
 
 ## Setup di Windows
 
@@ -137,18 +178,25 @@ pernah ditampilkan di layar.
 npm run typecheck        # TypeScript strict tanpa emit
 npm run lint             # ESLint (eslint-config-expo + Prettier)
 npm run format:check     # pastikan format Prettier
-npm run deps:check       # versi dependency terhadap Expo SDK yang terpasang (≈3 detik)
+npm run deps:check       # TypeScript editor = CI + versi dependency terhadap Expo SDK (≈3 detik)
+npm run check:editor-ts  # hanya pemeriksaan TypeScript editor (lokal, tanpa jaringan)
 npm test                 # unit + komponen test (jest-expo); menjalankan deps:check lebih dulu
 npm run doctor           # expo-doctor (pemeriksaan menyeluruh)
 npm run export:android   # bundel Android (Metro + Hermes) tanpa perangkat
 npm run db:test          # uji RLS ke database development (butuh .env.db / DATABASE_URL)
+npm run storage:test     # uji integrasi HTTP Storage dengan akun uji sementara (.env.local + .env.db)
+npm run db:types         # generate ulang tipe database dari skema development
+npm run db:types:check   # periksa drift tipe (dijalankan CI database)
 ```
 
-`npm test` menjalankan `npm run deps:check` lebih dulu (`pretest` di `package.json`), karena
-ketidakcocokan versi dependency dengan SDK adalah penyebab kegagalan yang sudah pernah mematikan
-gerbang rilis (ADR-053) dan baru terlihat di CI — di sana letaknya setelah seluruh test berjalan.
-Pemeriksaan itu memakai CLI Expo yang terpasang (`expo install --check`), jadi aturannya sama dengan
-`npm run doctor` dan tidak digandakan di repo ini. Ongkosnya ±3 detik pada mesin pengembang
+`npm test` menjalankan `npm run deps:check` lebih dulu (`pretest` di `package.json`) karena dua
+ketidakcocokan versi sudah pernah lolos sampai CI: editor yang memakai TypeScript bawaan VS Code
+(sehingga diagnostiknya berbeda dari `tsc`), dan dependency yang menyimpang dari Expo SDK — yang
+terakhir ini dulu baru terlihat di CI, setelah seluruh test berjalan (ADR-053). Pemeriksaan pertama
+(`check:editor-ts`) berjalan lokal tanpa jaringan dan membandingkan pengaturan editor, pin
+`devDependencies`, dan lockfile; pemeriksaan kedua memakai CLI Expo yang terpasang
+(`expo install --check`), jadi aturannya sama dengan `npm run doctor` dan tidak digandakan di repo
+ini. Ongkosnya ±3 detik pada mesin pengembang
 (termasuk startup npm dan Node; pemeriksaan CLI-nya sendiri ±1 detik), sedangkan `npm run doctor`
 yang menyeluruh tetap dijalankan di CI. Bila daftar versi resmi Expo tidak terjangkau
 (sedang offline), pemeriksaan melaporkan bahwa hasilnya **tidak bisa dipastikan** dengan
@@ -163,12 +211,14 @@ Hasil nyata pada commit ini (`a9858a9`, 16 Oktober 2026, Node 24.18, npm 12):
 | `npm run lint`         | Exit 0.                                                       |
 | `npm run format:check` | Exit 0.                                                       |
 | `npm run deps:check`   | Exit 0 — versi dependency cocok dengan Expo SDK 57.0.30 (ADR-054). |
-| `npm test`             | **20 suite, 222 test lulus**, exit 0 (dijalankan setelah `npm ci`). |
-| `npm run test:scripts` | **172 test lulus**, exit 0.                                   |
+| `npm test`             | **27 suite, 316 test lulus**, exit 0 (dijalankan setelah `npm ci`; sebelumnya 23 suite/250 test, kini termasuk 14 test kompresi foto, 18 test pembersihan objek yatim Storage, dan 17 test foto profil: 12 API + 5 komponen layar). Diverifikasi ulang 18 Oktober 2026. |
+| `npm run test:scripts` | **228 dari 229 test lulus** (exit 1), diverifikasi ulang 18 Oktober 2026. Satu-satunya kegagalan adalah asersi baris pertama `CHANGELOG.md` di `scripts/__tests__/update-changelog.test.mjs`: checkout Windows di mesin ini memakai `core.autocrlf=true` sehingga berkas itu ada di disk dengan CRLF sementara `HEADER` di script memakai LF — berkas dan scriptnya sendiri identik dengan `HEAD`, jadi ini bukan akibat perubahan kode. Di runner Linux (tanpa autocrlf) berkasnya LF dan asersinya lulus; perbaikannya adalah `.gitattributes` yang memaksa `CHANGELOG.md` berakhir LF. |
 | `npm run doctor`       | 21/21 pemeriksaan lulus (sebelum perbaikan versi: 20/21, exit 1). |
 | `npm run export:android` | Exit 0, bundel Hermes `entry-*.hbc` (~3,6 MB), tidak ada JWT/service role key di dalam bundel. |
-| `npm run db:test`      | **Exit 0 — `UJI RLS PROFIL LULUS`** (120 perintah: profil, follow/privasi, detail privat kendaraan, garasi, klub) terhadap project development, diverifikasi ulang 16 Oktober 2026. |
-| `npx supabase ...`     | CLI 2.120.0 (lewat `npx`, tidak masuk `package.json`). `link` + `db push` menerapkan seluruh migration (kedelapan versi; `npx supabase migration list` 16 Oktober 2026 menunjukkan kolom Local dan Remote sama untuk kedelapannya); jangan menaruh connection string di argumen perintah karena npm/npx mencetak ulang argumennya. |
+| `npm run db:test`      | **Exit 0 — dua berkas, dua notice** (18 Oktober 2026): `UJI RLS PROFIL LULUS` (171 perintah: profil, follow/privasi, detail privat kendaraan, garasi, klub, konten klub, perjalanan, Storage foto/logo/avatar) dan `UJI POLICY OWNER-GUARD LULUS` (17 perintah: 18 policy wadah diperiksa, detektor diuji-diri) terhadap project development. |
+| `npm run db:types:check` | Exit 0 — `database.generated.ts` (1.109 baris, Supabase CLI 2.121.0) sama dengan skema project development, diverifikasi 17 Oktober 2026. Drift yang disengaja terdeteksi (exit 1) dan menampilkan baris pertama yang berbeda. |
+| `npm run storage:test` | **Exit 0 — `UJI INTEGRASI STORAGE LULUS`** (27 langkah: unggah sebagai pemilik untuk foto kendaraan **dan** foto profil, signed URL + unduhan SHA-256, delapan penolakan lintas pengguna/anon, hapus oleh pemilik, verifikasi nol sisa) terhadap project development, 18 Oktober 2026. Dijalankan tiga kali berturut-turut tanpa sisa (satu di antaranya menyapu objek yatim yang sengaja ditinggalkan run terputus), dan sekali dengan publishable key salah (exit 1, data uji tetap dibersihkan). |
+| `npx supabase ...`     | CLI 2.121.0 (lewat `npx`, tidak masuk `package.json`). `link` + `db push` menerapkan seluruh migration (dua belas versi; `npx supabase migration list` 18 Oktober 2026 menunjukkan kolom Local dan Remote sama untuk kedua belasnya); jangan menaruh connection string di argumen perintah karena npm/npx mencetak ulang argumennya. |
 | `npx expo prebuild` + `./gradlew assembleRelease` | **Berjalan lokal maupun di GitHub Actions**: rantai yang sama menghasilkan APK bertanda tangan `v0.1.0-build9` (15 Oktober 2026) dan build preview berikutnya untuk setiap push yang mengubah isi aplikasi. `npm run test:scripts` juga menguji `scripts/configure-android-release.mjs`. |
 
 `npm test` tidak menyentuh jaringan: fungsi api menerima client sebagai argumen sehingga test
@@ -192,6 +242,16 @@ pada `@/lib/supabase/client` dan modul api.
   native module.
 
 ## Uji RLS profil (Supabase)
+
+`npm run db:test` menjalankan **dua** berkas uji berurutan, masing-masing dalam satu transaksi yang
+diakhiri `ROLLBACK` dan masing-masing menyatakan notice penanda lulusnya sendiri lewat direktif
+`-- db:test notice: <teks>` (berkas tanpa direktif itu ditolak sebelum apa pun dijalankan ke
+database):
+
+| Berkas | Yang dibuktikan | Notice penanda |
+| --- | --- | --- |
+| [`rls_profiles_test.sql`](supabase/tests/rls_profiles_test.sql) | Izin dan penolakan per tabel/RPC dan Storage (profil, follow, garasi, klub, perjalanan, bucket foto) | `UJI RLS PROFIL LULUS` |
+| [`rls_policy_guard_test.sql`](supabase/tests/rls_policy_guard_test.sql) | Pagar katalog: tidak ada policy wadah yang memberi akses lewat kolom kepemilikan tanpa penjaga keanggotaan (ADR-060) | `UJI POLICY OWNER-GUARD LULUS` |
 
 `supabase/tests/rls_profiles_test.sql` membuktikan bahwa user A tidak dapat membaca profil privat
 atau mengubah baris user B, bahwa `anon` tidak melihat apa pun, dan bahwa bootstrap trigger serta
@@ -218,9 +278,10 @@ npm run db:test      # memuat .env.db otomatis; password tidak pernah dicetak
 ```
 
 ```text
-# 2. Tanpa runner: tempel seluruh isi supabase/tests/rls_profiles_test.sql ke
-#    Supabase Dashboard → SQL Editor, lalu pastikan notice
-#    "UJI RLS PROFIL LULUS" muncul tanpa exception.
+# 2. Tanpa runner: tempel seluruh isi berkas uji yang ingin diperiksa ke
+#    Supabase Dashboard → SQL Editor, lalu pastikan notice pada direktifnya
+#    (mis. "UJI RLS PROFIL LULUS") muncul tanpa exception.
+#    Satu berkas saja: npm run db:test -- --file supabase/tests/rls_policy_guard_test.sql
 ```
 
 Aturan penting:
@@ -230,10 +291,98 @@ Aturan penting:
   masuk ke bundle aplikasi). Isi langsung di shell untuk satu perintah.
 - Runner hanya melaporkan lulus bila notice penanda benar-benar diterima dari server, sehingga
   "hijau palsu" (mis. berkas uji terpotong) tidak bisa lolos.
-- Status saat ini: **Passed against dev backend** (diverifikasi ulang 16 Oktober 2026) — `npm run db:test`
-  mencetak `UJI RLS PROFIL LULUS`, 120 perintah selesai, exit 0, pada database development yang sudah
-  memuat kedelapan migration (termasuk garasi dan klub Milestone 2). Jalur kegagalan runner juga sudah diuji sebelumnya (tanpa `DATABASE_URL`, host
-  tidak terjangkau, berkas tanpa penanda lulus). Jalankan ulang setiap kali policy/RPC berubah.
+- Status saat ini: **Passed against dev backend** (diverifikasi ulang 18 Oktober 2026) — `npm run db:test`
+  mencetak kedua notice (`UJI RLS PROFIL LULUS` 171 perintah + `UJI POLICY OWNER-GUARD LULUS`
+  17 perintah, 18 policy wadah diperiksa), exit 0, pada database development yang sudah memuat dua
+  belas migration (termasuk garasi, klub, dan tiga bucket Storage foto/logo/avatar). Jalur kegagalan
+  runner juga sudah diuji: tanpa `DATABASE_URL`, host tidak terjangkau, berkas tanpa direktif notice,
+  dan temuan policy tanpa penjaga yang belum terdaftar (exit 1 dengan daftar tabel.policy-nya).
+  Jalankan ulang setiap kali policy/RPC berubah.
+
+### Pagar policy: kepemilikan tanpa penjaga keanggotaan
+
+[`supabase/tests/rls_policy_guard_test.sql`](supabase/tests/rls_policy_guard_test.sql) membaca katalog
+(`pg_policies`) dan **gagal** bila ada policy pada tabel **wadah** — tabel `public` yang punya kolom
+`club_id` atau `ride_id` — yang memberi akses lewat kolom kepemilikan (`created_by`, `author_id`,
+`owner_id`, `user_id`, `sender_id`, `reporter_id`, `blocker_id`, `recipient_id`, `follower_id`,
+`followed_id`) tanpa penjaga keanggotaan (`is_club_member`, `is_club_admin`, `is_ride_member`,
+`is_ride_active_member`, `is_ride_host`, `can_publish_ride_location`, atau subquery ke
+`club_members`/`ride_members`).
+
+Pagar ini menutup kelas bug yang pernah nyata: `rides_select_allowed` sempat memuat
+`created_by = auth.uid()` yang berdiri sendiri, sehingga pembuat perjalanan klub tetap membacanya
+setelah keluar dari klub (ditutup `20261017090000`). Typecheck, lint, dan uji aplikasi tidak bisa
+melihat bentuk policy — hanya katalog database yang tahu.
+
+Pengecualian harus tertulis beserta alasannya di dalam berkas uji itu (saat ini empat: menghapus
+pesan/lokasi sendiri, dan dua policy hazard yang memang data komunitas). Daftar pengecualian
+diperiksa **anti-usang**: entri yang tidak lagi diperlukan (policy hilang/sudah berpenjaga/berubah
+bentuk) menggagalkan uji, supaya daftarnya tidak membusuk. Detektornya sendiri diuji-diri dengan
+tabel probe — satu policy tanpa penjaga harus tertangkap, satu dengan penjaga tidak boleh — supaya
+"nol temuan" tidak berarti "detektor buta".
+
+## Uji integrasi Storage (HTTP)
+
+`npm run storage:test` ([`scripts/storage-test.mjs`](scripts/storage-test.mjs)) menguji jalur yang
+benar-benar dipakai aplikasi lewat **HTTP API Storage**, bukan hanya policy di database seperti
+`db:test`:
+
+- dua akun uji sementara dibuat lewat `DATABASE_URL` — kata sandi acak per run, di-hash `pgcrypto`,
+  tidak pernah dicetak — lalu sign-in lewat **GoTrue password grant**. Uji ini karena itu tidak
+  membutuhkan `service_role` key, yang memang tidak pernah disimpan di repo/mesin ini;
+- user A mengunggah PNG 1×1 sebagai foto kendaraan (`vehicle-photos/<A>/<motor>/uji.png`) → HTTP 200;
+- A membuat **signed URL** lalu mengunduhnya tanpa token apa pun; isi berkas dibandingkan lewat
+  SHA-256 dengan yang diunggah;
+- **penolakan lintas pengguna**: B ditolak saat mengunggah ke folder A, menautkan motor A ke foldernya
+  sendiri, membuat signed URL untuk objek A, dan mengunduh objek A; `anon` juga ditolak. Setiap
+  percobaan dicek lagi di database — objek yang ditolak tidak boleh benar-benar terbentuk;
+- **pola yang sama diuji untuk foto profil** (`avatars/<A>/uji-avatar.png`): A unggah/sign/hapus, B dan
+  `anon` ditolak untuk unggah, sign, dan unduh, dan objek yang ditolak diverifikasi tidak terbentuk;
+- A menghapus objeknya lewat Storage API, lalu signed URL baru untuk path itu ditolak;
+- **pembersihan selalu berjalan** (blok `finally`, termasuk saat uji gagal): objek dihapus lewat
+  Storage API — Supabase menolak `delete from storage.objects` langsung — lalu akun uji dihapus
+  sehingga profil dan kendaraan ikut `ON DELETE CASCADE`, dan runner memverifikasi nol sisa.
+  `UJI INTEGRASI STORAGE LULUS` hanya dicetak bila semua langkah lulus **dan** tidak ada sisa.
+
+Cakupan: runner ini menguji bucket `vehicle-photos` dan `avatars` dari ujung ke ujung. Policy
+`club-logos` tetap diuji di database (`npm run db:test` bagian 13); jalur HTTP-nya belum ditambahkan
+karena alur logo perlu klub + keanggotaan terlebih dahulu.
+
+```powershell
+npm run storage:test    # memuat .env.local (URL + publishable key) dan .env.db (DATABASE_URL)
+```
+
+Sisa run yang terputus disapu otomatis di awal run berikutnya: akun pengganti memakai ID uji yang
+sama, dan policy DELETE hanya memeriksa folder pemilik, sehingga objek yatim tetap bisa dihapus.
+Status saat ini: **Passed against dev backend** (18 Oktober 2026) — 27 langkah lulus (termasuk 8
+langkah foto profil), tiga run berturut-turut bersih (satu di antaranya menyapu objek yatim yang
+sengaja ditinggalkan run terputus), dan jalur gagal (publishable key salah) berakhir exit 1 tanpa
+meninggalkan data uji.
+
+### Pembersihan objek yatim di aplikasi
+
+Penghapusan objek lama saat ganti foto bersifat best-effort: perangkat offline, aplikasi ditutup di
+tengah alur, atau baris kendaraan dihapus lebih dulu bisa meninggalkan berkas yang tidak lagi
+dirujuk baris mana pun. [`src/features/media/photoCleanup.ts`](src/features/media/photoCleanup.ts)
+merapikannya dari sisi klien karena `delete from storage.objects` langsung ditolak Supabase dan
+`service_role` tidak disimpan di repo ini:
+
+- `findOrphanPhotoPaths` (fungsi murni) membandingkan isi folder dengan `photo_path` yang masih
+  dirujuk, dan hanya menyebut path yang lebih tua dari **jendela tenggang 1 jam**
+  (`ORPHAN_PHOTO_GRACE_MS`) sebagai yatim — unggahan menulis objek lebih dulu baru memperbarui
+  barisnya, jadi objek baru belum tentu yatim;
+- `sweepOrphanVehiclePhotos` membaca folder `<user_id>/` dan setiap folder kendaraan per halaman
+  (100 entri), lalu menghapus semua yatim dalam **satu** panggilan `remove`; daftar kendaraan yang
+  dipakai harus lengkap, karena itulah pemanggilnya layar yang memegang seluruh garasi;
+- `cleanUpVehiclePhotosAfterDelete` dipanggil setelah baris kendaraan terhapus: objek yang pathnya
+  masih diketahui dihapus lebih dulu, lalu folder kendaraan itu disapu untuk sisa unggahan lama;
+- `garage.tsx` menjalankan sapuan di latar belakang setiap kali daftar garasi termuat (`void`, hasil
+  tidak ditampilkan). Pembersihan tidak pernah melempar dan tidak pernah membatalkan aksi utama —
+  kegagalannya hanya berarti objek dicoba lagi pada pembukaan garasi berikutnya.
+
+Sapuan ini optimasi kuota, bukan penegakan keamanan: policy `SELECT`/`DELETE` bucket
+`vehicle-photos` hanya cocok untuk folder pemiliknya, sehingga klien tidak punya jalur untuk
+menyentuh folder pengguna lain, dan objek yatim tetap hanya bisa dibaca pemiliknya.
 
 ## CI dan rilis APK (GitHub Actions)
 
@@ -420,10 +569,13 @@ src/
   types/        # deklarasi tipe lingkungan
   utils/        # color.ts (kontras WCAG)
 assets/         # ikon & splash
+.vscode/        # settings.json: IntelliSense memakai TypeScript dari node_modules
 scripts/        # generate-assets.mjs, db-test.mjs (runner uji RLS), verify-apk.mjs (tanda
                 # tangan APK), configure-android-release.mjs (tanda tangan + nomor
                 # versi build), write-app-env.mjs (konfigurasi publik EXPO_PUBLIC_*),
-                # smoke-test-apk.mjs (uji nyala di emulator), release-notes.mjs,
+                # smoke-test-apk.mjs (uji nyala di emulator), device-checklist.mjs
+                # (perekam bukti checklist 14 langkah di HP fisik),
+                # check-editor-ts.mjs (TypeScript editor = CI), release-notes.mjs,
                 # update-changelog.mjs, prune-preview-releases.mjs (pemangkas rilis
                 # preview lama)
 docs/           # sumber kebenaran produk
@@ -431,6 +583,7 @@ supabase/
   migrations/   # 20261013022938_initial_schema.sql (fondasi)
                 # 20261013023038_auth_profile_bootstrap.sql (bootstrap profil + constraint)
   tests/        # rls_profiles_test.sql (uji RLS dua akun + kontrol positif)
+                # rls_policy_guard_test.sql (pagar policy wadah: kepemilikan tanpa penjaga)
 .github/
   workflows/    # ci.yml
 ```
@@ -459,8 +612,10 @@ supabase/
   yang dikirim klien. Username dinormalkan (huruf kecil, `_`), divalidasi, dan keunikannya dijaga
   unique index + CHECK `profiles_username_format`. Bila username bentrok, trigger memakai username
   sementara `rider_xxxxxx` dan aplikasi menampilkan banner untuk menggantinya.
-- **Belum ada:** upload avatar (menunggu bucket Storage + policy), ubah email/password dari dalam
-  aplikasi.
+- **Foto profil:** bucket privat `avatars` (`<user_id>/<berkas>`, 2 MB, owner-only) dengan alur
+  unggah/ganti/hapus yang sama dengan foto kendaraan; `profiles.avatar_url` menyimpan **path**, bukan
+  URL, dan dijaga CHECK `profiles_avatar_path_owner`. Diatur dari tab Profil.
+- **Belum ada:** ubah email/password dari dalam aplikasi.
 
 ### Uji manual autentikasi (butuh backend + perangkat)
 

@@ -68,12 +68,17 @@ export function createRepo(t) {
  * mengganti program `adb` dengan tiruannya, sehingga test lain dan lingkungan test
  * itu sendiri tidak terpengaruh.
  *
+ * `input` menulis teks ke stdin proses itu lalu menutupnya — dipakai test
+ * script interaktif (`device-checklist.mjs`), di mana setiap baris adalah
+ * jawaban operator. Tanpa opsi ini stdin ditutup sejak awal, jadi pembaca
+ * baris di dalam script langsung menerima EOF dan tidak pernah menggantung.
+ *
  * `unset` menghapus nama variabel dari lingkungan proses itu. Diperlukan untuk
  * membuktikan perilaku "variabel benar-benar tidak ada": tanpa ini, variabel yang
  * kebetulan diset di mesin penguji akan lolos ke proses anak dan hasil test
  * bergantung pada mesin, bukan pada kode.
  */
-export function runScript(dir, relativePath, args = [], { env = {}, unset = [] } = {}) {
+export function runScript(dir, relativePath, args = [], { env = {}, unset = [], input } = {}) {
   const childEnv = { ...process.env, ...env };
   for (const nama of unset) delete childEnv[nama];
 
@@ -81,6 +86,7 @@ export function runScript(dir, relativePath, args = [], { env = {}, unset = [] }
     cwd: dir,
     encoding: 'utf8',
     env: childEnv,
+    input: input ?? '',
   });
 
   return { stdout: result.stdout ?? '', stderr: result.stderr ?? '', code: result.status };

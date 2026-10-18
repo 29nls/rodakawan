@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Alert, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/ui/AppText';
 import { Badge } from '@/components/ui/Badge';
@@ -18,6 +18,15 @@ import { spacing } from '@/constants/theme';
 import { BackendUnavailableBanner } from '@/features/auth/components/BackendUnavailableBanner';
 import type { AppError } from '@/features/auth/errors';
 import { useAuthSession } from '@/features/auth/session';
+import { PhotoCard } from '@/features/media/components/PhotoCard';
+import { PROFILE_AVATAR_MAX_DIMENSION } from '@/features/media/imageCompression';
+import { pickPhoto } from '@/features/media/picker';
+import {
+  deleteProfileAvatar,
+  getPhotoSignedUrl,
+  PROFILE_AVATAR_BUCKET,
+  uploadProfileAvatar,
+} from '@/features/media/photos';
 import { isGeneratedUsername } from '@/features/profile/validation';
 import { useProfile } from '@/features/profile/useProfile';
 import { useAppStatus } from '@/hooks/useAppStatus';
@@ -25,21 +34,104 @@ import { useAppStatus } from '@/hooks/useAppStatus';
 /**
  * Tab Profil: identitas akun, profil publik, dan pengaturan sesi.
  *
- * Semua aksi di layar ini benar-benar berfungsi (edit profil, keluar). Fitur yang
- * belum dibangun (foto profil, hapus akun) dinyatakan jelas sebagai belum tersedia.
+ * Semua aksi di layar ini benar-benar berfungsi (edit profil, foto profil, keluar).
+ * Fitur yang belum dibangun (hapus akun) dinyatakan jelas sebagai belum tersedia.
  */
 export default function ProfileScreen() {
   const router = useRouter();
   const { appInfo, backend: envBackend } = useAppStatus();
-  const { backend, email, requestedUsername, signOut } = useAuthSession();
+  const { backend, email, requestedUsername, signOut, userId } = useAuthSession();
   const { state, reload } = useProfile();
 
   const [signingOut, setSigningOut] = useState(false);
   const [signOutError, setSignOutError] = useState<AppError | null>(null);
   const [signOutNotice, setSignOutNotice] = useState<string | null>(null);
+  const [avatarBusy, setAvatarBusy] = useState(false);
+  const [avatarError, setAvatarError] = useState<AppError | null>(null);
+  const [avatarNotice, setAvatarNotice] = useState<string | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState<{ path: string; url: string } | null>(null);
 
   const profile = state.status === 'ready' ? state.profile : null;
   const showGeneratedNotice = profile !== null && isGeneratedUsername(profile.username);
+  const avatarPath = profile?.avatar_url ?? null;
+
+  // Signed URL dibuat ulang setiap kali path berubah dan tidak disimpan di database
+  // maupun state global, jadi tidak ada tautan permanen ke foto profil.
+  useEffect(() => {
+    if (!backend.available || !avatarPath) return;
+
+    let active = true;
+
+    void getPhotoSignedUrl(backend.client, PROFILE_AVATAR_BUCKET, avatarPath).then((result) => {
+      if (!active || !result.ok) return;
+      setAvatarPreview({ path: avatarPath, url: result.data });
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [backend, avatarPath]);
+
+  async function handlePickAvatar() {
+    if (!backend.available || !userId || avatarBusy) return;
+
+    setAvatarNotice(null);
+    setAvatarError(null);
+
+    const picked = await pickPhoto('avatar');
+    if (!picked.ok) {
+      setAvatarError(picked.error);
+      return;
+    }
+
+    if (!picked.asset) return;
+
+    setAvatarBusy(true);
+    const result = await uploadProfileAvatar(backend.client, userId, picked.asset);
+    setAvatarBusy(false);
+
+    if (!result.ok) {
+      setAvatarError(result.error);
+      return;
+    }
+
+    setAvatarNotice(
+      'Foto profil diperbarui. Foto ini privat: hanya akun Anda yang dapat membukanya.',
+    );
+    reload();
+  }
+
+  function confirmRemoveAvatar() {
+    Alert.alert('Hapus foto profil?', 'Foto akan dihapus permanen dari penyimpanan privat.', [
+      { text: 'Batal', style: 'cancel' },
+      {
+        text: 'Hapus',
+        style: 'destructive',
+        onPress: () => {
+          void (async () => {
+            if (!backend.available || !userId || avatarBusy) return;
+
+            setAvatarNotice(null);
+            setAvatarError(null);
+            setAvatarBusy(true);
+            const result = await deleteProfileAvatar(backend.client, userId);
+            setAvatarBusy(false);
+
+            if (!result.ok) {
+              setAvatarError(result.error);
+              return;
+            }
+
+            setAvatarPreview(null);
+            setAvatarNotice(
+              result.data.deleted ? 'Foto profil dihapus.' : 'Belum ada foto profil.',
+            );
+            reload();
+          })();
+        },
+      },
+    ]);
+  }
 
   async function handleSignOut() {
     if (signingOut) return;
@@ -79,6 +171,30 @@ export default function ProfileScreen() {
 
       {signOutNotice ? (
         <Banner message={signOutNotice} title="Keluar tanpa koneksi" tone="warning" />
+      ) : null}
+
+      {avatarError ? (
+        <Banner message={avatarError.message} title="Foto profil gagal diubah" tone="danger" />
+      ) : null}
+
+      {avatarNotice ? <Banner message={avatarNotice} title="Foto profil" tone="success" /> : null}
+
+      {profile ? (
+        <PhotoCard
+          busy={avatarBusy}
+          emptyText="Belum ada foto profil. Pilih foto dari galeri untuk akun ini."
+          hasPhoto={Boolean(avatarPath)}
+          hint="Foto disimpan di bucket privat dan hanya akun Anda yang dapat membuka atau menghapusnya. Foto tidak pernah menjadi URL publik; pengguna lain tidak dapat melihatnya."
+          onPick={() => {
+            void handlePickAvatar();
+          }}
+          onRemove={confirmRemoveAvatar}
+          photoUrl={avatarPath && avatarPreview?.path === avatarPath ? avatarPreview.url : null}
+          pickLabel={avatarPath ? 'Ganti foto profil' : 'Unggah foto profil'}
+          subtitle={`JPG, PNG, atau WEBP; maksimal 2 MB. Foto diperkecil otomatis ke ${PROFILE_AVATAR_MAX_DIMENSION} px sebelum diunggah.`}
+          testID="profile-avatar"
+          title="Foto profil"
+        />
       ) : null}
 
       <Card>
@@ -154,10 +270,6 @@ export default function ProfileScreen() {
               onPress={() => router.push('/profile/edit')}
               variant="secondary"
             />
-            <AppText tone="muted" variant="caption">
-              Unggah foto profil belum tersedia karena bucket Storage beserta policy-nya belum
-              dibuat (Milestone 2). Tombol palsu sengaja tidak ditampilkan.
-            </AppText>
           </>
         ) : null}
       </Card>

@@ -134,6 +134,13 @@ Status: **Implemented · Passed locally · Passed against dev backend** (13 Okto
       asersi follow (allow/deny/persetujuan/pencabutan), detail privat kendaraan lintas pengguna, dan
       penolakan peran `anon` pada `public.follows`.
 - [x] Grant `EXECUTE` untuk peran `anon` dicabut pada fungsi baru Milestone 1.6 (ADR-041).
+- [x] Audit policy kepemilikan (`created_by`/`author_id`/`owner_id`/…) dijalankan **otomatis di CI**, bukan
+      lagi mengandalkan audit manual: `supabase/tests/rls_policy_guard_test.sql` menolak policy pada tabel
+      wadah (`club_id`/`ride_id`) yang memberi akses lewat kolom kepemilikan tanpa penjaga keanggotaan
+      (ADR-060). Berjalan lewat `npm run db:test` (berkas kedua, notice
+      `UJI POLICY OWNER-GUARD LULUS`) dan di CI `database-rls`; detektornya diuji-diri lewat tabel probe
+      dan daftar pengecualiannya diperiksa anti-usang. Jalur gagal sudah terbukti (exit 1 dengan daftar
+      `tabel.policy` pada dua policy hazard yang saat itu belum terdaftar).
 - [ ] Ratifikasi pemilik produk atas model persetujuan follow (ADR-039): notifikasi permintaan,
       layar daftar permintaan, dan apakah follow ke profil publik juga perlu persetujuan.
 - [ ] Rate limit permintaan follow dan penolakan permintaan dari akun yang diblokir (belum ada;
@@ -144,15 +151,20 @@ terbuka, dengan uji allow/deny yang benar-benar dijalankan di project developmen
 
 ## Milestone 2 — Garasi dan klub
 
-Status: **Implemented · Passed locally · Passed against dev backend** (migration ke-6 sampai ke-8
-diterapkan, uji RLS LULUS dengan 120 perintah, diverifikasi ulang 16 Oktober 2026); **Tested on
-physical device** masih **Blocked**. Commit: `cf818be` (implementasi garasi + klub), `1ef13a8`
+Status: **Implemented · Passed locally · Passed against dev backend** (dua belas migration diterapkan,
+uji RLS LULUS dengan 171 perintah termasuk Storage foto/logo/avatar dan foto profil, diverifikasi ulang 18 Oktober 2026);
+**Tested on physical device** masih **Blocked** (APK dengan modul native baru belum dibangun). Commit: `cf818be` (implementasi garasi + klub), `1ef13a8`
 (checklist uji perangkat), `a9858a9` (perbaikan versi Expo; CI hijau).
 
 - [x] CRUD kendaraan; pisahkan detail sensitif. (`src/app/garage.tsx`, `src/app/vehicle.tsx`, `src/features/garage/api.ts`)
 - [x] Buat/temukan klub. (`src/app/(tabs)/community.tsx`, `src/app/club.tsx`, RPC `create_club`)
 - [x] Join request, approval dan role. (RPC `request_club_membership`, `review_club_membership`, `set_club_member_role`, `remove_club_member`, `leave_club` + tabel `club_role_audit`)
-- [ ] Storage foto dengan policy. **Belum, dan tidak dibuat setengah-setengah**: project development tidak memuat bucket maupun policy `storage` (diperiksa langsung: 0 bucket, 0 policy), tidak ada tombol unggah palsu, dan layar garasi/kendaraan menyatakan fitur ini belum tersedia.
+- [x] Foto kendaraan dan logo klub di Storage privat. (`src/features/media/photos.ts`, `PhotoCard`, unggah/ganti/hapus di `src/app/vehicle.tsx` dan `src/app/club-admin.tsx`; bucket + policy di `20261017120000_private_photo_storage.sql`, diperbaiki `20261017121000_club_logo_policy_qualified_name.sql`) Foto diperkecil + dikompres otomatis di perangkat sebelum diunggah (`src/features/media/imageCompression.ts`, 1600 px/512 px, kualitas 0.7) supaya kuota Storage dan waktu unggah hemat. Objek Storage yatim — sisa ganti foto yang gagal dihapus atau kendaraan yang barisnya sudah tidak ada — disapu otomatis dengan sesi pemilik (`src/features/media/photoCleanup.ts`: listing folder + jendela tenggang 1 jam, satu `remove` per sapuan), dijalankan di latar belakang saat garasi dibuka dan setelah kendaraan dihapus; 18 test unit menemaninya (ADR-058).
+- [x] Foto profil (avatar) privat. Bucket `avatars` (`<user_id>/<berkas>`, 2 MiB, JPEG/PNG/WEBP) dengan policy owner-only,
+  CHECK `profiles_avatar_path_owner`, unggah/ganti/hapus dari tab Profil (`src/app/(tabs)/profile.tsx`,
+  `uploadProfileAvatar`/`deleteProfileAvatar` di `src/features/media/photos.ts`), diperkecil otomatis ke 512 px;
+  17 test unit (12 API + 5 komponen) + 9 langkah HTTP Storage + asersi RLS (ADR-059). Foto profil sengaja hanya terlihat pemiliknya sampai
+  kebijakan visibilitas avatar ada.
 - [x] UI anggota/owner/admin. (`src/app/club-admin.tsx`)
 
 **Exit criteria:** non-member tidak bisa membaca detail klub privat atau mengubah anggota; plat privat

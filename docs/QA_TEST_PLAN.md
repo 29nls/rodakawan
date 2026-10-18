@@ -50,12 +50,20 @@
 | PROF-07 | Sesi kedaluwarsa saat menyimpan profil | Diarahkan keluar dengan pesan jelas; tidak menyimpan sebagai pengguna lain. |
 | PROF-08 | User A membuat relasi follow ke profil privat User B | Tidak ada akses baru: permintaan berstatus `pending` sampai pemilik menyetujui, dan status tidak dapat dipaksa klien. |
 | PROF-09 | Pemilik profil menyetujui atau mencabut relasi follow | Akses baca muncul setelah disetujui dan hilang kembali setelah relasi dihapus. |
+| PROF-10 | Unggah/ganti/hapus foto profil | Foto tampil dari signed URL di tab Profil; user B tidak bisa membaca atau menulis objek itu; foto lama hilang setelah diganti; kolom `avatar_url` kosong setelah dihapus; pengguna lain tidak melihat avatar tersebut. |
 | GAR-01 | User lain membuka garage publik | Hanya field yang diizinkan terlihat. |
 | GAR-02 | User lain membaca plat pribadi | Ditolak tanpa kebocoran payload. |
 | GAR-03 | User A membuat/mengubah detail privat untuk kendaraan User B | Ditolak policy dan foreign key komposit, termasuk ketika `motorcycle_id` diubah. |
+| GAR-05 | Unggah/ganti/hapus foto kendaraan | Foto tampil dari signed URL; user B tidak bisa membaca/menghapus objek yang sama; foto lama hilang setelah diganti; kolom `photo_path` kosong setelah dihapus; objek yang tidak lagi dirujuk baris mana pun hilang dari bucket setelah garasi dibuka lagi (sapuan latar belakang, tenggang 1 jam). |
 | CLUB-01 | Buat klub | Creator menjadi owner; data valid. |
 | CLUB-02 | Non-member membaca klub privat | Ditolak atau hanya metadata minimum sesuai aturan final. |
 | CLUB-03 | Member biasa mengubah role anggota | Ditolak. |
+| CLUB-12 | Buka dashboard admin klub dari detail klub | Tombol hanya tampil untuk owner/admin; anggota biasa dan non-anggota yang membuka `/club-admin` melihat state "Bukan admin klub", bukan data keanggotaan. |
+| CLUB-13 | Ubah nama, deskripsi, visibilitas, dan cara bergabung | Tersimpan lewat service klub; slug tetap sehingga tautan lama masih bekerja; perubahan terlihat setelah reload. |
+| CLUB-14 | Setujui atau tolak permintaan bergabung | Status keanggotaan berubah; persetujuan memberi akses, penolakan tetap ada dan terlihat saat filter status mencakup riwayat. |
+| CLUB-15 | Ubah peran atau keluarkan anggota | Owner dapat menaikkan/menurunkan peran dan mengeluarkan anggota; mencabut akses data klub; owner terakhir ditolak database. |
+| CLUB-11 | Unggah/ganti/hapus logo klub | Owner/admin berhasil; member biasa dan non-anggota ditolak; logo klub privat tidak terbaca non-anggota; logo klub publik tetap terlihat. |
+| CLUB-16 | Cari, filter, dan paginasi daftar anggota | Pencarian mencocokkan user ID/peran/status tanpa membedakan huruf besar-kecil; filter status dan peran dapat digabung; hasil dipotong 5 baris per halaman dan nomor halaman dijepit setelah anggota disetujui/dikeluarkan. |
 | RIDE-01 | Creator membuat ride | Ride status `planned`, host membership tersedia. |
 | RIDE-02 | Host memulai ride | State menjadi `active`; hanya anggota sah bergabung channel. |
 | RIDE-03 | User non-member join private channel | Join ditolak. |
@@ -111,6 +119,12 @@
 ## 7. Security testing
 
 - Jalankan RLS negative test pada tabel exposed.
+- **Pagar policy otomatis (SEC-01):** `npm run db:test` menjalankan
+  `supabase/tests/rls_policy_guard_test.sql`, yang menolak policy pada tabel wadah
+  (`club_id`/`ride_id`) yang memberi akses lewat kolom kepemilikan (`created_by`, `author_id`,
+  `owner_id`, `user_id`, `sender_id`, …) tanpa penjaga keanggotaan. Pengecualian harus tertulis
+  beserta alasannya dan ikut diperiksa anti-usang. Berjalan di CI `database-rls` setiap kali
+  `supabase/**`, `scripts/db-test.mjs`, atau tipe database berubah.
 - Tes access lintas user/club/ride.
 - Coba direct REST query, Realtime subscribe, direct storage URL, IDOR dengan mengganti UUID, dan token expired.
 - Cek build bundle/JS source map untuk service role/API secrets.
@@ -153,8 +167,13 @@ Yang **sudah otomatis** (`npm test`, jaringan dimatikan; client Supabase diganti
 | `src/features/clubs/__tests__/*.test.ts` | Validasi klub, jelajah/buat klub, dan alur keanggotaan lewat RPC (ajukan, batalkan, tinjau, peran, keluarkan, keluar). |
 | `src/components/ui/__tests__/*` | Perilaku dasar komponen yang dipakai form (tombol, field). |
 
-Hasil terakhir dijalankan (16 Oktober 2026, Node 24.18, commit `a9858a9`, setelah `npm ci`):
-`npm test -- --ci` → **20 suite, 222 test lulus**; `npm run test:scripts` → **172 test lulus**;
+Hasil terakhir dijalankan (17 Oktober 2026, Node 24.18, setelah `npm ci`):
+`npm test -- --ci` → **23 suite, 250 test lulus**; `npm run test:scripts` → **172 test lulus**;
+(diperbarui 18 Oktober 2026 setelah penambahan test kompresi foto, pembersihan Storage, dan foto
+profil: `npm test -- --ci` → **27 suite, 316 test lulus**, termasuk 14 test kompresi foto, 18 test
+pembersihan objek yatim, dan 17 test foto profil (12 API + 5 komponen layar); `npm run test:scripts` → **228 dari 229 test lulus** — satu-satunya kegagalan adalah
+asersi baris pertama `CHANGELOG.md` di checkout Windows yang memakai `core.autocrlf=true`, lihat
+catatan pada tabel hasil di README);
 `npm run deps:check`, `npm run typecheck`, `npm run lint`, `npm run format:check`, `npm run doctor`
 (21/21), dan `npm run export:android` semuanya exit 0.
 
@@ -162,8 +181,19 @@ Yang **sudah diverifikasi terhadap dev backend** (13 Oktober 2026, project devel
 RodaKawan — ADR-035; diperluas pada Milestone 1.6):
 
 - `supabase/tests/rls_profiles_test.sql` — `npm run db:test` mencetak notice `UJI RLS PROFIL LULUS`
-  (**120 perintah**, exit 0) pada database development yang memuat kedelapan migration; dijalankan
-  ulang 16 Oktober 2026 dengan hasil yang sama.
+  (**171 perintah**, exit 0) pada database development yang memuat dua belas migration; dijalankan
+  ulang 18 Oktober 2026 dengan hasil yang sama.
+- `supabase/tests/rls_policy_guard_test.sql` (SEC-01, 18 Oktober 2026) — notice
+  `UJI POLICY OWNER-GUARD LULUS`, **17 perintah**, exit 0. Yang dibuktikan: **18 policy wadah**
+  diperiksa dan tidak ada temuan kepemilikan tanpa penjaga di luar daftar pengecualian; detektornya
+  **diuji-diri** dengan tabel probe (satu policy tanpa penjaga harus tertangkap, satu dengan penjaga
+  tidak boleh) sehingga "nol temuan" tidak bisa berarti "detektor buta"; empat pengecualian
+  (`chat_delete_own`, `ride_locations_delete_self`, dua policy hazard) diverifikasi masih
+  diperlukan dan masih berbentuk sama (entri usang menggagalkan uji); dan keenam token penjaga
+  (`is_club_member`, `is_club_admin`, `is_ride_member`, `is_ride_active_member`, `is_ride_host`,
+  `can_publish_ride_location`) masih dipakai policy nyata. Jalur gagalnya juga terukur: saat
+  pemeriksaan pertama dijalankan, dua policy hazard belum terdaftar dan runner **exit 1** dengan
+  pesan yang menyebut `tabel.policy` dan ekspresi pelanggarannya.
   - **Profil — PROF-01…PROF-05.** Bootstrap trigger membuat profil dengan username yang dinormalkan,
     A tidak dapat membaca profil privat B maupun mengubah baris B (0 baris, `INSERT` ditolak),
     username duplikat ditolak unique constraint, format salah ditolak CHECK, `anon` tidak melihat
@@ -183,6 +213,46 @@ RodaKawan — ADR-035; diperluas pada Milestone 1.6):
   - **Garasi — GAR-04 (Milestone 2).** Hanya boleh ada satu kendaraan utama per pengguna
     (partial unique index `motorcycles_single_primary_idx` + trigger penjaga), termasuk saat
     kendaraan utama dihapus atau dipindahkan.
+  - **Storage foto dan foto profil — GAR-05 / CLUB-11 / PROF-10 (17–18 Oktober 2026).** Ketiga
+    bucket privat dengan batas ukuran/MIME yang benar; A membaca/menghapus objek kendaraan dan foto
+    profilnya sendiri tetapi tidak objek B; `INSERT` ke folder B dan ke folder sendiri dengan id
+    kendaraan B ditolak RLS; logo klub publik terbaca non-anggota, logo klub privat hanya anggota,
+    dan hanya owner/admin yang bisa menulis; `anon` tidak melihat objek apa pun; CHECK menolak
+    `photo_path`/`logo_path`/`avatar_url` milik entitas lain.
+  - **Storage lewat HTTP API (18 Oktober 2026).** `npm run storage:test` membuat dua akun uji
+    sementara lewat SQL (tanpa service_role), sign-in lewat GoTrue password grant, lalu membuktikan
+    pada API Storage yang sesungguhnya: A mengunggah foto kendaraannya (HTTP 200), signed URL dibaca
+    tanpa token dan isinya identik (SHA-256), B ditolak saat mengunggah ke folder A, menautkan motor A
+    ke foldernya sendiri, membuat signed URL, dan mengunduh objek A; `anon` juga ditolak; objek yang
+    ditolak diverifikasi tidak terbentuk di database. Pola yang sama dibuktikan untuk foto profil
+    (`avatars/<A>/uji-avatar.png`): A unggah/sign/hapus, B dan `anon` ditolak untuk unggah, sign,
+    dan unduh. A kemudian menghapus objeknya lewat API sehingga signed URL baru untuk path itu
+    ditolak. Runner selalu membersihkan (objek lewat Storage API, akun + baris turunan lewat
+    `ON DELETE CASCADE`) dan memverifikasi nol sisa sebelum mencetak `UJI INTEGRASI STORAGE LULUS`
+    (27 langkah, exit 0, idempotent).
+  - **Pembersihan objek yatim — GAR-05 (18 Oktober 2026).** `src/features/media/photoCleanup.ts`
+    diuji tanpa jaringan (18 test): fungsi murni `findOrphanPhotoPaths` menyimpan objek yang masih
+    dirujuk, menghapus objek lama yang tidak dirujuk, **membiarkan** objek yang baru dibuat
+    (< tenggang 1 jam) dan objek bertimestamp tak terbaca, membersihkan seluruh isi folder kendaraan
+    yang barisnya sudah dihapus, membersihkan berkas yang tertinggal di akar folder pengguna,
+    mengabaikan path di luar folder sesi, serta mengembalikan path terurut tanpa duplikat;
+    `sweepOrphanVehiclePhotos` mengambil halaman berikutnya saat satu halaman penuh, menghapus semua
+    yatim dalam satu panggilan `remove`, tidak memanggil `remove` bila tidak ada yatim, memetakan
+    penolakan listing/remove sebagai error (tidak berpura-pura berhasil), dan tidak melempar saat
+    klien tidak punya `storage` — sifat yang membuat pemanggil `void` di layar garasi aman.
+    `cleanUpVehiclePhotosAfterDelete` membuktikan urutannya: objek kendaraan yang dihapus lebih dulu,
+    lalu folder kendaraan itu disapu untuk sisa unggahan lama.
+  - **Foto profil — PROF-10 (18 Oktober 2026).** 12 test unit di `photos.test.ts` dan 5 test komponen
+    di `src/features/profile/__tests__/profile-avatar.test.tsx` (tombol unggah memakai `userId` sesi,
+    batal memilih foto tidak memanggil backend, izin galeri ditolak ditampilkan sebagai pesan,
+    hapus hanya lewat dialog konfirmasi, dan kegagalan unggah tidak tampil sebagai sukses) untuk
+    `uploadProfileAvatar`/`deleteProfileAvatar`: path selalu `<user_id>/<berkas>`, unggahan ditolak
+    sebelum menyentuh Storage bila baris profil belum ada, objek baru dibersihkan bila baris gagal
+    diperbarui, objek lama dihapus setelah path baru tersimpan, penolakan Storage tidak menyentuh
+    baris, foto persegi 4000 px diperkecil ke 512 px dengan format dipertahankan, dan penghapusan
+    mengosongkan kolom sebelum menghapus objek (idempoten, dan nilai lama yang bukan path milik sesi
+    tidak dipakai untuk menghapus objek). `isOwnProfileAvatarPath` menolak folder pengguna lain,
+    URL lama, dan path tanpa nama berkas.
   - **Klub — CLUB-01…CLUB-10 (Milestone 2).** Pembuatan klub menjadikan pembuatnya owner dan slug
     bentrok ditolak; non-anggota tidak membaca klub privat; anggota `pending` tidak dapat menyetujui
     dirinya sendiri; klub `invite_only` menolak pengajuan; owner terakhir tidak bisa diturunkan atau
@@ -214,9 +284,27 @@ Yang **masih Blocked** (butuh perangkat / alur aplikasi / akun):
 - **GAR-01…GAR-04 dan CLUB-01…CLUB-10 lewat aplikasi di perangkat fisik** — butuh APK dari commit
   Milestone 2 (`cf818be`/`a9858a9`) dan dua akun nyata. Aturan di database sudah lulus; yang belum
   dibuktikan adalah alur layarnya (bagian 5 `docs/MILESTONE_2_REPORT.md` memuat checklist-nya).
-- **Unggah foto kendaraan dan logo klub — tidak ada yang bisa diuji.** Supabase Storage sengaja belum
-  disiapkan (0 bucket, 0 policy di project development) dan tidak ada tombol unggah, jadi statusnya
-  **belum diimplementasikan**, bukan gagal.
+  Bukti tiap langkah direkam otomatis oleh `node scripts/device-checklist.mjs` (tangkapan layar,
+  hierarki UI, logcat, identitas perangkat dan APK); penilaian langkah tetap dilakukan manusia.
+- **GAR-05 / CLUB-11 lewat aplikasi di perangkat** — logika unggah/ganti/hapus, kompresi otomatis
+  (14 test unit: batas dimensi + penghematan luas piksel, pemilihan format, ambang lewati, dan fallback),
+  pembersihan objek yatim (18 test unit), policy Storage
+  (`npm run db:test` bagian 13), serta jalur HTTP nyata (`npm run storage:test`) sudah lulus, tetapi
+  alur galeri → perkecil → unggah → signed URL dari **perangkat fisik** belum dijalankan. Butuh APK
+  baru karena `expo-image-picker`, `expo-file-system`, dan `expo-image-manipulator` adalah modul
+  native. Yang harus dibuktikan manual: izin galeri muncul hanya saat tombol ditekan, foto HEIC
+  iPhone terkonversi/diterima, foto 12 MP benar-benar turun ukurannya sebelum diunggah (kuota
+  Storage hemat) dan hasilnya tetap tajam — termasuk foto potret yang tinggi, foto PNG berlogo
+  transparan yang tidak berubah menjadi latar hitam, EXIF lokasi tidak ikut terunggah, pesan batas
+  ukuran hanya muncul bila kompresi gagal, foto lama hilang setelah ganti, dan akun kedua tidak bisa
+  membuka foto kendaraan akun pertama.
+- **PROF-10 lewat aplikasi di perangkat** — unggah/ganti/hapus foto profil dari tab Profil belum
+  dijalankan di perangkat fisik (butuh APK baru karena modul native yang sama). Aturan bucket,
+  kebijakan owner-only, dan jalur HTTP-nya sudah lulus (`npm run db:test` bagian 13 dan
+  `npm run storage:test` langkah 15–23); yang perlu dibuktikan manual: foto dari galeri muncul di
+  kartu setelah unggah, foto lama hilang dari bucket setelah diganti, tombol hapus bekerja,
+  pratinjau tetap tampil setelah aplikasi dibuka ulang (signed URL baru), dan akun kedua tidak bisa
+  membuka avatar akun pertama.
 
 Aturan pelaporan: jangan mencatat AUTH/PROF sebagai lulus pada tabel di atas bila hanya test lokal yang
 dijalankan. Tandai "lulus (unit)" atau "belum dijalankan". Runner `db:test` hanya melaporkan lulus bila

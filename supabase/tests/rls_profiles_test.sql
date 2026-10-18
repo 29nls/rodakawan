@@ -1,3 +1,5 @@
+-- db:test notice: UJI RLS PROFIL LULUS
+--
 -- RodaKawan — uji RLS tabel public.profiles (Milestone 1)
 --
 -- Tujuan: membuktikan bahwa
@@ -24,7 +26,17 @@
 --    non-anggota tidak membaca klub privat, anggota tidak menyetujui dirinya sendiri,
 --    owner terakhir tidak bisa diturunkan/dikeluarkan, klub invite_only menolak permintaan,
 --    peran admin member tidak terlihat oleh anggota biasa, dan peran `anon` tidak punya
---    EXECUTE satu pun (Milestone 2).
+--    EXECUTE satu pun (Milestone 2);
+-- 14. konten klub (post, komentar, reaksi) mengikuti keanggotaan **aktif**: mantan anggota
+--    kehilangan hak baca dan tulis, sedangkan post `visibility='public'` di klub publik
+--    tetap terbaca non-anggota (itu tujuannya, bukan kebocoran);
+-- 15. `rides_select_allowed` tidak lagi memakai `created_by` sebagai jalan keluar dari
+--    keanggotaan klub: perjalanan ber-`club_id` hanya terbaca anggota aktif klub itu,
+--    sementara perjalanan tanpa klub tetap memakai kepemilikan/peserta;
+-- 16. Storage foto kendaraan dan logo klub: bucket privat dengan batas ukuran/MIME,
+--    foto kendaraan hanya untuk pemilik, logo klub hanya untuk anggota/pengunjung klub
+--    publik dan hanya owner/admin yang menulis, path tidak bisa menautkan objek orang
+--    lain, serta peran `anon` tidak melihat objek apa pun.
 --
 -- Cakupan berkas ini lebih luas dari namanya: ia adalah rangkaian uji RLS Milestone 1/1.6
 -- untuk `public.profiles`, `public.follows`, dan `public.motorcycle_private_details`.
@@ -111,6 +123,16 @@ begin
     v_missing := v_missing || 'policy follows_delete_either_party'::text;
   end if;
 
+  -- Versi `rides_select_allowed` harus menyebut keanggotaan klub; versi lama hanya
+  -- mengandalkan `created_by`, sehingga migration 20261017090000 belum diterapkan.
+  if not exists (
+    select 1 from pg_policies
+    where schemaname = 'public' and tablename = 'rides'
+      and policyname = 'rides_select_allowed' and qual like '%is_club_member%'
+  ) then
+    v_missing := v_missing || 'policy rides_select_allowed versi 20261017090000 (keanggotaan klub)'::text;
+  end if;
+
   if not exists (
     select 1 from pg_policies
     where schemaname = 'public' and tablename = 'motorcycle_private_details'
@@ -121,6 +143,132 @@ begin
 
   if array_length(v_missing, 1) is not null then
     raise exception 'UJI GAGAL (paritas skema): objek berikut belum ada — %. Terapkan migration Milestone 1.6 lebih dulu: 20261013140000_follow_consent_private_profiles.sql dan 20261013140100_private_vehicle_details_owner_integrity.sql.',
+      array_to_string(v_missing, ', ');
+  end if;
+end;
+$$;
+
+-- 0c. Paritas skema Storage dan constraint path.
+--     Tanpa blok ini, database yang belum menerima migration foto gagal dengan
+--     pesan "relation storage.objects does not exist" atau asersi yang membingungkan.
+do $$
+declare
+  v_missing text[] := array[]::text[];
+  v_vehicle storage.buckets;
+  v_club storage.buckets;
+  v_avatar storage.buckets;
+begin
+  select * into v_vehicle from storage.buckets where id = 'vehicle-photos';
+  select * into v_club from storage.buckets where id = 'club-logos';
+  select * into v_avatar from storage.buckets where id = 'avatars';
+
+  if v_vehicle.id is null or v_vehicle.public then
+    v_missing := v_missing || 'bucket privat vehicle-photos'::text;
+  end if;
+
+  if v_vehicle.file_size_limit is distinct from 5242880
+     or v_vehicle.allowed_mime_types is null
+     or not ('image/jpeg' = any (v_vehicle.allowed_mime_types))
+     or not ('image/png' = any (v_vehicle.allowed_mime_types))
+     or not ('image/webp' = any (v_vehicle.allowed_mime_types)) then
+    v_missing := v_missing || 'batas 5 MiB / MIME pada vehicle-photos'::text;
+  end if;
+
+  if v_club.id is null or v_club.public then
+    v_missing := v_missing || 'bucket privat club-logos'::text;
+  end if;
+
+  if v_club.file_size_limit is distinct from 2097152
+     or v_club.allowed_mime_types is null
+     or not ('image/jpeg' = any (v_club.allowed_mime_types)) then
+    v_missing := v_missing || 'batas 2 MiB / MIME pada club-logos'::text;
+  end if;
+
+  if v_avatar.id is null or v_avatar.public then
+    v_missing := v_missing || 'bucket privat avatars'::text;
+  end if;
+
+  if v_avatar.file_size_limit is distinct from 2097152
+     or v_avatar.allowed_mime_types is null
+     or not ('image/jpeg' = any (v_avatar.allowed_mime_types))
+     or not ('image/webp' = any (v_avatar.allowed_mime_types)) then
+    v_missing := v_missing || 'batas 2 MiB / MIME pada avatars'::text;
+  end if;
+
+  if not exists (
+    select 1 from pg_policies
+    where schemaname = 'storage' and tablename = 'objects'
+      and policyname = 'vehicle_photos_select_owner'
+  ) then
+    v_missing := v_missing || 'policy vehicle_photos_select_owner'::text;
+  end if;
+
+  if not exists (
+    select 1 from pg_policies
+    where schemaname = 'storage' and tablename = 'objects'
+      and policyname = 'vehicle_photos_delete_owner'
+  ) then
+    v_missing := v_missing || 'policy vehicle_photos_delete_owner'::text;
+  end if;
+
+  if not exists (
+    select 1 from pg_policies
+    where schemaname = 'storage' and tablename = 'objects'
+      and policyname = 'club_logos_insert_admin'
+  ) then
+    v_missing := v_missing || 'policy club_logos_insert_admin'::text;
+  end if;
+
+  if not exists (
+    select 1 from pg_policies
+    where schemaname = 'storage' and tablename = 'objects'
+      and policyname = 'avatars_select_owner'
+  ) then
+    v_missing := v_missing || 'policy avatars_select_owner'::text;
+  end if;
+
+  if not exists (
+    select 1 from pg_policies
+    where schemaname = 'storage' and tablename = 'objects'
+      and policyname = 'avatars_insert_owner'
+  ) then
+    v_missing := v_missing || 'policy avatars_insert_owner'::text;
+  end if;
+
+  if not exists (
+    select 1 from pg_policies
+    where schemaname = 'storage' and tablename = 'objects'
+      and policyname = 'avatars_delete_owner'
+  ) then
+    v_missing := v_missing || 'policy avatars_delete_owner'::text;
+  end if;
+
+  if not exists (
+    select 1 from pg_constraint
+    where conname = 'motorcycles_photo_path_owner'
+      and conrelid = 'public.motorcycles'::regclass
+  ) then
+    v_missing := v_missing || 'constraint motorcycles_photo_path_owner'::text;
+  end if;
+
+  if not exists (
+    select 1 from pg_constraint
+    where conname = 'clubs_logo_path_owner'
+      and conrelid = 'public.clubs'::regclass
+  ) then
+    v_missing := v_missing || 'constraint clubs_logo_path_owner'::text;
+  end if;
+
+  if not exists (
+    select 1 from pg_constraint
+    where conname = 'profiles_avatar_path_owner'
+      and conrelid = 'public.profiles'::regclass
+  ) then
+    v_missing := v_missing || 'constraint profiles_avatar_path_owner'::text;
+  end if;
+
+  if array_length(v_missing, 1) is not null then
+    raise exception 'UJI GAGAL (paritas skema Storage): objek berikut belum ada — %. Terapkan migration Storage terbaru lebih dulu: 20261017120000_private_photo_storage.sql dan 20261018120000_profile_avatar_storage.sql.',
       array_to_string(v_missing, ', ');
   end if;
 end;
@@ -1126,7 +1274,10 @@ $$;
 -- membaca baris klub yang bersangkutan.
 create table public.uji_m2_konteks (
   nama text primary key,
-  club_id uuid
+  club_id uuid,
+  -- Dipakai bagian 11/12 untuk menyimpan id post/komentar/perjalanan yang dibuat lewat
+  -- peran `authenticated` (RLS menyembunyikannya dari query pengujian berikutnya).
+  id uuid
 );
 grant select, insert, update, delete on public.uji_m2_konteks to authenticated;
 
@@ -1684,6 +1835,911 @@ begin
 end;
 $$;
 
+-- 11. Konten klub: post, komentar, dan reaksi mengikuti keanggotaan aktif.
+-- ----------------------------------------------------------------------------
+-- Bagian ini menutup celah cakupan: sebelum audit 17 Oktober 2026, policy
+-- `club_posts`, `post_comments`, dan `post_reactions` tidak pernah diuji sama sekali.
+-- Yang dibuktikan: anggota aktif melihat kontennya, dan setelah keluar ia tidak lagi
+-- membaca, menyisipkan, mengubah, maupun menghapus konten klub yang tidak terlihat.
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+
+do $$
+declare
+  v_pub uuid;
+  v_post uuid;
+  v_comment uuid;
+  v_rows int;
+begin
+  select club_id into v_pub from public.uji_m2_konteks where nama = 'publik';
+
+  select count(*) into v_rows
+  from public.club_members
+  where club_id = v_pub
+    and user_id = '22222222-2222-2222-2222-222222222222'
+    and status = 'active';
+
+  if v_rows <> 1 then
+    raise exception 'UJI GAGAL: pra-syarat bagian 11 tidak terpenuhi (anggota klub publik tidak aktif)';
+  end if;
+
+  insert into public.club_posts (club_id, author_id, content, visibility)
+  values (v_pub, auth.uid(), 'post khusus anggota klub', 'club')
+  returning id into v_post;
+
+  insert into public.post_comments (post_id, author_id, content)
+  values (v_post, auth.uid(), 'komentar anggota klub')
+  returning id into v_comment;
+
+  insert into public.post_reactions (post_id, user_id) values (v_post, auth.uid());
+
+  insert into public.uji_m2_konteks (nama, id)
+  values ('post_anggota', v_post), ('komentar_anggota', v_comment);
+end;
+$$;
+
+-- 11a. Kontrol positif: selama masih anggota, semuanya terbaca dan bisa diubah.
+do $$
+declare
+  v_post uuid;
+  v_rows int;
+begin
+  select id into v_post from public.uji_m2_konteks where nama = 'post_anggota';
+
+  select count(*) into v_rows from public.club_posts where id = v_post;
+  if v_rows <> 1 then
+    raise exception 'UJI GAGAL: anggota aktif tidak membaca post klubnya sendiri (% baris)', v_rows;
+  end if;
+
+  select count(*) into v_rows from public.post_comments where post_id = v_post;
+  if v_rows <> 1 then
+    raise exception 'UJI GAGAL: anggota aktif tidak membaca komentar post klubnya (% baris)', v_rows;
+  end if;
+
+  select count(*) into v_rows from public.post_reactions where post_id = v_post;
+  if v_rows <> 1 then
+    raise exception 'UJI GAGAL: anggota aktif tidak membaca reaksi post klubnya (% baris)', v_rows;
+  end if;
+
+  update public.club_posts set content = 'post khusus anggota (disunting)' where id = v_post;
+  get diagnostics v_rows = row_count;
+  if v_rows <> 1 then
+    raise exception 'UJI GAGAL: anggota aktif tidak bisa menyunting postnya (% baris)', v_rows;
+  end if;
+end;
+$$;
+
+-- 11b. Keluar dari klub publik: konten `visibility='club'` tidak lagi terlihat.
+--      Klubnya publik, jadi ini membuktikan izin mengikuti keanggotaan, bukan visibilitas klub.
+do $$
+declare
+  v_pub uuid;
+  v_status text;
+begin
+  select club_id into v_pub from public.uji_m2_konteks where nama = 'publik';
+  v_status := public.leave_club(v_pub);
+
+  if v_status <> 'left' then
+    raise exception 'UJI GAGAL: keluar dari klub publik menghasilkan status %', v_status;
+  end if;
+end;
+$$;
+
+do $$
+declare
+  v_post uuid;
+  v_comment uuid;
+  v_rows int;
+begin
+  select id into v_post from public.uji_m2_konteks where nama = 'post_anggota';
+  select id into v_comment from public.uji_m2_konteks where nama = 'komentar_anggota';
+
+  select count(*) into v_rows from public.club_posts where id = v_post;
+  if v_rows <> 0 then
+    raise exception 'UJI GAGAL: mantan anggota membaca post klub (% baris)', v_rows;
+  end if;
+
+  select count(*) into v_rows from public.post_comments where post_id = v_post;
+  if v_rows <> 0 then
+    raise exception 'UJI GAGAL: mantan anggota membaca komentar post klub (% baris)', v_rows;
+  end if;
+
+  select count(*) into v_rows from public.post_reactions where post_id = v_post;
+  if v_rows <> 0 then
+    raise exception 'UJI GAGAL: mantan anggota membaca reaksi post klub (% baris)', v_rows;
+  end if;
+
+  update public.club_posts set content = 'DITIMPA MANTAN ANGGOTA' where id = v_post;
+  get diagnostics v_rows = row_count;
+  if v_rows <> 0 then
+    raise exception 'UJI GAGAL: mantan anggota mengubah post klub (% baris)', v_rows;
+  end if;
+
+  update public.post_comments set content = 'DITIMPA MANTAN ANGGOTA' where id = v_comment;
+  get diagnostics v_rows = row_count;
+  if v_rows <> 0 then
+    raise exception 'UJI GAGAL: mantan anggota mengubah komentar klub (% baris)', v_rows;
+  end if;
+
+  delete from public.post_comments where id = v_comment;
+  get diagnostics v_rows = row_count;
+  if v_rows <> 0 then
+    raise exception 'UJI GAGAL: mantan anggota menghapus komentar klub (% baris)', v_rows;
+  end if;
+
+  begin
+    insert into public.post_comments (post_id, author_id, content)
+    values (v_post, auth.uid(), 'komentar baru dari mantan anggota');
+    raise exception 'UJI GAGAL: mantan anggota menyisipkan komentar baru ke post klub';
+  exception
+    when insufficient_privilege then
+      raise notice 'UJI: sisip komentar oleh mantan anggota ditolak RLS (SQLSTATE 42501)';
+  end;
+
+  begin
+    insert into public.post_reactions (post_id, user_id) values (v_post, auth.uid());
+    raise exception 'UJI GAGAL: mantan anggota menyisipkan reaksi ke post klub';
+  exception
+    when insufficient_privilege then
+      raise notice 'UJI: sisip reaksi oleh mantan anggota ditolak RLS (SQLSTATE 42501)';
+  end;
+
+  raise notice 'UJI: mantan anggota kehilangan baca/tulis post, komentar, dan reaksi klub';
+end;
+$$;
+
+-- 11c. Post publik di klub publik tetap publik; post khusus anggota tetap tertutup.
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+
+do $$
+declare
+  v_pub uuid;
+  v_post uuid;
+begin
+  select club_id into v_pub from public.uji_m2_konteks where nama = 'publik';
+
+  insert into public.club_posts (club_id, author_id, content, visibility)
+  values (v_pub, auth.uid(), 'post publik untuk semua pengguna', 'public')
+  returning id into v_post;
+
+  insert into public.post_comments (post_id, author_id, content)
+  values (v_post, auth.uid(), 'komentar pada post publik');
+
+  insert into public.uji_m2_konteks (nama, id) values ('post_publik', v_post);
+end;
+$$;
+
+-- 999 (bukan anggota klub publik) melihat post publik, bukan post khusus anggota.
+set local request.jwt.claims = '{"sub":"99999999-9999-9999-9999-999999999999","role":"authenticated"}';
+
+do $$
+declare
+  v_post_pub uuid;
+  v_post_anggota uuid;
+  v_rows int;
+begin
+  select id into v_post_pub from public.uji_m2_konteks where nama = 'post_publik';
+  select id into v_post_anggota from public.uji_m2_konteks where nama = 'post_anggota';
+
+  select count(*) into v_rows from public.club_posts where id = v_post_pub;
+  if v_rows <> 1 then
+    raise exception 'UJI GAGAL: post publik di klub publik tidak terbaca non-anggota (% baris)', v_rows;
+  end if;
+
+  select count(*) into v_rows from public.post_comments where post_id = v_post_pub;
+  if v_rows <> 1 then
+    raise exception 'UJI GAGAL: komentar post publik tidak terbaca non-anggota (% baris)', v_rows;
+  end if;
+
+  select count(*) into v_rows from public.club_posts where id = v_post_anggota;
+  if v_rows <> 0 then
+    raise exception 'UJI GAGAL: non-anggota membaca post khusus anggota (% baris)', v_rows;
+  end if;
+end;
+$$;
+
+-- 11d. Anggota yang keluar bisa bergabung lagi di klub open; status kembali aktif.
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+
+do $$
+declare
+  v_pub uuid;
+  v_status text;
+begin
+  select club_id into v_pub from public.uji_m2_konteks where nama = 'publik';
+  v_status := public.request_club_membership(v_pub);
+
+  if v_status <> 'active' then
+    raise exception 'UJI GAGAL: bergabung ulang ke klub open menghasilkan status %', v_status;
+  end if;
+end;
+$$;
+
+-- 12. Perjalanan: `created_by` bukan jalan keluar dari keanggotaan klub.
+-- ----------------------------------------------------------------------------
+-- Data perjalanan disiapkan sebagai pemilik database karena pembuatan perjalanan
+-- belum punya RPC (lihat docs/MILESTONE_3_PLAN.md); yang diuji adalah policy SELECT-nya.
+reset role;
+
+delete from public.rides where id in (
+  'eeeeeeee-eeee-eeee-eeee-eeeeeeeeee01',
+  'eeeeeeee-eeee-eeee-eeee-eeeeeeeeee02',
+  'eeeeeeee-eeee-eeee-eeee-eeeeeeeeee03',
+  'eeeeeeee-eeee-eeee-eeee-eeeeeeeeee04',
+  'eeeeeeee-eeee-eeee-eeee-eeeeeeeeee05',
+  'eeeeeeee-eeee-eeee-eeee-eeeeeeeeee06'
+);
+
+insert into public.rides (id, club_id, created_by, title, visibility)
+select 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeee01', club_id,
+       '11111111-1111-1111-1111-111111111111',
+       'UJI ride klub oleh mantan anggota', 'club'
+from public.uji_m2_konteks where nama = 'privat';
+
+insert into public.rides (id, club_id, created_by, title, visibility)
+select 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeee02', club_id,
+       '22222222-2222-2222-2222-222222222222',
+       'UJI ride undangan klub', 'invite_only'
+from public.uji_m2_konteks where nama = 'privat';
+
+insert into public.rides (id, club_id, created_by, title, visibility)
+values ('eeeeeeee-eeee-eeee-eeee-eeeeeeeeee03', null,
+        '11111111-1111-1111-1111-111111111111',
+        'UJI ride pribadi A', 'invite_only');
+
+insert into public.rides (id, club_id, created_by, title, visibility)
+values ('eeeeeeee-eeee-eeee-eeee-eeeeeeeeee04', null,
+        '22222222-2222-2222-2222-222222222222',
+        'UJI ride publik B', 'public');
+
+insert into public.rides (id, club_id, created_by, title, visibility)
+values ('eeeeeeee-eeee-eeee-eeee-eeeeeeeeee05', null,
+        '22222222-2222-2222-2222-222222222222',
+        'UJI ride pribadi dengan peserta', 'invite_only');
+
+insert into public.rides (id, club_id, created_by, title, visibility)
+select 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeee06', club_id,
+       '11111111-1111-1111-1111-111111111111',
+       'UJI ride undangan klub publik', 'invite_only'
+from public.uji_m2_konteks where nama = 'publik';
+
+-- B adalah host aktif di ride undangan klub; A hanya peserta di ride pribadi B.
+insert into public.ride_members (ride_id, user_id, role, status, joined_at)
+values
+  ('eeeeeeee-eeee-eeee-eeee-eeeeeeeeee02', '22222222-2222-2222-2222-222222222222',
+   'host', 'joined', now()),
+  ('eeeeeeee-eeee-eeee-eeee-eeeeeeeeee05', '11111111-1111-1111-1111-111111111111',
+   'rider', 'joined', now());
+
+set local role authenticated;
+
+-- 12a. A keluar dari klub privat pada 10f. Semua perjalanan klub privat harus tertutup
+--      baginya — termasuk yang `created_by`-nya dia — sementara perjalanan pribadinya
+--      dan perjalanan tempat ia masih menjadi peserta tetap terbaca.
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+
+do $$
+declare
+  v_rows int;
+  v_titles text;
+begin
+  select count(*) into v_rows
+  from public.rides where id = 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeee01';
+  if v_rows <> 0 then
+    raise exception 'UJI GAGAL: mantan anggota klub membaca perjalanan klub lewat created_by (% baris)', v_rows;
+  end if;
+
+  select count(*) into v_rows
+  from public.rides where id = 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeee02';
+  if v_rows <> 0 then
+    raise exception 'UJI GAGAL: mantan anggota klub membaca perjalanan undangan klub (% baris)', v_rows;
+  end if;
+
+  select count(*) into v_rows
+  from public.rides where id = 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeee03';
+  if v_rows <> 1 then
+    raise exception 'UJI GAGAL: pembuat tidak membaca perjalanan pribadinya (% baris)', v_rows;
+  end if;
+
+  select count(*) into v_rows
+  from public.rides where id = 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeee04';
+  if v_rows <> 1 then
+    raise exception 'UJI GAGAL: perjalanan publik tidak terbaca pengguna terautentikasi (% baris)', v_rows;
+  end if;
+
+  select count(*) into v_rows
+  from public.rides where id = 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeee05';
+  if v_rows <> 1 then
+    raise exception 'UJI GAGAL: peserta aktif tidak membaca perjalanan pribadi tempat ia bergabung (% baris)', v_rows;
+  end if;
+
+  select count(*) into v_rows
+  from public.rides where id = 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeee06';
+  if v_rows <> 1 then
+    raise exception 'UJI GAGAL: anggota aktif klub publik tidak membaca perjalanan undangan klubnya (% baris)', v_rows;
+  end if;
+
+  select string_agg(title, ', ' order by title) into v_titles from public.rides;
+  raise notice 'UJI: mantan anggota klub hanya melihat perjalanan pribadi/publiknya (% baris: %)',
+    (select count(*) from public.rides), v_titles;
+end;
+$$;
+
+-- 12b. Anggota aktif klub privat membaca perjalanan klubnya (kontrol positif).
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+
+do $$
+declare
+  v_rows int;
+begin
+  select count(*) into v_rows
+  from public.rides where id = 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeee01';
+  if v_rows <> 1 then
+    raise exception 'UJI GAGAL: anggota aktif klub tidak membaca perjalanan visibility=club (% baris)', v_rows;
+  end if;
+
+  select count(*) into v_rows
+  from public.rides where id = 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeee02';
+  if v_rows <> 1 then
+    raise exception 'UJI GAGAL: host tidak membaca perjalanan undangan klubnya (% baris)', v_rows;
+  end if;
+
+  select count(*) into v_rows
+  from public.rides where id = 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeee03';
+  if v_rows <> 0 then
+    raise exception 'UJI GAGAL: pengguna lain membaca perjalanan pribadi invite_only (% baris)', v_rows;
+  end if;
+end;
+$$;
+
+-- 12c. Peran `anon` tetap tidak melihat perjalanan apa pun.
+set local role anon;
+set local request.jwt.claims = '{"role":"anon"}';
+
+do $$
+declare
+  v_rows int;
+begin
+  select count(*) into v_rows from public.rides;
+  if v_rows <> 0 then
+    raise exception 'UJI GAGAL: peran anon membaca % baris perjalanan', v_rows;
+  end if;
+end;
+$$;
+
+-- 13. Storage: foto kendaraan dan logo klub.
+-- ----------------------------------------------------------------------------
+-- Objek disiapkan sebagai pemilik database (Storage service menulis dengan hak
+-- lebih tinggi), lalu policy diuji dengan peran `authenticated` yang sama seperti
+-- permintaan aplikasi. Yang diuji adalah aturan RLS Storage, bukan unggahan HTTP;
+-- batas ukuran/MIME bucket diperiksa dari konfigurasi bucket karena penegakannya
+-- ada di Storage service.
+reset role;
+
+do $$
+declare
+  v_bucket storage.buckets;
+begin
+  select * into v_bucket from storage.buckets where id = 'vehicle-photos';
+  if v_bucket.id is null or v_bucket.public then
+    raise exception 'UJI GAGAL: bucket vehicle-photos tidak ada atau publik';
+  end if;
+
+  if v_bucket.file_size_limit is distinct from 5242880 then
+    raise exception 'UJI GAGAL: batas foto kendaraan % byte (harus 5242880)', v_bucket.file_size_limit;
+  end if;
+
+  if v_bucket.allowed_mime_types is null
+     or not ('image/jpeg' = any (v_bucket.allowed_mime_types))
+     or not ('image/png' = any (v_bucket.allowed_mime_types))
+     or not ('image/webp' = any (v_bucket.allowed_mime_types)) then
+    raise exception 'UJI GAGAL: MIME vehicle-photos tidak sesuai (%)', v_bucket.allowed_mime_types;
+  end if;
+
+  select * into v_bucket from storage.buckets where id = 'club-logos';
+  if v_bucket.id is null or v_bucket.public then
+    raise exception 'UJI GAGAL: bucket club-logos tidak ada atau publik';
+  end if;
+
+  if v_bucket.file_size_limit is distinct from 2097152 then
+    raise exception 'UJI GAGAL: batas logo klub % byte (harus 2097152)', v_bucket.file_size_limit;
+  end if;
+
+  select * into v_bucket from storage.buckets where id = 'avatars';
+  if v_bucket.id is null or v_bucket.public then
+    raise exception 'UJI GAGAL: bucket avatars tidak ada atau publik';
+  end if;
+
+  if v_bucket.file_size_limit is distinct from 2097152 then
+    raise exception 'UJI GAGAL: batas foto profil % byte (harus 2097152)', v_bucket.file_size_limit;
+  end if;
+
+  raise notice 'UJI: ketiga bucket privat dengan batas ukuran/MIME yang benar';
+end;
+$$;
+
+-- 13a. Siapkan objek uji dan kendaraan (kendaraan sudah ada di bagian 7/9).
+-- Storage memasang trigger yang menolak DELETE langsung dari tabel; Storage API
+-- sendiri membukanya lewat GUC ini. Pengujian perlu membersihkan objek lama dan
+-- menguji policy DELETE, jadi GUC yang sama dipakai di sini. RLS tetap berlaku:
+-- flag ini hanya melewati penjaga trigger, bukan policy peran.
+set local storage.allow_delete_query = 'true';
+
+delete from storage.objects
+where bucket_id in ('vehicle-photos', 'club-logos', 'avatars')
+  and (name like '11111111-1111-1111-1111-111111111111/%'
+       or name like '22222222-2222-2222-2222-222222222222/%');
+
+insert into storage.objects (bucket_id, name, metadata)
+values
+  (
+    'vehicle-photos',
+    '11111111-1111-1111-1111-111111111111/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/uji-foto-a.jpg',
+    '{"mimetype":"image/jpeg","size":1024}'::jsonb
+  ),
+  (
+    'vehicle-photos',
+    '22222222-2222-2222-2222-222222222222/bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb/uji-foto-b.jpg',
+    '{"mimetype":"image/jpeg","size":1024}'::jsonb
+  );
+
+insert into storage.objects (bucket_id, name, metadata)
+select 'club-logos', club_id::text || '/uji-logo-publik.jpg',
+       '{"mimetype":"image/png","size":1024}'::jsonb
+from public.uji_m2_konteks where nama = 'publik';
+
+insert into storage.objects (bucket_id, name, metadata)
+select 'club-logos', club_id::text || '/uji-logo-privat.jpg',
+       '{"mimetype":"image/png","size":1024}'::jsonb
+from public.uji_m2_konteks where nama = 'privat';
+
+insert into storage.objects (bucket_id, name, metadata)
+values
+  (
+    'avatars',
+    '11111111-1111-1111-1111-111111111111/uji-avatar-a.jpg',
+    '{"mimetype":"image/jpeg","size":1024}'::jsonb
+  ),
+  (
+    'avatars',
+    '22222222-2222-2222-2222-222222222222/uji-avatar-b.jpg',
+    '{"mimetype":"image/jpeg","size":1024}'::jsonb
+  );
+
+-- 13b. A (pemilik kendaraan, owner klub publik, sudah keluar dari klub privat).
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+
+do $$
+declare
+  v_pub uuid;
+  v_priv uuid;
+  v_rows int;
+begin
+  select club_id into v_pub from public.uji_m2_konteks where nama = 'publik';
+  select club_id into v_priv from public.uji_m2_konteks where nama = 'privat';
+
+  select count(*) into v_rows
+  from storage.objects
+  where bucket_id = 'vehicle-photos'
+    and name = '11111111-1111-1111-1111-111111111111/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/uji-foto-a.jpg';
+  if v_rows <> 1 then
+    raise exception 'UJI GAGAL: pemilik tidak membaca foto kendaraannya sendiri (% baris)', v_rows;
+  end if;
+
+  select count(*) into v_rows
+  from storage.objects
+  where bucket_id = 'vehicle-photos'
+    and name = '22222222-2222-2222-2222-222222222222/bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb/uji-foto-b.jpg';
+  if v_rows <> 0 then
+    raise exception 'UJI GAGAL: A membaca foto kendaraan B (% baris)', v_rows;
+  end if;
+
+  insert into storage.objects (bucket_id, name, metadata)
+  values (
+    'vehicle-photos',
+    '11111111-1111-1111-1111-111111111111/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/uji-foto-baru.jpg',
+    '{}'::jsonb
+  );
+
+  begin
+    insert into storage.objects (bucket_id, name, metadata)
+    values (
+      'vehicle-photos',
+      '22222222-2222-2222-2222-222222222222/bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb/uji-coba-a.jpg',
+      '{}'::jsonb
+    );
+    raise exception 'UJI GAGAL: A mengunggah objek ke folder kendaraan B';
+  exception
+    when insufficient_privilege then
+      null;
+  end;
+
+  begin
+    insert into storage.objects (bucket_id, name, metadata)
+    values (
+      'vehicle-photos',
+      '11111111-1111-1111-1111-111111111111/bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb/uji-coba-b.jpg',
+      '{}'::jsonb
+    );
+    raise exception 'UJI GAGAL: A mengunggah objek ke folder sendiri tetapi kendaraan B';
+  exception
+    when insufficient_privilege then
+      null;
+  end;
+
+  update storage.objects
+  set metadata = '{"palsu":true}'::jsonb
+  where bucket_id = 'vehicle-photos'
+    and name = '22222222-2222-2222-2222-222222222222/bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb/uji-foto-b.jpg';
+  get diagnostics v_rows = row_count;
+  if v_rows <> 0 then
+    raise exception 'UJI GAGAL: A mengubah metadata foto kendaraan B (% baris)', v_rows;
+  end if;
+
+  delete from storage.objects
+  where bucket_id = 'vehicle-photos'
+    and name = '22222222-2222-2222-2222-222222222222/bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb/uji-foto-b.jpg';
+  get diagnostics v_rows = row_count;
+  if v_rows <> 0 then
+    raise exception 'UJI GAGAL: A menghapus foto kendaraan B (% baris)', v_rows;
+  end if;
+
+  delete from storage.objects
+  where bucket_id = 'vehicle-photos'
+    and name = '11111111-1111-1111-1111-111111111111/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/uji-foto-baru.jpg';
+  get diagnostics v_rows = row_count;
+  if v_rows <> 1 then
+    raise exception 'UJI GAGAL: pemilik tidak bisa menghapus objeknya sendiri (% baris)', v_rows;
+  end if;
+
+  select count(*) into v_rows
+  from storage.objects
+  where bucket_id = 'avatars'
+    and name = '11111111-1111-1111-1111-111111111111/uji-avatar-a.jpg';
+  if v_rows <> 1 then
+    raise exception 'UJI GAGAL: pemilik tidak membaca foto profilnya sendiri (% baris)', v_rows;
+  end if;
+
+  select count(*) into v_rows
+  from storage.objects
+  where bucket_id = 'avatars'
+    and name = '22222222-2222-2222-2222-222222222222/uji-avatar-b.jpg';
+  if v_rows <> 0 then
+    raise exception 'UJI GAGAL: A membaca foto profil B (% baris)', v_rows;
+  end if;
+
+  insert into storage.objects (bucket_id, name, metadata)
+  values (
+    'avatars',
+    '11111111-1111-1111-1111-111111111111/uji-avatar-baru.jpg',
+    '{}'::jsonb
+  );
+
+  begin
+    insert into storage.objects (bucket_id, name, metadata)
+    values (
+      'avatars',
+      '22222222-2222-2222-2222-222222222222/uji-coba-avatar-a.jpg',
+      '{}'::jsonb
+    );
+    raise exception 'UJI GAGAL: A mengunggah foto profil ke folder B';
+  exception
+    when insufficient_privilege then
+      null;
+  end;
+
+  update storage.objects
+  set metadata = '{"palsu":true}'::jsonb
+  where bucket_id = 'avatars'
+    and name = '22222222-2222-2222-2222-222222222222/uji-avatar-b.jpg';
+  get diagnostics v_rows = row_count;
+  if v_rows <> 0 then
+    raise exception 'UJI GAGAL: A mengubah metadata foto profil B (% baris)', v_rows;
+  end if;
+
+  delete from storage.objects
+  where bucket_id = 'avatars'
+    and name = '22222222-2222-2222-2222-222222222222/uji-avatar-b.jpg';
+  get diagnostics v_rows = row_count;
+  if v_rows <> 0 then
+    raise exception 'UJI GAGAL: A menghapus foto profil B (% baris)', v_rows;
+  end if;
+
+  delete from storage.objects
+  where bucket_id = 'avatars'
+    and name = '11111111-1111-1111-1111-111111111111/uji-avatar-baru.jpg';
+  get diagnostics v_rows = row_count;
+  if v_rows <> 1 then
+    raise exception 'UJI GAGAL: pemilik tidak bisa menghapus foto profilnya sendiri (% baris)', v_rows;
+  end if;
+
+  select count(*) into v_rows
+  from storage.objects
+  where bucket_id = 'club-logos' and name = v_pub::text || '/uji-logo-publik.jpg';
+  if v_rows <> 1 then
+    raise exception 'UJI GAGAL: owner klub publik tidak membaca logo klubnya (% baris)', v_rows;
+  end if;
+
+  select count(*) into v_rows
+  from storage.objects
+  where bucket_id = 'club-logos' and name = v_priv::text || '/uji-logo-privat.jpg';
+  if v_rows <> 0 then
+    raise exception 'UJI GAGAL: mantan anggota club privat membaca logo klub (% baris)', v_rows;
+  end if;
+
+  insert into storage.objects (bucket_id, name, metadata)
+  values ('club-logos', v_pub::text || '/uji-logo-publik-baru.jpg', '{}'::jsonb);
+
+  begin
+    insert into storage.objects (bucket_id, name, metadata)
+    values ('club-logos', v_priv::text || '/uji-coba-logo.jpg', '{}'::jsonb);
+    raise exception 'UJI GAGAL: A mengunggah logo ke klub privat yang bukan haknya';
+  exception
+    when insufficient_privilege then
+      null;
+  end;
+
+  update storage.objects
+  set metadata = '{"diubah":true}'::jsonb
+  where bucket_id = 'club-logos' and name = v_priv::text || '/uji-logo-privat.jpg';
+  get diagnostics v_rows = row_count;
+  if v_rows <> 0 then
+    raise exception 'UJI GAGAL: A mengubah logo klub privat (% baris)', v_rows;
+  end if;
+
+  update storage.objects
+  set metadata = '{"diubah":true}'::jsonb
+  where bucket_id = 'club-logos' and name = v_pub::text || '/uji-logo-publik.jpg';
+  get diagnostics v_rows = row_count;
+  if v_rows <> 1 then
+    raise exception 'UJI GAGAL: owner klub publik tidak bisa mengubah logonya (% baris)', v_rows;
+  end if;
+
+  raise notice 'UJI: foto kendaraan dan foto profil owner-only; logo klub mengikuti peran owner/admin';
+end;
+$$;
+
+-- 13c. B: owner klub privat, anggota aktif klub publik (bukan admin).
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+
+do $$
+declare
+  v_pub uuid;
+  v_priv uuid;
+  v_rows int;
+begin
+  select club_id into v_pub from public.uji_m2_konteks where nama = 'publik';
+  select club_id into v_priv from public.uji_m2_konteks where nama = 'privat';
+
+  select count(*) into v_rows
+  from storage.objects
+  where bucket_id = 'club-logos'
+    and name in (v_pub::text || '/uji-logo-publik.jpg', v_priv::text || '/uji-logo-privat.jpg');
+  if v_rows <> 2 then
+    raise exception 'UJI GAGAL: anggota aktif membaca % logo (harus 2)', v_rows;
+  end if;
+
+  begin
+    insert into storage.objects (bucket_id, name, metadata)
+    values ('club-logos', v_pub::text || '/uji-coba-anggota.jpg', '{}'::jsonb);
+    raise exception 'UJI GAGAL: anggota biasa mengunggah logo klub publik';
+  exception
+    when insufficient_privilege then
+      null;
+  end;
+
+  insert into storage.objects (bucket_id, name, metadata)
+  values ('club-logos', v_priv::text || '/uji-logo-baru.jpg', '{}'::jsonb);
+
+  delete from storage.objects
+  where bucket_id = 'club-logos' and name = v_priv::text || '/uji-logo-baru.jpg';
+  get diagnostics v_rows = row_count;
+  if v_rows <> 1 then
+    raise exception 'UJI GAGAL: owner klub privat tidak bisa menghapus logonya (% baris)', v_rows;
+  end if;
+
+  delete from storage.objects
+  where bucket_id = 'club-logos' and name = v_pub::text || '/uji-logo-publik.jpg';
+  get diagnostics v_rows = row_count;
+  if v_rows <> 0 then
+    raise exception 'UJI GAGAL: anggota biasa menghapus logo klub publik (% baris)', v_rows;
+  end if;
+
+  raise notice 'UJI: anggota klub hanya membaca logo; owner/admin yang menulis';
+end;
+$$;
+
+-- 13d. C (bukan anggota klub mana pun): logo klub publik terbaca, klub privat tidak.
+set local request.jwt.claims = '{"sub":"99999999-9999-9999-9999-999999999999","role":"authenticated"}';
+
+do $$
+declare
+  v_pub uuid;
+  v_priv uuid;
+  v_rows int;
+begin
+  select club_id into v_pub from public.uji_m2_konteks where nama = 'publik';
+  select club_id into v_priv from public.uji_m2_konteks where nama = 'privat';
+
+  select count(*) into v_rows
+  from storage.objects
+  where bucket_id = 'club-logos' and name = v_pub::text || '/uji-logo-publik.jpg';
+  if v_rows <> 1 then
+    raise exception 'UJI GAGAL: pengunjung klub publik tidak membaca logo (% baris)', v_rows;
+  end if;
+
+  select count(*) into v_rows
+  from storage.objects
+  where bucket_id = 'club-logos' and name = v_priv::text || '/uji-logo-privat.jpg';
+  if v_rows <> 0 then
+    raise exception 'UJI GAGAL: non-anggota membaca logo klub privat (% baris)', v_rows;
+  end if;
+
+  select count(*) into v_rows from storage.objects where bucket_id = 'vehicle-photos';
+  if v_rows <> 0 then
+    raise exception 'UJI GAGAL: pengguna lain membaca % foto kendaraan', v_rows;
+  end if;
+
+  select count(*) into v_rows from storage.objects where bucket_id = 'avatars';
+  if v_rows <> 0 then
+    raise exception 'UJI GAGAL: pengguna lain membaca % foto profil', v_rows;
+  end if;
+
+  begin
+    insert into storage.objects (bucket_id, name, metadata)
+    values ('club-logos', v_pub::text || '/uji-coba-luar.jpg', '{}'::jsonb);
+    raise exception 'UJI GAGAL: non-anggota mengunggah logo klub';
+  exception
+    when insufficient_privilege then
+      null;
+  end;
+
+  raise notice 'UJI: non-anggota hanya membaca logo klub publik';
+end;
+$$;
+
+-- 13e. Peran `anon` tidak memiliki akses Storage apa pun.
+set local role anon;
+set local request.jwt.claims = '{"role":"anon"}';
+
+do $$
+declare
+  v_rows int;
+begin
+  select count(*) into v_rows from storage.objects;
+  if v_rows <> 0 then
+    raise exception 'UJI GAGAL: peran anon membaca % objek Storage', v_rows;
+  end if;
+
+  begin
+    insert into storage.objects (bucket_id, name, metadata)
+    values (
+      'vehicle-photos',
+      '11111111-1111-1111-1111-111111111111/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/uji-anon.jpg',
+      '{}'::jsonb
+    );
+    raise exception 'UJI GAGAL: peran anon mengunggah objek Storage';
+  exception
+    when insufficient_privilege then
+      null;
+  end;
+
+  begin
+    insert into storage.objects (bucket_id, name, metadata)
+    values ('avatars', '11111111-1111-1111-1111-111111111111/uji-anon.jpg', '{}'::jsonb);
+    raise exception 'UJI GAGAL: peran anon mengunggah foto profil';
+  exception
+    when insufficient_privilege then
+      null;
+  end;
+
+  raise notice 'UJI: peran anon tidak membaca/menulis objek Storage';
+end;
+$$;
+
+-- 13f. Constraint path: kolom tidak bisa menautkan objek milik entitas lain.
+reset role;
+
+do $$
+declare
+  v_pub uuid;
+  v_priv uuid;
+begin
+  select club_id into v_pub from public.uji_m2_konteks where nama = 'publik';
+  select club_id into v_priv from public.uji_m2_konteks where nama = 'privat';
+
+  update public.motorcycles
+  set photo_path = '11111111-1111-1111-1111-111111111111/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/uji-foto-a.jpg'
+  where id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+
+  begin
+    update public.motorcycles
+    set photo_path = '22222222-2222-2222-2222-222222222222/bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb/uji-foto-b.jpg'
+    where id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+    raise exception 'UJI GAGAL: path foto kendaraan B diterima pada kendaraan A';
+  exception
+    when check_violation then
+      null;
+  end;
+
+  begin
+    update public.motorcycles
+    set photo_path = '11111111-1111-1111-1111-111111111111/bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb/uji-foto-salah.jpg'
+    where id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+    raise exception 'UJI GAGAL: path dengan id kendaraan lain diterima';
+  exception
+    when check_violation then
+      null;
+  end;
+
+  begin
+    update public.motorcycles
+    set photo_path = '11111111-1111-1111-1111-111111111111/uji-tanpa-id.jpg'
+    where id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+    raise exception 'UJI GAGAL: path tanpa segmen kendaraan diterima';
+  exception
+    when check_violation then
+      null;
+  end;
+
+  update public.clubs
+  set logo_path = v_pub::text || '/uji-logo-publik.jpg'
+  where id = v_pub;
+
+  begin
+    update public.clubs
+    set logo_path = v_priv::text || '/uji-logo-privat.jpg'
+    where id = v_pub;
+    raise exception 'UJI GAGAL: path logo klub lain diterima';
+  exception
+    when check_violation then
+      null;
+  end;
+
+  begin
+    update public.clubs
+    set logo_path = 'uji-logo-tanpa-folder.jpg'
+    where id = v_pub;
+    raise exception 'UJI GAGAL: path logo tanpa folder klub diterima';
+  exception
+    when check_violation then
+      null;
+  end;
+
+  update public.profiles
+  set avatar_url = '11111111-1111-1111-1111-111111111111/uji-avatar-a.jpg'
+  where id = '11111111-1111-1111-1111-111111111111';
+
+  begin
+    update public.profiles
+    set avatar_url = '22222222-2222-2222-2222-222222222222/uji-avatar-b.jpg'
+    where id = '11111111-1111-1111-1111-111111111111';
+    raise exception 'UJI GAGAL: avatar di folder pengguna lain diterima pada profil A';
+  exception
+    when check_violation then
+      null;
+  end;
+
+  begin
+    update public.profiles
+    set avatar_url = 'uji-avatar-tanpa-folder.jpg'
+    where id = '11111111-1111-1111-1111-111111111111';
+    raise exception 'UJI GAGAL: path avatar tanpa folder pengguna diterima';
+  exception
+    when check_violation then
+      null;
+  end;
+
+  update public.profiles
+  set avatar_url = null
+  where id = '11111111-1111-1111-1111-111111111111';
+
+  raise notice 'UJI: CHECK menolak path foto/logo/avatar milik entitas lain';
+end;
+$$;
+
+reset storage.allow_delete_query;
 reset role;
 drop table if exists public.uji_m2_konteks;
 
@@ -1698,7 +2754,7 @@ begin
 
   raise notice 'UJI: jejak audit klub mencatat % perubahan (buat, gabung, setujui, tolak, peran, keluar, keluarkan)',
     v_audit;
-  raise notice 'UJI RLS PROFIL LULUS: izin dan penolakan sesuai harapan (profil, follow, garasi, klub).';
+  raise notice 'UJI RLS PROFIL LULUS: izin dan penolakan sesuai harapan (profil, follow, garasi, klub, konten klub, perjalanan, storage).';
 end;
 $$;
 

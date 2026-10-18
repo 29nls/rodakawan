@@ -36,6 +36,16 @@ import {
   privateNotesError,
   type MotorcycleFormErrors,
 } from '@/features/garage/validation';
+import { PhotoCard } from '@/features/media/components/PhotoCard';
+import { VEHICLE_PHOTO_MAX_DIMENSION } from '@/features/media/imageCompression';
+import { pickPhoto } from '@/features/media/picker';
+import {
+  deleteVehiclePhoto,
+  getPhotoSignedUrl,
+  removePhotoObject,
+  uploadVehiclePhoto,
+  VEHICLE_PHOTO_BUCKET,
+} from '@/features/media/photos';
 
 type DetailState =
   | { status: 'loading' }
@@ -66,10 +76,13 @@ export default function VehicleScreen() {
   const [notes, setNotes] = useState('');
   const [plateErrorText, setPlateErrorText] = useState<string | undefined>(undefined);
   const [busy, setBusy] = useState(false);
+  const [photoBusy, setPhotoBusy] = useState(false);
+  const [photoPreview, setPhotoPreview] = useState<{ path: string; url: string } | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [actionError, setActionError] = useState<AppError | null>(null);
 
   const reload = useCallback(() => setReloadToken((token) => token + 1), []);
+  const vehiclePhotoPath = state.status === 'ready' ? state.vehicle.photoPath : null;
 
   useEffect(() => {
     if (!backend.available || !userId || vehicleId.length === 0) return;
@@ -119,6 +132,87 @@ export default function VehicleScreen() {
       active = false;
     };
   }, [backend, reloadToken, userId, vehicleId]);
+
+  // Signed URL dibuat ulang setiap kali path berubah; URL lama tidak disimpan
+  // di state global maupun database, jadi tidak ada tautan permanen ke foto.
+  // Pratinjau hanya dipakai bila path-nya masih sama dengan baris yang tampil.
+  useEffect(() => {
+    if (!backend.available || !vehiclePhotoPath) return;
+
+    let active = true;
+
+    void getPhotoSignedUrl(backend.client, VEHICLE_PHOTO_BUCKET, vehiclePhotoPath).then(
+      (result) => {
+        if (!active || !result.ok) return;
+        setPhotoPreview({ path: vehiclePhotoPath, url: result.data });
+      },
+    );
+
+    return () => {
+      active = false;
+    };
+  }, [backend, vehiclePhotoPath]);
+
+  async function handlePickPhoto() {
+    if (!backend.available || !userId || photoBusy) return;
+
+    setNotice(null);
+    setActionError(null);
+
+    const picked = await pickPhoto('vehicle');
+    if (!picked.ok) {
+      setActionError(picked.error);
+      return;
+    }
+
+    if (!picked.asset) return;
+
+    setPhotoBusy(true);
+    const result = await uploadVehiclePhoto(backend.client, userId, vehicleId, picked.asset);
+    setPhotoBusy(false);
+
+    if (!result.ok) {
+      setActionError(result.error);
+      return;
+    }
+
+    setNotice('Foto kendaraan diperbarui. Foto ini privat: hanya akun Anda yang dapat membukanya.');
+    reload();
+  }
+
+  function confirmRemovePhoto() {
+    Alert.alert('Hapus foto kendaraan?', 'Foto akan dihapus permanen dari penyimpanan privat.', [
+      { text: 'Batal', style: 'cancel' },
+      {
+        text: 'Hapus',
+        style: 'destructive',
+        onPress: () => {
+          void (async () => {
+            if (!backend.available || !userId || photoBusy) return;
+
+            setNotice(null);
+            setActionError(null);
+            setPhotoBusy(true);
+            const result = await deleteVehiclePhoto(backend.client, userId, vehicleId);
+            setPhotoBusy(false);
+
+            if (!result.ok) {
+              setActionError(result.error);
+              return;
+            }
+
+            setPhotoPreview(null);
+            setNotice(
+              result.data.deleted
+                ? 'Foto kendaraan dihapus.'
+                : 'Kendaraan ini belum memiliki foto.',
+            );
+            reload();
+          })();
+        },
+      },
+    ]);
+  }
 
   async function handleSaveVehicle() {
     if (!backend.available || !userId || busy) return;
@@ -213,8 +307,15 @@ export default function VehicleScreen() {
           void (async () => {
             if (!backend.available || !userId) return;
 
+            const photoPath = state.status === 'ready' ? state.vehicle.photoPath : null;
+
             setBusy(true);
             const result = await deleteMotorcycle(backend.client, userId, vehicleId);
+
+            if (result.ok && photoPath) {
+              await removePhotoObject(backend.client, VEHICLE_PHOTO_BUCKET, photoPath);
+            }
+
             setBusy(false);
 
             if (!result.ok) {
@@ -230,6 +331,10 @@ export default function VehicleScreen() {
   }
 
   const vehicle = state.status === 'ready' ? state.vehicle : null;
+  const photoUrl =
+    vehicle && vehiclePhotoPath && photoPreview?.path === vehiclePhotoPath
+      ? photoPreview.url
+      : null;
 
   return (
     <Screen scroll testID="vehicle-screen">
@@ -266,6 +371,22 @@ export default function VehicleScreen() {
 
       {vehicle ? (
         <>
+          <PhotoCard
+            busy={photoBusy}
+            emptyText="Belum ada foto. Pilih foto dari galeri untuk kendaraan ini."
+            hasPhoto={Boolean(vehicle.photoPath)}
+            hint="Foto disimpan di bucket privat. Hanya akun pemilik kendaraan yang dapat membuka atau menghapusnya; foto tidak pernah menjadi URL publik."
+            onPick={() => {
+              void handlePickPhoto();
+            }}
+            onRemove={confirmRemovePhoto}
+            photoUrl={photoUrl}
+            pickLabel={vehicle.photoPath ? 'Ganti foto' : 'Unggah foto'}
+            subtitle={`JPG, PNG, atau WEBP; maksimal 5 MB. Foto diperkecil otomatis ke ${VEHICLE_PHOTO_MAX_DIMENSION} px sebelum diunggah.`}
+            testID="vehicle-photo"
+            title="Foto kendaraan"
+          />
+
           <Card>
             <SectionHeader
               subtitle="Perubahan di sini hanya menyentuh data publik kendaraan Anda."
@@ -374,15 +495,16 @@ export default function VehicleScreen() {
           <Card>
             <SectionHeader subtitle="Tindakan ini tidak bisa dibatalkan." title="Hapus kendaraan" />
             <Button
-              accessibilityHint="Menghapus kendaraan ini dari garasi Anda."
-              disabled={busy}
+              accessibilityHint="Menghapus kendaraan ini dari garasi Anda beserta detail privatnya."
+              disabled={busy || photoBusy}
               icon="trash-outline"
               label="Hapus kendaraan"
               onPress={confirmDeleteVehicle}
               variant="ghost"
             />
             <AppText tone="muted" variant="caption">
-              Foto kendaraan belum bisa diunggah pada milestone ini; kolom foto dibiarkan kosong.
+              Objek foto di Storage tidak otomatis terhapus saat kendaraan dihapus. Hapus foto lebih
+              dulu dari kartu foto di atas bila ingin membersihkannya.
             </AppText>
           </Card>
         </>

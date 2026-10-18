@@ -32,6 +32,10 @@ import {
   parseModelYear,
   type MotorcycleFormErrors,
 } from '@/features/garage/validation';
+import {
+  cleanUpVehiclePhotosAfterDelete,
+  sweepOrphanVehiclePhotos,
+} from '@/features/media/photoCleanup';
 import { describeUnavailableReason } from '@/lib/supabase/client';
 
 type GarageState =
@@ -75,6 +79,11 @@ export default function GarageScreen() {
 
       if (result.ok) {
         setState({ status: 'ready', vehicles: result.data });
+
+        // Objek foto yang tertinggal dari unggahan gagal (mis. perangkat offline
+        // saat mengganti foto) dirapikan di latar belakang. Hasilnya sengaja
+        // tidak ditampilkan: sapuan ini tidak menghalangi apa pun di layar ini.
+        void sweepOrphanVehiclePhotos(client, userId, result.data);
       } else {
         setState({ status: 'error', error: result.error });
       }
@@ -186,6 +195,20 @@ export default function GarageScreen() {
     setActionError(null);
 
     const result = await deleteMotorcycle(backend.client, userId, vehicle.id);
+
+    // Baris sudah terhapus, jadi path foto diambil dari ringkasan yang tampil.
+    // Objek yang masih diketahui dihapus lebih dulu, lalu folder kendaraan itu
+    // disapu untuk sisa unggahan sebelumnya. Kegagalan membersihkan objek tidak
+    // membatalkan penghapusan kendaraan.
+    if (result.ok) {
+      await cleanUpVehiclePhotosAfterDelete(
+        backend.client,
+        userId,
+        vehicle.photoPath,
+        state.status === 'ready' ? state.vehicles.filter((item) => item.id !== vehicle.id) : [],
+      );
+    }
+
     setBusyId(null);
 
     if (!result.ok) {
@@ -369,8 +392,8 @@ export default function GarageScreen() {
       </Card>
 
       <AppText tone="muted" variant="caption">
-        Unggah foto kendaraan belum tersedia pada milestone ini; kolom foto dibiarkan kosong dan
-        tidak ada tombol unggah yang berpura-pura berfungsi.
+        Foto kendaraan diunggah dari halaman detail masing-masing kendaraan. Bucket penyimpanannya
+        privat dan hanya dapat dibaca akun pemilik kendaraan.
       </AppText>
     </Screen>
   );

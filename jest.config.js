@@ -8,6 +8,9 @@ module.exports = {
     // storage tetap dapat diimpor tanpa perangkat.
     '^expo-sqlite/localStorage/install$': '<rootDir>/src/test-support/sqliteLocalStorageShim.js',
   },
+  // Mock bawaan jest-expo untuk `Image.getSize` hanya mendukung bentuk callback,
+  // sedangkan kode membaca dimensi foto lewat bentuk Promise (didukung React Native).
+  setupFiles: ['<rootDir>/src/test-support/imageSizeShim.js'],
   testMatch: ['<rootDir>/src/**/__tests__/**/*.test.ts?(x)'],
   collectCoverageFrom: [
     'src/**/*.{ts,tsx}',

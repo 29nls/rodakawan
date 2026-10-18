@@ -134,9 +134,8 @@ export function ProfileForm({
       <Button fullWidth label="Batal" onPress={onCancel} variant="ghost" />
 
       <AppText tone="muted" variant="caption">
-        Foto profil belum dapat diunggah: bucket Storage dengan policy akses belum dibuat
-        (dijadwalkan pada Milestone 2). Struktur profil sudah menyediakan kolom avatar_url sehingga
-        foto bisa ditambahkan tanpa mengubah skema.
+        Foto profil diatur dari tab Profil, bukan dari formulir ini. Foto disimpan di bucket privat
+        dan hanya akun Anda yang dapat membukanya.
       </AppText>
     </View>
   );

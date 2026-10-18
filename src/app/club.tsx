@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, StyleSheet, View } from 'react-native';
+import { Alert, Image, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/ui/AppText';
 import { Badge, type BadgeTone } from '@/components/ui/Badge';
@@ -25,6 +25,7 @@ import {
   type ApiResult,
   type ClubDetail,
 } from '@/features/clubs/api';
+import { CLUB_LOGO_BUCKET, getPhotoSignedUrl } from '@/features/media/photos';
 import type { ClubMemberRow, ClubMemberStatus } from '@/lib/supabase/database.types';
 
 type ClubState =
@@ -62,11 +63,13 @@ export default function ClubScreen() {
 
   const [state, setState] = useState<ClubState>({ status: 'loading' });
   const [reloadToken, setReloadToken] = useState(0);
+  const [logoPreview, setLogoPreview] = useState<{ path: string; url: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [actionError, setActionError] = useState<AppError | null>(null);
 
   const reload = useCallback(() => setReloadToken((token) => token + 1), []);
+  const logoPath = state.status === 'ready' ? state.detail.club.logo_path : null;
 
   useEffect(() => {
     if (!backend.available || !userId || clubId.length === 0) return;
@@ -106,6 +109,23 @@ export default function ClubScreen() {
       active = false;
     };
   }, [backend, clubId, reloadToken, userId]);
+
+  // Logo klub juga privat. Signed URL-nya hanya diminta bila pengguna memang
+  // boleh membaca klub ini; non-anggota klub privat tidak akan mendapatkannya.
+  useEffect(() => {
+    if (!backend.available || !logoPath) return;
+
+    let active = true;
+
+    void getPhotoSignedUrl(backend.client, CLUB_LOGO_BUCKET, logoPath).then((result) => {
+      if (!active || !result.ok) return;
+      setLogoPreview({ path: logoPath, url: result.data });
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [backend, logoPath]);
 
   async function handleJoin() {
     if (!backend.available || !userId || busy) return;
@@ -154,6 +174,7 @@ export default function ClubScreen() {
   }
 
   const detail = state.status === 'ready' ? state.detail : null;
+  const logoUrl = logoPath && logoPreview?.path === logoPath ? logoPreview.url : null;
   const status = detail?.memberStatus ?? null;
   const badge = status ? statusCopy[status] : null;
   const canJoin =
@@ -200,6 +221,14 @@ export default function ClubScreen() {
       {detail ? (
         <>
           <Card>
+            {logoUrl ? (
+              <Image
+                accessibilityLabel={`Logo ${detail.club.name}`}
+                resizeMode="cover"
+                source={{ uri: logoUrl }}
+                style={styles.logo}
+              />
+            ) : null}
             <View style={styles.badges}>
               <Badge
                 label={detail.club.visibility === 'public' ? 'Klub publik' : 'Klub privat'}
@@ -348,6 +377,12 @@ export default function ClubScreen() {
 }
 
 const styles = StyleSheet.create({
+  logo: {
+    aspectRatio: 1,
+    borderRadius: spacing.md,
+    maxWidth: 160,
+    width: '100%',
+  },
   badges: {
     flexDirection: 'row',
     flexWrap: 'wrap',

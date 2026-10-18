@@ -29,6 +29,9 @@ credentials.json
 supabase/.temp/
 supabase/.branches/
 
+# Bukti uji perangkat fisik (tangkapan layar, logcat, ringkasan): data pribadi, jangan di-commit
+bukti-perangkat/
+
 # Logs & caches
 *.log
 npm-debug.*

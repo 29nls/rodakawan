@@ -317,6 +317,85 @@ export function mapTableError(error: unknown): AppError {
 }
 
 /**
+ * Error dari Supabase Storage (unggah, hapus, signed URL).
+ *
+ * Storage tidak memakai kode PostgREST; yang tersedia adalah status HTTP dan
+ * pesan dari service. Pesan itu tidak pernah diteruskan apa adanya ke pengguna
+ * karena bisa memuat detail internal (nama bucket, policy, path).
+ */
+export function mapStorageError(error: unknown): AppError {
+  const like = toErrorLike(error);
+
+  if (isFetchFailure(like)) return NETWORK_ERROR;
+
+  const status = typeof like.status === 'number' ? like.status : undefined;
+  const message = (like.message ?? '').toLowerCase();
+
+  if (
+    status === 413 ||
+    /payload too large|exceeded the maximum allowed size|file is too large/.test(message)
+  ) {
+    return {
+      code: 'invalid_data',
+      message:
+        'Berkas foto terlalu besar untuk diunggah. Pilih foto lain atau perkecil ukurannya, lalu coba lagi.',
+      retryable: false,
+    };
+  }
+
+  if (
+    status === 415 ||
+    /mime type|content type|invalid file type|unsupported media/.test(message)
+  ) {
+    return {
+      code: 'invalid_data',
+      message: 'Format berkas ini tidak didukung. Gunakan foto JPG, PNG, atau WEBP.',
+      retryable: false,
+    };
+  }
+
+  if (status === 403 || status === 401) {
+    return {
+      code: 'not_authorized',
+      message:
+        'Penyimpanan foto menolak tindakan ini. Pastikan foto ini milik akun Anda (atau Anda admin klub), lalu muat ulang dan coba lagi.',
+      retryable: false,
+    };
+  }
+
+  if (status === 404) {
+    return {
+      code: 'not_found',
+      message: 'Foto ini tidak ditemukan di penyimpanan. Muat ulang halaman lalu coba lagi.',
+      retryable: false,
+    };
+  }
+
+  if (status === 409) {
+    return {
+      code: 'conflict',
+      message:
+        'Foto dengan nama yang sama sudah ada. Coba unggah ulang; nama berkas baru dibuat otomatis.',
+      retryable: true,
+    };
+  }
+
+  if (status === 429) {
+    return {
+      code: 'rate_limited',
+      message: 'Terlalu banyak permintaan unggah. Tunggu sebentar, lalu coba lagi.',
+      retryable: true,
+    };
+  }
+
+  return {
+    code: 'unknown',
+    message: 'Penyimpanan foto tidak dapat diakses. Periksa koneksi internet Anda, lalu coba lagi.',
+    retryable: true,
+  };
+}
+
+/**
  * Error dari pemanggilan RPC (`client.rpc(...)`).
  *
  * Beda penting dibanding `mapTableError`: bila fungsi RPC-nya sendiri belum ada di

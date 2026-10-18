@@ -18,6 +18,8 @@ name: Database RLS
 #
 #   - `supabase/**`           — migration dan berkas uji RLS (`supabase/tests/`)
 #   - `scripts/db-test.mjs`   — runner yang membaca dan menafsirkan hasilnya
+#   - `scripts/db-types.mjs` dan `src/lib/supabase/database.*.ts`
+#                             — sumber dan hasil generate tipe database
 #   - workflow ini sendiri    — perubahan aturannya harus teruji
 #
 # Aturan yang dipegang (sama seperti sebelumnya):
@@ -25,8 +27,17 @@ name: Database RLS
 # - Sebelum uji dijalankan, connection string diverifikasi menunjuk **project
 #   development** (ref `xvmcpfkkveeaevfcvfug`). Selain itu workflow berhenti,
 #   sehingga secret yang salah tempat tidak bisa menjalankan uji apa pun.
-# - Berkas uji `supabase/tests/rls_profiles_test.sql` membungkus seluruhnya dalam
-#   transaksi yang di-ROLLBACK, sehingga ulang bukan data dihapus oleh test.
+# - Setiap berkas uji (`supabase/tests/rls_profiles_test.sql` dan
+#   `supabase/tests/rls_policy_guard_test.sql`) membungkus seluruh asersinya dalam
+#   transaksi yang di-ROLLBACK, sehingga menjalankannya ulang tidak menghapus atau
+#   meninggalkan data apa pun.
+# - Berkas kedua adalah pagar katalog policy: gagal bila ada policy pada tabel wadah
+#   yang memberi akses lewat kolom kepemilikan (created_by/author_id/owner_id/…) tanpa
+#   penjaga keanggotaan. Detektornya diuji-diri di dalam berkas itu, dan daftar
+#   pengecualiannya diperiksa anti-usang (lihat ADR-060).
+# - Tipe database (`database.generated.ts`) diperiksa terhadap skema yang sama:
+#   bila migration sudah diterapkan tetapi tipe belum diregenerasi, langkah
+#   `db:types:check` gagal dan menampilkan perbedaan pertama.
 # - Pull request dari fork tidak menerima secret sama sekali, jadi jobnya dilewati
 #   (bukan digagalkan) — pembaca luar tetap mendapat seluruh pemeriksaan `ci.yml`.
 
@@ -36,11 +47,17 @@ on:
     paths:
       - 'supabase/**'
       - 'scripts/db-test.mjs'
+      - 'scripts/db-types.mjs'
+      - 'src/lib/supabase/database.generated.ts'
+      - 'src/lib/supabase/database.types.ts'
       - '.github/workflows/database-rls.yml'
   pull_request:
     paths:
       - 'supabase/**'
       - 'scripts/db-test.mjs'
+      - 'scripts/db-types.mjs'
+      - 'src/lib/supabase/database.generated.ts'
+      - 'src/lib/supabase/database.types.ts'
       - '.github/workflows/database-rls.yml'
   workflow_dispatch:
 
@@ -53,7 +70,7 @@ concurrency:
 
 jobs:
   rls:
-    name: Uji RLS terhadap database development
+    name: Uji RLS dan tipe database development
     # PR dari fork tidak punya secret; jangan mengagalkan pekerjaan orang yang tidak
     # mungkin memenuhi syarat ini.
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
@@ -98,21 +115,42 @@ jobs:
           esac
 
       # Dijalankan satu kali dan hasilnya dicetak apa adanya. Selain keluar non-nol bila
-      # asersi gagal, keluarannya harus memuat notice penanda dari server
-      # (`UJI RLS PROFIL LULUS`) — runner "hijau palsu" (mis. berkas uji terpotong)
-      # tidak bisa lolos karena `scripts/db-test.mjs` hanya melaporkan lulus bila notice
-      # itu benar-benar diterima.
-      - name: Jalankan uji RLS dan pastikan penanda lulus diterima
+      # asersi gagal, keluaran harus memuat notice penanda dari **setiap** berkas uji:
+      #
+      #   - `UJI RLS PROFIL LULUS`        — aturan izin/penolakan per tabel dan Storage
+      #   - `UJI POLICY OWNER-GUARD LULUS` — tidak ada policy wadah yang memberi akses
+      #     lewat kolom kepemilikan tanpa penjaga keanggotaan (ADR-060)
+      #
+      # Runner "hijau palsu" (mis. berkas uji terpotong) tidak bisa lolos karena
+      # `scripts/db-test.mjs` hanya melaporkan lulus bila notice itu benar-benar diterima;
+      # pemeriksaan kedua di sini menjaga jalur yang sama bila runner itu sendiri berubah.
+      - name: Jalankan uji RLS dan pastikan semua penanda lulus diterima
         env:
           DATABASE_URL: ${{ secrets.DB_TEST_DATABASE_URL }}
         run: |
           OUTPUT="$(npm run db:test 2>&1)" || STATUS=$?
           printf '%s\n' "${OUTPUT}"
+          MISSING=""
           case "${OUTPUT}" in
-            *"UJI RLS PROFIL LULUS"*) echo "Penanda lulus diterima dari server." ;;
-            *)
-              echo "::error::Penanda lulus tidak diterima; berkas uji berhenti sebelum seluruh asersi dijalankan."
-              exit 1
-              ;;
+            *"UJI RLS PROFIL LULUS"*) ;;
+            *) MISSING="${MISSING} UJI RLS PROFIL LULUS" ;;
           esac
+          case "${OUTPUT}" in
+            *"UJI POLICY OWNER-GUARD LULUS"*) ;;
+            *) MISSING="${MISSING} UJI POLICY OWNER-GUARD LULUS" ;;
+          esac
+          if [ -n "${MISSING}" ]; then
+            echo "::error::Penanda lulus berikut tidak diterima:${MISSING}. Berkas uji berhenti sebelum seluruh asersi dijalankan."
+            exit 1
+          fi
+          echo "Seluruh penanda lulus diterima dari server."
           exit "${STATUS:-0}"
+
+      # Diperiksa terhadap database yang sama dengan uji RLS: perubahan skema yang
+      # sudah diterapkan tetapi belum diikuti `npm run db:types` akan membuat tipe
+      # aplikasi tertinggal (kolom/RPC baru tidak dikenal TypeScript). Langkah ini
+      # hanya membaca katalog skema; tidak ada data yang diubah.
+      - name: Pastikan tipe database tidak menyimpang dari skema
+        env:
+          DATABASE_URL: ${{ secrets.DB_TEST_DATABASE_URL }}
+        run: npm run db:types:check

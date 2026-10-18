@@ -34,7 +34,15 @@
       ],
       "expo-status-bar",
       "expo-font",
-      "expo-sqlite"
+      "expo-sqlite",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "RodaKawan memakai foto dari galeri hanya untuk foto kendaraan dan logo klub yang Anda pilih sendiri.",
+          "cameraPermission": false,
+          "microphonePermission": false
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

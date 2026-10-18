@@ -6,6 +6,14 @@ module.exports = defineConfig([
   expoConfig,
   eslintPluginPrettierRecommended,
   {
-    ignores: ['dist/*', '.expo/*', 'android/*', 'ios/*', 'node_modules/*'],
+    ignores: [
+      'dist/*',
+      '.expo/*',
+      'android/*',
+      'ios/*',
+      'node_modules/*',
+      // Hasil `supabase gen types`: bentuknya ditentukan CLI, bukan aturan lint repo.
+      'src/lib/supabase/database.generated.ts',
+    ],
   },
 ]);

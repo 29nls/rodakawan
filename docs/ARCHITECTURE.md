@@ -31,7 +31,7 @@ Prinsip: aplikasi mobile tidak menyimpan secret layanan. Perubahan yang melibatk
 | Peta | Evaluasi `react-native-maps` atau MapLibre React Native | Pilih setelah uji peta, routing, tiles, lisensi dan API key. Native maps memerlukan build yang sesuai; MapLibre tidak tersedia dalam Expo Go. |
 | Lokasi | `expo-location` + `expo-task-manager` | Background behavior wajib dites di development build dan perangkat nyata. |
 | Push | `expo-notifications` | Periksa kembali persyaratan build dan kredensial push untuk SDK yang dipilih. |
-| Media foto | Supabase Storage | Validasi ukuran, tipe, ownership, kebijakan download, dan hapus file yatim. |
+| Media foto | Supabase Storage | Tiga bucket privat (`vehicle-photos`, `club-logos`, `avatars`); perkecil + kompres di perangkat sebelum unggah, validasi ukuran/tipe, ownership lewat path + policy, signed URL berumur pendek, dan hapus file yatim. |
 | Voice PTT | LiveKit React Native / Expo quickstart | Fase P2; token room dibuat backend. Jalankan development build karena native WebRTC. |
 | Musik lokal | `expo-audio` + API media yang sesuai | Fase P2; uji audio focus, izin file, background playback dan konflik dengan PTT. |
 | Build/test Android | Expo EAS Build di cloud | Menghindari kebutuhan Android Studio untuk kompilasi lokal. Akun/kredit/limit EAS perlu dicek pada saat build. |
@@ -182,7 +182,9 @@ Setiap perubahan sebaiknya menjalankan:
 1. formatter/linter;
 2. TypeScript `tsc --noEmit`;
 3. unit tests untuk domain/service penting;
-4. test SQL/RLS di test project;
+4. test SQL/RLS di test project — `npm run db:test` menjalankan dua berkas: izin/penolakan per tabel
+   dan Storage (`rls_profiles_test.sql`), lalu pagar katalog policy wadah
+   (`rls_policy_guard_test.sql`: kepemilikan tanpa penjaga keanggotaan ⇒ CI gagal, ADR-060);
 5. smoke test pada development build Android;
 6. EAS preview APK untuk milestone yang melibatkan native config.
 

@@ -14,3 +14,6 @@ README.md
 CHANGELOG.md
 
 assets/*.png
+
+# Hasil `supabase gen types`; bentuknya ditentukan CLI, bukan Prettier.
+src/lib/supabase/database.generated.ts

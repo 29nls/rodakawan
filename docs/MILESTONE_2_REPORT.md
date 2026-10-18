@@ -61,8 +61,13 @@ jejak audit tidak bisa dibaca anggota biasa, dan `anon` menolak semua EXECUTE.
 
 ## 4. Yang belum selesai (jujur)
 
-- **Foto belum bisa diunggah**: tidak ada bucket/policy Storage dan tidak ada tombol
-  unggah palsu; kolom `photo_path`/`logo_path` dibiarkan kosong dan disebut apa adanya.
+- **Foto kendaraan dan logo klub ditambahkan 17 Oktober 2026**, setelah laporan ini pertama ditulis:
+  bucket privat `vehicle-photos`/`club-logos`, policy owner-only untuk kendaraan dan owner/admin
+  untuk logo, unggah/ganti/hapus dari layar detail kendaraan dan dashboard klub, serta uji Storage
+  RLS (`npm run db:test`, 171 perintah). **Foto profil** menyusul 18 Oktober 2026 dengan bucket privat
+  `avatars` (owner-only) dan unggah/ganti/hapus dari tab Profil. Yang tetap **Blocked** adalah
+  verifikasi galeri/unggah di perangkat fisik karena modul native baru memerlukan APK yang dibangun
+  ulang.
 - **Perangkat fisik & alur auth nyata masih BLOCKED** untuk pemilik aplikasi: registrasi,
   konfirmasi email, login, reset sandi, sesi, logout, edit profil, privasi lintas pengguna,
   serta seluruh alur garasi/klub lewat layar. Yang dipakai harus APK dari commit Milestone 2 —
@@ -110,3 +115,37 @@ garasi dan klub ada — ia hanya membuktikan alur Milestone 1.
 | 12 | Privasi lintas pengguna: akun B membuka kendaraan/klub akun A | ditolak dengan pesan jelas, bukan data kosong yang membingungkan |
 | 13 | Klub: ubah peran anggota dan keluarkan anggota dari akun owner | peran berubah, anggota yang dikeluarkan kehilangan akses, owner terakhir tidak bisa diturunkan |
 | 14 | Putuskan jaringan (mode pesawat) saat membuka garasi/klub, lalu sambungkan kembali | pesan galat jelas, tombol coba lagi bekerja, data benar setelah pulih |
+
+### Merekam bukti checklist
+
+Perekaman bukti tidak lagi bergantung pada ingatan operator. Dengan HP fisik tersambung dan `adb`
+di PATH:
+
+```powershell
+node scripts/device-checklist.mjs --apk app-preview.apk `
+  --expect-sha256 4417798e7596db33dd92c497583a09a79c2d8a091ae002211794602687ee2d48
+```
+
+Script membaca tabel di atas **langsung dari dokumen ini** (teks langkah tidak disalin ke kode),
+memilih satu perangkat berstatus `device` (atau yang disebut `--serial`), menolak emulator kecuali
+`--allow-emulator`, memasang APK bila `--apk` diberikan, dan mencocokkan SHA-256 build sebelum
+langkah pertama — checklist terhadap build yang salah tidak bisa dimulai.
+
+Yang direkam otomatis untuk setiap langkah, di `bukti-perangkat/<waktu>/langkah-NN/`: tangkapan
+layar, hierarki UI (`uiautomator dump`), irisan logcat sejak langkah dimulai, aktivitas/jendela
+terdepan, dan `meta.json` (waktu, status, catatan). Di akar direktori: `perangkat.json` dan
+`perangkat.txt` (identitas HP, versi aplikasi, SHA-256 APK), `logcat-lengkap.txt`, serta
+`ringkasan.md`/`ringkasan.json`. Langkah 14 dijalankan sebagian oleh script: jaringan dimatikan,
+layar tanpa jaringan direkam (`layar-offline.*`), lalu jaringan dinyalakan kembali **sebelum**
+script menunggu input berikutnya — termasuk saat run dihentikan di tengah jalan.
+
+Yang tetap milik manusia adalah penilaiannya. Setelah layar direkam, operator memilih `r` (sesuai
+harapan), `g` (tidak sesuai, bukti tetap diambil), `s` (lewati), atau `q` (berhenti), lalu menulis
+catatan. Ringkasan menyebut status itu sebagai penilaian operator, dan script keluar 0 hanya bila
+**semua** langkah terpilih berstatus direkam; langkah yang dilewati, ditandai gagal, atau belum
+sempat dijalankan membuatnya keluar 1.
+
+`node scripts/device-checklist.mjs --list` menampilkan ke-14 langkah tanpa menyentuh perangkat.
+Direktori bukti bawaan (`bukti-perangkat/<waktu>`) ada di `.gitignore`, karena isinya bisa memuat
+data akun nyata. Test-nya ada di `scripts/__tests__/device-checklist.test.mjs` dan berjalan dengan
+`adb` tiruan di `npm run test:scripts`; itu membuktikan perekamannya, bukan hasil checklist-nya.
