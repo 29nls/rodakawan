@@ -99,105 +99,39 @@ berdiri sendiri — pola itulah yang pernah membuat mantan anggota masih membaca
 8. GPS mati, izin ditolak, kehilangan jaringan, lokasi basi, dan pembatasan baterai tampil sebagai
    keadaan UI yang eksplisit.
 
-## Usulan migration aditif (DRAFT — belum dibuat, belum diterapkan)
+## Draf migration dan uji RLS/RPC
 
-Blok berikut adalah **rancangan** untuk ditelaah, bukan berkas di `supabase/migrations/`. Jangan
-menjalankannya di database mana pun sebelum uji RLS allow/deny ditulis dan M2 lulus.
+Dua berkas berikut adalah **draft**, bukan migration aktif:
 
-```sql
--- DRAFT Milestone 3 — belum ada berkas migration, jangan diterapkan.
--- 1) Transisi status hanya lewat RPC.
-create or replace function public.transition_ride(p_ride_id uuid, p_next text)
-returns public.rides
-language plpgsql
-security definer
-set search_path = ''
-as $$
-declare
-  v_ride public.rides;
-begin
-  if auth.uid() is null then
-    raise exception 'not authenticated' using errcode = '42501';
-  end if;
-  if p_next not in ('active', 'completed', 'cancelled') then
-    raise exception 'invalid state' using errcode = '22023';
-  end if;
+- [`supabase/drafts/milestone_3_ride_state.sql`](../supabase/drafts/milestone_3_ride_state.sql) —
+  RPC `transition_ride` (state machine di database), RPC `set_ride_location_sharing` (consent per
+  perjalanan), dan dua trigger yang menghapus `ride_locations` saat consent dimatikan, anggota
+  keluar, atau perjalanan selesai/dibatalkan. Tidak ada tabel atau policy baru.
+- [`supabase/tests/drafts/rls_rides_m3_draft.sql`](../supabase/tests/drafts/rls_rides_m3_draft.sql) —
+  uji allow/deny untuk `anon`, non-anggota, anggota, host, consent, dan pembersihan lokasi. Berkas ini
+  **tidak** terdaftar di `DEFAULT_TEST_FILES`; menjalankannya tanpa draf akan berhenti dengan pesan
+  paritas yang jelas.
 
-  select * into v_ride from public.rides where id = p_ride_id for update;
-  if not found then
-    raise exception 'ride not found' using errcode = 'P0002';
-  end if;
-  if not public.is_ride_host(p_ride_id) then
-    raise exception 'only host may change ride state' using errcode = '42501';
-  end if;
-  if v_ride.status in ('completed', 'cancelled') then
-    raise exception 'ride is final' using errcode = '23514';
-  end if;
-  if p_next = 'active' and v_ride.status <> 'planned' then
-    raise exception 'invalid transition' using errcode = '23514';
-  end if;
+Cara menjalankan setelah gerbang M2 lulus dan draf diterapkan ke database **scratch/development**
+(bukan produksi):
 
-  update public.rides
-     set status = p_next,
-         started_at = case when p_next = 'active' then now() else started_at end,
-         ended_at = case when p_next in ('completed','cancelled') then now() else ended_at end
-   where id = p_ride_id
-   returning * into v_ride;
-  return v_ride;
-end;
-$$;
-revoke all on function public.transition_ride(uuid, text) from public;
-grant execute on function public.transition_ride(uuid, text) to authenticated;
+```powershell
+# 1. Terapkan draf ke database scratch (jangan ke project produksi).
+npx supabase db execute --file supabase/drafts/milestone_3_ride_state.sql
 
--- 2) Consent mati = lokasi hilang; keluar/removed = lokasi hilang.
-create or replace function public.clear_ride_location_on_opt_out()
-returns trigger
-language plpgsql
-security definer
-set search_path = ''
-as $$
-begin
-  if new.sharing_location = false or new.status <> 'joined' then
-    delete from public.ride_locations
-     where ride_id = new.ride_id and user_id = new.user_id;
-  end if;
-  return new;
-end;
-$$;
-
-create trigger ride_members_clear_location
-after update of sharing_location, status on public.ride_members
-for each row execute function public.clear_ride_location_on_opt_out();
-
--- 3) Ride selesai/batal = seluruh lokasi perjalanan dihapus.
-create or replace function public.clear_ride_locations_on_finish()
-returns trigger
-language plpgsql
-security definer
-set search_path = ''
-as $$
-begin
-  if new.status in ('completed', 'cancelled') and old.status is distinct from new.status then
-    delete from public.ride_locations where ride_id = new.id;
-  end if;
-  return new;
-end;
-$$;
-
-create trigger rides_clear_locations
-after update of status on public.rides
-for each row execute function public.clear_ride_locations_on_finish();
+# 2. Jalankan hanya uji draf ini, bukan seluruh daftar default.
+npm run db:test -- --file supabase/tests/drafts/rls_rides_m3_draft.sql
 ```
 
-Catatan rancangan:
+Validasi 19 Oktober 2026: draf dan ujinya dijalankan bersama dalam **satu transaksi yang di-ROLLBACK**
+terhadap project development — 77 perintah, notice `UJI RLS PERJALANAN M3 LULUS` diterima, lalu
+diperiksa bahwa tidak ada fungsi, trigger, tabel konteks, atau baris ride uji yang tertinggal. Ini
+membuktikan perilaku draf, bukan menerapkannya secara permanen.
 
-- `can_publish_ride_location` yang ada sudah mensyaratkan `sharing_location = true` dan ride aktif;
-  migration ini menambahkan pembersihan saat consent/keanggotaan berubah, bukan melonggarkan policy.
-- Perlu keputusan: apakah owner/admin klub boleh menyelesaikan perjalanan, atau hanya host. Draft di
-  atas memilih **hanya host** (lebih ketat).
-- Perlu keputusan: apakah lokasi boleh dibaca host setelah anggota berhenti berbagi — draft menjawab
-  **tidak**, karena barisnya dihapus.
-- Kanal Realtime harus privat dan otorisasinya mengikuti RLS; jangan memakai kanal publik.
+Jangan menyalin draf ke `supabase/migrations/` atau menambahkannya ke `DEFAULT_TEST_FILES` sebelum
+gerbang M2 lulus. `scripts/__tests__/milestone-3-draft.test.mjs` memeriksa bahwa tidak ada migration
+aktif yang memuat RPC M3 dan berkas uji draf tidak masuk daftar runner, sehingga aktivasi tidak bisa
+terjadi diam-diam.
 
 ## Perangkat dan platform
 

@@ -49,7 +49,7 @@ lulus.
 | `npm run lint`           | LULUS (0 error, 0 warning)                                   |
 | `npm run format:check`   | LULUS                                                        |
 | `npm test -- --ci`       | LULUS — 27 suite / 316 test                                  |
-| `npm run test:scripts`   | LULUS — 236 test (sebelumnya 235; satu test regresi CRLF ditambahkan) |
+| `npm run test:scripts`   | LULUS — 240 test (236 + 4 penjaga draf M3; sebelumnya 235 dengan satu kegagalan CRLF) |
 | `npm run db:test`        | **LULUS** — `UJI RLS PROFIL LULUS` 171 perintah + `UJI POLICY OWNER-GUARD LULUS` 17 perintah |
 | `npm run db:types:check` | LULUS — `database.generated.ts` sama dengan skema database    |
 | `npm run storage:test`   | LULUS — 27 langkah HTTP Storage, nol sisa data uji            |

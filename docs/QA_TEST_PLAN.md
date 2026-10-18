@@ -171,7 +171,7 @@ Hasil terakhir dijalankan (19 Oktober 2026, Node 24.18.1, npm 12.0.2, setelah `n
 `package-lock.json`):
 `npm test -- --ci` → **27 suite, 316 test lulus** (termasuk 14 test kompresi foto, 18 test
 pembersihan objek yatim, dan 17 test foto profil: 12 API + 5 komponen layar); `npm run test:scripts`
-→ **236 test lulus, exit 0**;
+→ **240 test lulus, exit 0** (termasuk 4 test penjaga draf Milestone 3);
 `npm run deps:check`, `npm run typecheck`, `npm run lint`, `npm run format:check`, dan
 `npm run export:android` semuanya exit 0. `npm run doctor` **tidak dapat dipastikan**: 20 dari 21
 pemeriksaan berjalan, pemeriksaan skema config gagal `EAI_AGAIN exp.host` karena DNS lingkungan ini
@@ -182,7 +182,8 @@ melaporkan 228/229 (lalu 234/235) karena asersi baris pertama `CHANGELOG.md` mem
 disk (`core.autocrlf=true`) dengan `HEADER` ber-LF. Perbaikannya **bukan** menonaktifkan asersi atau
 mengubah `core.autocrlf`, melainkan menyeragamkan akhir baris di batas perbandingan
 (`normalizeLineEndings`), ditambah test regresi untuk input LF/CRLF/CR dan test bahwa judul yang
-diubah tetap ditolak (ADR-063). Versi sekarang: **236/236 lulus**.
+diubah tetap ditolak (ADR-063). Versi sekarang: **240/240 lulus** (empat di antaranya penjaga draf
+Milestone 3 di `scripts/__tests__/milestone-3-draft.test.mjs`).
 
 Yang **sudah diverifikasi terhadap dev backend** (13 Oktober 2026, project development khusus
 RodaKawan — ADR-035; diperluas pada Milestone 1.6):
