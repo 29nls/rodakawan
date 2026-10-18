@@ -8,6 +8,18 @@ sedangkan build preview (`v<versi>-build<N>`) diringkas di dalam blok yang bisa 
 versi adalah tautan ke halaman rilisnya di GitHub, sehingga riwayat ini bisa dinavigasi langsung
 dari berkas.
 
+## [v0.1.0-build21](https://github.com/29nls/rodakawan/releases/tag/v0.1.0-build21) — 2026-10-18 · pratinjau
+
+<details>
+<summary>Catatan rilis pratinjau</summary>
+
+### Perubahan lain
+
+- catat build20 sebagai rilis terbaru dan build19 sebagai baseline (`a7d67db`)
+- tambah draft RLS/RPC Milestone 3 tanpa mengaktifkan skema (`60985a2`)
+
+</details>
+
 ## Belum dirilis — Milestone 3
 
 - Perjalanan klub: buat/ubah, undang, terima undangan, gabung, keluar, keluarkan peserta, dan
