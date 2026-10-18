@@ -88,6 +88,43 @@ describe('CLI db-types.mjs', () => {
     assert.match(hasil.stdout, /localhost:5432\/postgres/);
   });
 
+  it('mengoper --db-url ke CLI sebagai target, tanpa mencetaknya ke log', (t) => {
+    const fake = fakeNpx(
+      t,
+      process.platform === 'win32'
+        ? `echo ARGS=%* > "%FAKE_ARGS_FILE%"\r\necho LEVEL=%npm_config_loglevel% >> "%FAKE_ARGS_FILE%"\r\necho ${TIPE_CONTOH}`
+        : `echo "ARGS=$@" > "$FAKE_ARGS_FILE"\necho "LEVEL=$npm_config_loglevel" >> "$FAKE_ARGS_FILE"\necho "${TIPE_CONTOH}"`,
+    );
+    const out = generatedFile(t);
+    const argsFile = path.join(tempDir(t), 'args.txt');
+
+    const hasil = runScript(process.cwd(), 'db-types.mjs', ['--out', out], {
+      env: { ...envWith(fake), FAKE_ARGS_FILE: argsFile },
+    });
+
+    assert.equal(hasil.code, 0, hasil.stderr);
+
+    // Target dioper eksplisit: tanpa ini CLI hanya mau jalan bila mesin sudah
+    // ter-link (butuh access token tersimpan di mesin) — persis kegagalan CI
+    // "Must specify one of --local, --linked, --project-id, or --db-url".
+    const args = fs.readFileSync(argsFile, 'utf8');
+    assert.match(args, /--db-url/);
+    assert.equal(
+      args.includes(DATABASE_URL),
+      true,
+      'CLI harus menerima connection string dari DATABASE_URL sebagai --db-url',
+    );
+
+    // Nilai itu memang ikut sebagai argumen proses, tetapi tidak boleh masuk log.
+    assert.equal(`${hasil.stdout}${hasil.stderr}`.includes(PASSWORD), false);
+    assert.equal(`${hasil.stdout}${hasil.stderr}`.includes(DATABASE_URL), false);
+    assert.match(hasil.stdout, /localhost:5432\/postgres/);
+
+    // `npx` mengeluarkan "npm notice" yang memuat ulang baris perintahnya (termasuk
+    // `--db-url`); loglevel error menutupnya di dalam proses anak sekaligus.
+    assert.match(fs.readFileSync(argsFile, 'utf8'), /LEVEL=error/);
+  });
+
   it('lulus bila berkas yang di-commit sama dengan hasil generate', (t) => {
     const fake = fakeNpx(t, `echo ${TIPE_CONTOH}`);
     const out = generatedFile(t);

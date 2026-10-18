@@ -289,9 +289,14 @@ npm run db:types:check    # sama dengan langkah CI; gagal bila tipe tertinggal
 ```
 
 Perintah ini memakai `DATABASE_URL` dari `.env.db` yang sama dengan `npm run db:test` (4.6), jadi
-connection string tidak perlu diketik. CLI Supabase dipin ke versi tertentu dan hanya membaca
-katalog skema — tidak ada data yang diubah. Bila `db:types:check` gagal, jalankan `npm run db:types`,
-tinjau diff-nya, lalu commit hasilnya; berkas generated tidak boleh disunting manual.
+connection string tidak perlu diketik. Target dioper ke CLI lewat `--db-url` (ADR-061), sehingga
+perintah ini **tidak** membutuhkan `supabase login`, link project, maupun `SUPABASE_ACCESS_TOKEN` —
+di CI cukup secret `DB_TEST_DATABASE_URL` yang sama dengan uji RLS. (Sebelumnya CLI jatuh ke jalur
+`--linked` yang memakai access token tersimpan di mesin pengembang: lancar di komputer lokal,
+gagal di CI dengan `Must specify one of --local, --linked, --project-id, or --db-url`.) CLI Supabase
+adalah versi yang dipin dan hanya membaca katalog skema — tidak ada data yang diubah. Bila
+`db:types:check` gagal, jalankan `npm run db:types`, tinjau diff-nya, lalu commit hasilnya; berkas
+generated tidak boleh disunting manual.
 
 ### 4.8 Uji manual alur autentikasi
 

@@ -12,8 +12,12 @@
  *
  * Aturan keamanan yang dipegang (sama seperti `scripts/db-test.mjs`):
  * - Kredensial dibaca dari environment (`DATABASE_URL`, atau `SUPABASE_DB_URL`) dan
- *   tidak pernah dikirim sebagai argumen proses. `npm run db:types` memuat `.env.db`
- *   secara otomatis; jangan memakai `.env`/`.env.local` karena keduanya dibaca Expo.
+ *   tidak pernah dicetak; `npm run db:types` memuat `.env.db` secara otomatis. Jangan
+ *   memakai `.env`/`.env.local` karena keduanya dibaca Expo.
+ * - Satu pengecualian yang disengaja: `supabase gen types` hanya bisa diarahkan ke
+ *   project lewat `--db-url`, jadi connection string ikut sebagai argumen proses anak
+ *   (lihat catatan di `generateTypes`). Nilai itu tidak pernah dicetak, dan CI memakai
+ *   runner sekali pakai.
  * - Nilai connection string tidak pernah dicetak; yang ditampilkan hanya
  *   `user@host:port/database` tanpa password. Keluaran error CLI juga disunting
  *   supaya URL yang mungkin muncul di pesan koneksi tidak ikut tercetak.
@@ -128,10 +132,41 @@ function normalize(text) {
 }
 
 /**
+ * Mengutip satu argumen untuk `cmd.exe` (hanya argumen, bukan nama perintahnya).
+ *
+ * Jalur Windows menjalankan perintah lewat shell (`.cmd` tidak bisa dieksekusi
+ * langsung oleh `execFile`), sehingga argumen mengandung spasi atau metakarakter
+ * harus dibungkus tanda kutip agar tidak dipecah/ditafsirkan ulang — nilai
+ * connection string memuat `?` dan `=`. Kutip di dalamnya digandakan.
+ */
+function quoteForCmd(argument) {
+  return `"${argument.replaceAll('"', '""')}"`;
+}
+
+/**
  * Menjalankan CLI Supabase dan mengembalikan tipe hasil generate.
  *
+ * Kenapa target dioper lewat `--db-url` (dan bukan mengandalkan `--linked`):
+ * - `--linked` memakai access token Supabase yang tersimpan di **mesin** (keyring
+ *   atau profile CLI). Di komputer pengembang token itu kebetulan ada, sehingga
+ *   perintahnya tampak berhasil — sampai dijalankan di CI, yang tidak punya token
+ *   sama sekali: CLI berhenti dengan "Must specify one of --local, --linked,
+ *   --project-id, or --db-url" (insiden 18 Oktober 2026). Artinya keberhasilan
+ *   pemeriksaan drift tergantung rahasia mesin yang tidak terdokumentasi.
+ * - `--project-id` membutuhkan secret baru `SUPABASE_ACCESS_TOKEN` (PAT platform,
+ *   cakupannya jauh lebih luas dari kredensial database yang sudah ada).
+ * - `--db-url` memakai `DATABASE_URL` yang sama dengan uji RLS, jadi kedua
+ *   pemeriksaan memastikan hal yang sama terhadap target yang sama. Workflow sudah
+ *   memverifikasi connection string itu menunjuk project **development** sebelum
+ *   langkah ini berjalan.
+ * Harganya: nilai ikut sebagai argumen proses anak, jadi bisa dibaca lewat `ps`
+ * oleh proses lain milik user yang sama. Nilai tidak pernah dicetak (lihat
+ * `redact()`), CI memakai runner sekali pakai milik satu pekerjaan, dan nilai yang
+ * sama sudah tersimpan sebagai `.env.db` di mesin pengembang.
+ *
  * `shell` hanya dipakai di Windows karena `.cmd` tidak bisa dijalankan langsung
- * oleh `execFile`; seluruh argumen bersifat tetap (tanpa masukan pengguna).
+ * oleh `execFile`; seluruh argumen bersifat tetap dan diutip, tanpa masukan
+ * pengguna.
  */
 async function generateTypes(url) {
   const args = [
@@ -142,21 +177,36 @@ async function generateTypes(url) {
     'typescript',
     '--schema',
     SCHEMA,
+    '--db-url',
+    url,
   ];
 
   const options = {
     cwd: ROOT,
-    env: { ...process.env, DO_NOT_TRACK: '1' },
+    env: {
+      ...process.env,
+      DO_NOT_TRACK: '1',
+      // `npx` mencetak ulang baris perintahnya sebagai "npm notice", lengkap dengan
+      // `--db-url`. Isinya tetap tidak pernah sampai ke log skrip ini (lihat `redact()`
+      // dan uji "tidak mencetaknya ke log"), tetapi loglevel error menutup sumbernya
+      // sejak di dalam proses anak — jadi connection string tidak pernah ikut tertangkap.
+      npm_config_loglevel: 'error',
+    },
     maxBuffer: 64 * 1024 * 1024,
     timeout: 180_000,
   };
 
   try {
     // Di Windows `.cmd` tidak bisa dijalankan langsung tanpa shell. Argumennya
-    // tetap statis (tanpa masukan pengguna), jadi penggabungan ini aman.
+    // tetap statis (tanpa masukan pengguna) dan diutip, jadi penggabungan ini aman.
     const { stdout } =
       process.platform === 'win32'
-        ? await execFileAsync(['npx', ...args].join(' '), { ...options, shell: true })
+        ? // `npx`-nya sengaja tidak diutip: `cmd.exe` tidak mencari PATH/PATHEXT untuk
+          // token pertama yang berada di dalam tanda kutip.
+          await execFileAsync(['npx', ...args.map(quoteForCmd)].join(' '), {
+            ...options,
+            shell: true,
+          })
         : await execFileAsync('npx', args, options);
 
     if (!stdout.includes('export type Database')) {
