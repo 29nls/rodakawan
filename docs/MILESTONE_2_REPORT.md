@@ -3,14 +3,20 @@
 Status: **Implemented · Passed locally · Passed against dev backend**; **Tested on physical device**
 masih **Blocked**. Tanggal verifikasi terakhir: 2026-10-19.
 
-Basis kode: `main` @ `749424c` — commit yang **sama** dengan tag rilis
+Basis implementasi: `main` @ `749424c` — commit yang **sama** dengan tag rilis pertama
 [`v0.1.0-build19`](https://github.com/29nls/rodakawan/releases/tag/v0.1.0-build19). Implementasi
 garasi + klub ada di `cf818be`, checklist perangkat di `1ef13a8`, perbaikan versi Expo di `a9858a9`,
-dan perbaikan generator tipe database di `ca2461c`. Setelah tag itu `origin/main` hanya maju satu
-commit dokumentasi (`ee0a0bd`, `CHANGELOG.md` saja) — **tidak ada perubahan kode aplikasi**.
+dan perbaikan generator tipe database di `ca2461c`.
 
-Bukti otomatis pada commit tersebut: CI **#26** hijau, Database RLS **#4** hijau, dan Release APK
-**#19** sukses (18 Oktober 2026). Rilisnya `v0.1.0-build19`, sebuah *prerelease*.
+Build **terbaru** yang memuat implementasi yang sama adalah
+[`v0.1.0-build20`](https://github.com/29nls/rodakawan/releases/tag/v0.1.0-build20) dari `fa4397e`
+(18 Oktober 2026). Commit itu hanya menambahkan dokumentasi dan tooling di atas `749424c` — tidak ada
+perubahan kode aplikasi atau dependency native. Artefak build20 sudah diunduh ulang dan diverifikasi:
+105.904.031 byte, SHA-256 `a4ae87b459c8ffffaaeb53406bbb2dd1ec529aa91112a64ea887f0b015d9fe9d`,
+sertifikat `3ea8bb47…b14d`, dex/bundel yang sama dengan build19.
+
+Bukti otomatis: CI **#26**, Database RLS **#4**, dan Release APK **#19** hijau pada `749424c`; CI
+**#27** dan Release APK **#20** hijau pada `fa4397e` (18 Oktober 2026). Keduanya *prerelease*.
 
 ## 1. Migrasi
 
@@ -85,12 +91,13 @@ menghapus dari layar detail kendaraan, dashboard klub, dan tab Profil; tampilan 
 berumur 1 jam. Foto diperkecil dan dikompres di perangkat (`expo-image-manipulator`), dan objek
 kendaraan yatim disapu dengan sesi pemilik.
 
-**Modul native sudah ada di APK build19 — bukan lagi alasan untuk menunda uji perangkat.** Diperiksa
-pada berkas rilis yang diunduh ulang (19 Oktober 2026):
+**Modul native sudah ada di APK build19 dan build20 — bukan lagi alasan untuk menunda uji perangkat.**
+Diperiksa pada kedua berkas rilis yang diunduh ulang (19 Oktober 2026):
 
-- ukuran `105.904.027` byte dan SHA-256 `775a3309…b3d9` sama dengan metadata GitHub Release;
-- `node scripts/verify-apk.mjs` lulus: 1.290 entri, CRC-32 cocok, skema tanda tangan **v2**,
-  sertifikat `3ea8bb47…b14d`;
+- build19: `105.904.027` byte, SHA-256 `775a3309…b3d9`; build20: `105.904.031` byte, SHA-256
+  `a4ae87b4…fe9d` — keduanya sama dengan metadata GitHub Release;
+- `node scripts/verify-apk.mjs` lulus pada keduanya: 1.290 entri, CRC-32 cocok, skema tanda tangan
+  **v2**, sertifikat `3ea8bb47…b14d`;
 - `classes*.dex` memuat `expo.modules.imagepicker`, `expo.modules.imagemanipulator`, dan
   `expo.modules.filesystem`;
 - `assets/index.android.bundle` menyebut `vehicle-photos`, `club-logos`, dan `avatars`.
@@ -102,14 +109,17 @@ signed URL setelah aplikasi dibuka ulang, dan penolakan lintas pengguna lewat la
 
 Milik pemilik aplikasi; tidak boleh ditandai lulus berdasarkan uji unit, emulator, atau smoke test.
 
-**Pakai APK dari commit Milestone 2:
-[v0.1.0-build19](https://github.com/29nls/rodakawan/releases/tag/v0.1.0-build19)** (pratinjau,
-terbit 18 Oktober 2026 06:20 UTC). Tag-nya menunjuk `749424c`, yang memuat seluruh implementasi
-Milestone 2 dan modul native foto.
+**Pakai APK terbaru dari sumber Milestone 2:
+[v0.1.0-build20](https://github.com/29nls/rodakawan/releases/tag/v0.1.0-build20)** (pratinjau,
+terbit 18 Oktober 2026 18:53 UTC). Tag-nya menunjuk `fa4397e`, yang memuat `749424c` (seluruh
+implementasi Milestone 2) plus dokumentasi/tooling. Build19 tetap menjadi **baseline audit** dan
+boleh dipakai; jangan mencampur hash keduanya.
 
-- Berkas: `app-preview.apk` · 105.904.027 byte
-- SHA-256: `775a3309fce38416fe04222652031282047f0197bb149da8520b13e73d42b3d9`
+- Berkas: `app-preview.apk` · 105.904.031 byte
+- SHA-256: `a4ae87b459c8ffffaaeb53406bbb2dd1ec529aa91112a64ea887f0b015d9fe9d`
 - Sertifikat penandatangan: `3ea8bb4745b638be8fddf71e15edd9786d45aac65c0384b87be8fa2c32b3b14d`
+- Baseline build19: `105.904.027` byte, SHA-256
+  `775a3309fce38416fe04222652031282047f0197bb149da8520b13e73d42b3d9`
 - `versionCode`/nama versi mengikuti `app.json` (`0.1.0`); nomor build ada di nama tag.
 
 APK ini **sudah** melewati verifikasi tanda tangan dan uji nyala otomatis di emulator (job smoke test
@@ -117,18 +127,18 @@ hijau). Yang belum, dan tidak bisa digantikan oleh uji itu: dijalankan manusia d
 akun nyata.
 
 `v0.1.0-build11` (SHA-256 `4417798e…2d48`) dan `v0.1.0-build9` adalah build lama; jangan memakai
-hash-nya untuk build19. `v0.1.0-build9` dibuat dari `7639ba9`, **sebelum** garasi dan klub ada,
-sehingga hanya membuktikan alur Milestone 1.
+hash-nya untuk build19/build20. `v0.1.0-build9` dibuat dari `7639ba9`, **sebelum** garasi dan klub
+ada, sehingga hanya membuktikan alur Milestone 1.
 
 ### Langkah pemilik (HP fisik)
 
-1. **Unduh** `app-preview.apk` dari halaman Release `v0.1.0-build19` (atau
-   `gh release download v0.1.0-build19 --repo 29nls/rodakawan -p app-preview.apk`).
+1. **Unduh** `app-preview.apk` dari halaman Release `v0.1.0-build20` (atau
+   `gh release download v0.1.0-build20 --repo 29nls/rodakawan -p app-preview.apk`).
 2. **Cocokkan SHA-256** sebelum memasang:
    `Get-FileHash .\app-preview.apk -Algorithm SHA256` (PowerShell) atau
    `sha256sum app-preview.apk`. Nilainya **harus**
-   `775a3309fce38416fe04222652031282047f0197bb149da8520b13e73d42b3d9`. Bila berbeda, berhenti —
-   berkas itu bukan artefak rilis ini.
+   `a4ae87b459c8ffffaaeb53406bbb2dd1ec529aa91112a64ea887f0b015d9fe9d` (build20). Bila berbeda,
+   berhenti — berkas itu bukan artefak rilis ini.
 3. **Sambungkan HP** dengan USB debugging aktif dan izinkan komputer ini: `adb devices` harus
    menampilkan perangkat berstatus `device` (bukan `unauthorized`).
 4. **Pasang** APK: `node scripts/device-checklist.mjs --apk app-preview.apk --expect-sha256 <hash>`;
@@ -170,7 +180,7 @@ Perekaman bukti tidak bergantung pada ingatan operator. Dengan HP fisik tersambu
 
 ```powershell
 node scripts/device-checklist.mjs --apk app-preview.apk `
-  --expect-sha256 775a3309fce38416fe04222652031282047f0197bb149da8520b13e73d42b3d9
+  --expect-sha256 a4ae87b459c8ffffaaeb53406bbb2dd1ec529aa91112a64ea887f0b015d9fe9d
 ```
 
 Script membaca tabel di atas **langsung dari dokumen ini** (teks langkah tidak disalin ke kode),

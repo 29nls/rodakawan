@@ -112,8 +112,8 @@ butuh APK di perangkat tetap **Blocked**.
       ketika file database berubah; run pertama hijau pada 16 Oktober 2026 (`38862870367`, notice
       `UJI RLS PROFIL LULUS`, 120 perintah).
 - [x] Menjalankan rilis APK pertama sampai GitHub Release berisi APK. — `v0.1.0-build9` (15 Oktober
-      2026) terbit; `v0.1.0-build19` (18 Oktober 2026, `749424c`) adalah build terbaru yang memuat
-      Milestone 2.
+      2026) terbit; `v0.1.0-build20` (18 Oktober 2026, `fa4397e`) adalah build terbaru yang memuat
+      Milestone 2 (baseline audit: `v0.1.0-build19` dari `749424c`).
 - [ ] Uji manual AUTH-01…AUTH-14 dan PROF-01…PROF-07 di perangkat. — **Blocked** (APK tersedia, tetapi
       belum dijalankan di HP fisik; lihat bagian 5 `MILESTONE_2_REPORT.md`).
 
@@ -157,10 +157,11 @@ terbuka, dengan uji allow/deny yang benar-benar dijalankan di project developmen
 Status: **Implemented · Passed locally · Passed against dev backend** (dua belas migration diterapkan,
 uji RLS LULUS dengan 171 + 17 perintah termasuk Storage foto/logo/avatar dan foto profil, diverifikasi
 ulang 19 Oktober 2026); **Tested on physical device** masih **Blocked** — bukan karena APK-nya belum
-ada, tetapi karena belum dijalankan manusia di HP. Basis: `749424c` = tag `v0.1.0-build19`
-(`app-preview.apk`, 105.904.027 byte, SHA-256 `775a3309…b3d9`); implementasi `cf818be`, checklist
-perangkat `1ef13a8`, perbaikan versi Expo `a9858a9`, perbaikan generator tipe `ca2461c`. CI #26,
-Database RLS #4, dan Release APK #19 hijau pada commit yang sama. Setelah tag hanya ada commit
+ada, tetapi karena belum dijalankan manusia di HP. Basis implementasi: `749424c` (tag
+`v0.1.0-build19`, 105.904.027 byte, SHA-256 `775a3309…b3d9`); build terbaru: `v0.1.0-build20` dari
+`fa4397e` (105.904.031 byte, SHA-256 `a4ae87b4…fe9d`). Implementasi `cf818be`, checklist perangkat
+`1ef13a8`, perbaikan versi Expo `a9858a9`, perbaikan generator tipe `ca2461c`. CI #26/RLS #4/Release
+#19 hijau pada `749424c`; CI #27/Release #20 hijau pada `fa4397e`. Setelah tag hanya ada commit
 dokumentasi `ee0a0bd`.
 
 - [x] CRUD kendaraan; pisahkan detail sensitif. (`src/app/garage.tsx`, `src/app/vehicle.tsx`, `src/features/garage/api.ts`)
@@ -263,7 +264,7 @@ aktif; tracking tidak berjalan tanpa ride aktif dan opt-in.
 
 | Item | Status | Memblokir Milestone 3? | Pemilik keputusan |
 | --- | --- | --- | --- |
-| Uji perangkat fisik Milestone 2 | **Blocked** — APK `v0.1.0-build19` siap, belum dijalankan | **Ya** — gerbang masuk seluruh M3 | Pemilik aplikasi |
+| Uji perangkat fisik Milestone 2 | **Blocked** — APK `v0.1.0-build20` siap, belum dijalankan | **Ya** — gerbang masuk seluruh M3 | Pemilik aplikasi |
 | Penyedia peta/tile | **Belum diputuskan** (ADR-009, ADR-064) | **Ya**, hanya untuk langkah marker/peta; skema & RPC ride tidak | Pemilik produk + engineering |
 | UI persetujuan follow (daftar permintaan) | Belum ada; aturan database sudah | Tidak — pekerjaan sosial (M6) | Pemilik produk |
 | Rate limit follow + penolakan permintaan dari akun terblokir | Belum ada | Tidak — hardening sosial (M6) | Engineering |

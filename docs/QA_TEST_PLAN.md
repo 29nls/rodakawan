@@ -292,7 +292,8 @@ Yang **masih Blocked** (butuh perangkat / alur aplikasi / akun):
 - Alur follow dari **aplikasi** (kirim permintaan, terima permintaan) belum ada; yang terbukti baru
   aturan dan fungsi di database.
 - **GAR-01…GAR-04 dan CLUB-01…CLUB-10 lewat aplikasi di perangkat fisik** — butuh APK dari commit
-  Milestone 2 (`749424c`, rilis `v0.1.0-build19`) dan dua akun nyata. Aturan di database sudah lulus;
+  Milestone 2 (`fa4397e`, rilis `v0.1.0-build20`; baseline `749424c`/build19) dan dua akun nyata.
+  Aturan di database sudah lulus;
   yang belum dibuktikan adalah alur layarnya (bagian 5 `docs/MILESTONE_2_REPORT.md` memuat
   checklist-nya).
   Bukti tiap langkah direkam otomatis oleh `node scripts/device-checklist.mjs` (tangkapan layar,
@@ -302,7 +303,7 @@ Yang **masih Blocked** (butuh perangkat / alur aplikasi / akun):
   pembersihan objek yatim (18 test unit), policy Storage
   (`npm run db:test` bagian 13), serta jalur HTTP nyata (`npm run storage:test`) sudah lulus, tetapi
   alur galeri → perkecil → unggah → signed URL dari **perangkat fisik** belum dijalankan.
-  `v0.1.0-build19` **sudah memuat** modul native itu (diperiksa di `classes*.dex` dan bundel JS),
+  `v0.1.0-build20` **sudah memuat** modul native itu (diperiksa di `classes*.dex` dan bundel JS),
   jadi tidak perlu build baru hanya untuk mendapatkannya. Yang harus dibuktikan manual: izin galeri muncul hanya saat tombol ditekan, foto HEIC
   iPhone terkonversi/diterima, foto 12 MP benar-benar turun ukurannya sebelum diunggah (kuota
   Storage hemat) dan hasilnya tetap tajam — termasuk foto potret yang tinggi, foto PNG berlogo
@@ -310,7 +311,7 @@ Yang **masih Blocked** (butuh perangkat / alur aplikasi / akun):
   ukuran hanya muncul bila kompresi gagal, foto lama hilang setelah ganti, dan akun kedua tidak bisa
   membuka foto kendaraan akun pertama.
 - **PROF-10 lewat aplikasi di perangkat** — unggah/ganti/hapus foto profil dari tab Profil belum
-  dijalankan di perangkat fisik (modul native yang sama sudah ada di `v0.1.0-build19`). Aturan bucket,
+  dijalankan di perangkat fisik (modul native yang sama sudah ada di `v0.1.0-build20`). Aturan bucket,
   kebijakan owner-only, dan jalur HTTP-nya sudah lulus (`npm run db:test` bagian 13 dan
   `npm run storage:test` langkah 15–23); yang perlu dibuktikan manual: foto dari galeri muncul di
   kartu setelah unggah, foto lama hilang dari bucket setelah diganti, tombol hapus bekerja,

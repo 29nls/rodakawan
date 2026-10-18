@@ -6,7 +6,8 @@ dikerjakan".
 
 **Gerbang masuk:** Milestone 3 tidak dimulai sebelum gerbang penerimaan Milestone 2 lulus, yaitu
 seluruh checklist bagian 5 [`MILESTONE_2_REPORT.md`](MILESTONE_2_REPORT.md) dijalankan di perangkat
-fisik dengan APK `v0.1.0-build19` dan dua akun nyata. Sampai itu terjadi, status garasi/klub adalah
+fisik dengan APK `v0.1.0-build20` (baseline audit: `v0.1.0-build19`) dan dua akun nyata. Sampai itu
+terjadi, status garasi/klub adalah
 **Implemented · Passed locally · Passed against dev backend · Tested on physical device: Blocked**,
 dan tidak ada kode live-location yang ditulis.
 

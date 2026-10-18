@@ -33,7 +33,7 @@ Istilah status dipakai konsisten di seluruh dokumentasi:
 | Milestone 1.6: privasi follow + detail privat kendaraan | Ya    | Ya             | **Ya** (uji RLS LULUS) | —    |
 | Milestone 2: garasi (CRUD, kendaraan utama, detail privat nomor polisi) | Ya | Ya | **Ya** (uji RLS LULUS, 171 perintah) | **Blocked** (APK belum diuji di HP) |
 | Milestone 2: klub (buat, gabung, peran, keluarkan, jejak audit) | Ya | Ya | **Ya** (uji RLS LULUS) | **Blocked** |
-| Milestone 2: foto kendaraan & logo klub (Supabase Storage) | Ya — bucket privat, unggah/ganti/hapus, foto diperkecil + dikompres otomatis di perangkat, objek yatim disapu otomatis | Ya (75 unit test) | **Ya** (uji Storage RLS LULUS + uji HTTP LULUS) | **Blocked** (belum dijalankan di HP; build19 sudah memuat modul native) |
+| Milestone 2: foto kendaraan & logo klub (Supabase Storage) | Ya — bucket privat, unggah/ganti/hapus, foto diperkecil + dikompres otomatis di perangkat, objek yatim disapu otomatis | Ya (75 unit test) | **Ya** (uji Storage RLS LULUS + uji HTTP LULUS) | **Blocked** (belum dijalankan di HP; build19/build20 sudah memuat modul native) |
 | Milestone 2: foto profil (avatar) | Ya — bucket privat owner-only, unggah/ganti/hapus dari tab Profil, foto diperkecil otomatis | Ya (17 unit test) | **Ya** (uji HTTP Storage LULUS) | **Blocked** (uji perangkat) |
 | Milestone 2+: perjalanan, lokasi, chat, hazard, feed, musik | **Belum** | — | — | — |
 
@@ -69,7 +69,8 @@ karena berkasnya ditulis ulang (perlu dikonfirmasi di perangkat — checklist GA
 (`npm run db:test` bagian 13) dan lewat HTTP API Storage dengan akun uji sementara
 (`npm run storage:test`: unggah, signed URL, penolakan lintas pengguna, lalu pembersihan penuh).
 Modul native yang dipakai (`expo-image-picker`, `expo-file-system`, `expo-image-manipulator`) **sudah
-ada di APK `v0.1.0-build19`** — diperiksa di `classes*.dex` dan bundel JS berkas rilis itu; yang
+ada di APK `v0.1.0-build19` dan `v0.1.0-build20`** — diperiksa di `classes*.dex` dan bundel JS kedua
+berkas rilis itu; yang
 belum terbukti adalah pemakaian nyata di perangkat fisik (izin galeri, hasil kompresi, signed URL
 setelah aplikasi dibuka ulang).
 
@@ -225,7 +226,7 @@ Hasil nyata pada commit `749424c` (19 Oktober 2026, Node 24.18.1, npm 12.0.2):
 | `npm run db:types:check` | Exit 0 — `database.generated.ts` (653 baris, Supabase CLI 2.121.0) sama dengan skema project development, diverifikasi ulang 18 Oktober 2026 **tanpa link project maupun access token** (target dioper lewat `--db-url`, ADR-061). Skenario CI direproduksi lokal dengan memindahkan `supabase/.temp` (tautan CLI) — sebelumnya exit 1 dengan `Must specify one of --local, --linked, --project-id, or --db-url`. Drift yang disengaja terdeteksi (exit 1) dan menampilkan baris pertama yang berbeda. |
 | `npm run storage:test` | **Exit 0 — `UJI INTEGRASI STORAGE LULUS`** (27 langkah: unggah sebagai pemilik untuk foto kendaraan **dan** foto profil, signed URL + unduhan SHA-256, delapan penolakan lintas pengguna/anon, hapus oleh pemilik, verifikasi nol sisa) terhadap project development, 18 Oktober 2026. Dijalankan tiga kali berturut-turut tanpa sisa (satu di antaranya menyapu objek yatim yang sengaja ditinggalkan run terputus), dan sekali dengan publishable key salah (exit 1, data uji tetap dibersihkan). |
 | `npx supabase ...`     | CLI 2.121.0 (lewat `npx`, tidak masuk `package.json`). `link` + `db push` menerapkan seluruh migration (dua belas versi; `npx supabase migration list` 18 Oktober 2026 menunjukkan kolom Local dan Remote sama untuk kedua belasnya). Pada umumnya jangan menaruh connection string di argumen perintah karena npm/npx mencetak ulang baris perintahnya; pengecualian tunggal adalah `npm run db:types` (ADR-061) yang mengoperkannya sebagai `--db-url` karena itulah satu-satunya cara mengarahkan `gen types` tanpa access token mesin — perintah itu menyetel `npm_config_loglevel=error` supaya `npx` tidak mencetak ulang argumennya dan menyunting seluruh keluaran sebelum dicetak, dan keduanya diuji di `scripts/__tests__/db-types.test.mjs`. |
-| `npx expo prebuild` + `./gradlew assembleRelease` | **Berjalan lokal maupun di GitHub Actions**: Release APK run **#19** (18 Oktober 2026, commit `749424c`) menerbitkan `v0.1.0-build19` berisi `app-preview.apk` bertanda tangan. `npm run test:scripts` juga menguji `scripts/configure-android-release.mjs`. |
+| `npx expo prebuild` + `./gradlew assembleRelease` | **Berjalan lokal maupun di GitHub Actions**: Release APK run **#20** (18 Oktober 2026, commit `fa4397e`) menerbitkan `v0.1.0-build20`; run **#19** menerbitkan `v0.1.0-build19` dari `749424c`. Keduanya berisi `app-preview.apk` bertanda tangan. `npm run test:scripts` juga menguji `scripts/configure-android-release.mjs`. |
 
 `npm test` tidak menyentuh jaringan: fungsi api menerima client sebagai argumen sehingga test
 menyuntikkan fake client dari `src/test-support/fakeSupabase.ts`; test navigasi memakai `jest.mock`
@@ -444,10 +445,10 @@ tanpa filter).
   tidak ikut muncul sebagai “perubahan” di catatan rilis maupun entri berikutnya. Rinciannya di
   [`docs/SETUP_GUIDE.md`](docs/SETUP_GUIDE.md) bagian 6.8.
 
-Status per 19 Oktober 2026 pada commit `749424c`: CI **#26** hijau, Database RLS **#4** hijau, dan
-Release APK **#19** sukses. Ketiganya berjalan pada commit yang sama dengan tag `v0.1.0-build19`.
-Satu-satunya commit setelah tag itu di `origin/main` adalah `ee0a0bd` (mencatat rilis di
-`CHANGELOG.md`, `[skip ci]`), jadi tidak ada kode aplikasi yang lebih baru daripada APK tersebut.
+Status per 19 Oktober 2026: pada `749424c`, CI **#26**, Database RLS **#4**, dan Release APK **#19**
+hijau (tag `v0.1.0-build19`). Commit audit `fa4397e` hanya menambah dokumentasi/tooling; CI **#27**
+dan Release APK **#20** hijau, menerbitkan `v0.1.0-build20`. `origin/main` kini `78cc37e`
+(pencatatan build20 di `CHANGELOG.md`). Tidak ada perubahan kode aplikasi setelah `749424c`.
 
 Uji RLS berjalan **di GitHub Actions**, bukan hanya lokal: workflow `database-rls` memverifikasi
 connection string menunjuk project development sebelum menyentuh database, lalu menolak lulus bila
@@ -456,11 +457,14 @@ terakhir (`gen types` tanpa target, ADR-061); perbaikannya ada di `ca2461c` dan 
 Workflow `ci.yml` tetap bebas secret Supabase.
 
 Kedua alur rilis **sudah berjalan di GitHub**. APK preview terbaru yang **memuat** Milestone 2 adalah
-[v0.1.0-build19](https://github.com/29nls/rodakawan/releases/tag/v0.1.0-build19) (18 Oktober 2026,
-commit `749424c`): `app-preview.apk`, 105.904.027 byte, SHA-256
-`775a3309fce38416fe04222652031282047f0197bb149da8520b13e73d42b3d9`, sertifikat
-`3ea8bb4745b638be8fddf71e15edd9786d45aac65c0384b87be8fa2c32b3b14d`. Berkas itu sudah diunduh ulang
-dan diverifikasi lokal: SHA-256 dan ukurannya sama dengan metadata rilis, tanda tangan v2 sah, dan
+[v0.1.0-build20](https://github.com/29nls/rodakawan/releases/tag/v0.1.0-build20) (18 Oktober 2026,
+commit `fa4397e`): `app-preview.apk`, 105.904.031 byte, SHA-256
+`a4ae87b459c8ffffaaeb53406bbb2dd1ec529aa91112a64ea887f0b015d9fe9d`, sertifikat
+`3ea8bb4745b638be8fddf71e15edd9786d45aac65c0384b87be8fa2c32b3b14d`. Baseline audit sebelumnya,
+[v0.1.0-build19](https://github.com/29nls/rodakawan/releases/tag/v0.1.0-build19) dari `749424c`,
+berukuran 105.904.027 byte dengan SHA-256
+`775a3309fce38416fe04222652031282047f0197bb149da8520b13e73d42b3d9`. Kedua berkas sudah diunduh ulang
+dan diverifikasi lokal: SHA-256/ukuran sama dengan metadata rilis, tanda tangan v2 sah, dan
 `classes*.dex` memuat modul `expo.modules.imagepicker`, `expo.modules.imagemanipulator`, serta
 `expo.modules.filesystem`. `v0.1.0-build9` (commit `7639ba9`) dibuat **sebelum** garasi dan klub ada,
 sehingga ia **bukan** bukti fitur Milestone 2. Push yang hanya mengubah dokumentasi melewatkan
@@ -501,7 +505,7 @@ sebelum rilis Play Store bila identitas final berbeda (ADR-015).
 
 Status: rantai build **sudah terbukti di GitHub Actions** — Release APK run #19 (18 Oktober 2026)
 menjalankan prebuild, Gradle, verifikasi tanda tangan, uji nyala di emulator, dan penerbitan
-`v0.1.0-build19`. Yang belum terbukti adalah pemasangan dan pemakaian APK itu di HP fisik pemilik.
+`v0.1.0-build20`. Yang belum terbukti adalah pemasangan dan pemakaian APK itu di HP fisik pemilik.
 
 ### Merilis APK lewat workflow
 
