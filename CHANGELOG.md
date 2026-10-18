@@ -8,6 +8,17 @@ sedangkan build preview (`v<versi>-build<N>`) diringkas di dalam blok yang bisa 
 versi adalah tautan ke halaman rilisnya di GitHub, sehingga riwayat ini bisa dinavigasi langsung
 dari berkas.
 
+## [v0.1.0-build22](https://github.com/29nls/rodakawan/releases/tag/v0.1.0-build22) — 2026-10-18 · pratinjau
+
+<details>
+<summary>Catatan rilis pratinjau</summary>
+
+### Perubahan lain
+
+- Add RLS tests for ride sharing and location consent (`554a507`)
+
+</details>
+
 ## [v0.1.0-build21](https://github.com/29nls/rodakawan/releases/tag/v0.1.0-build21) — 2026-10-18 · pratinjau
 
 <details>
