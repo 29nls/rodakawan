@@ -60,6 +60,7 @@ import pg from 'pg';
 const DEFAULT_TEST_FILES = [
   'supabase/tests/rls_profiles_test.sql',
   'supabase/tests/rls_policy_guard_test.sql',
+  'supabase/tests/rls_rides_test.sql',
 ];
 
 /** Direktif di dalam berkas uji: notice yang harus diterima dari server. */

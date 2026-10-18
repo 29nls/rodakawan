@@ -31,24 +31,31 @@ Istilah status dipakai konsisten di seluruh dokumentasi:
 | Milestone 1: profil sendiri + username unik       | Ya          | Ya             | **Blocked** | **Blocked**     |
 | Milestone 1: RLS `public.profiles`                | Ya          | Ya             | **Ya** (uji RLS LULUS) | —    |
 | Milestone 1.6: privasi follow + detail privat kendaraan | Ya    | Ya             | **Ya** (uji RLS LULUS) | —    |
-| Milestone 2: garasi (CRUD, kendaraan utama, detail privat nomor polisi) | Ya | Ya | **Ya** (uji RLS LULUS, 171 perintah) | **Blocked** (APK belum diuji di HP) |
-| Milestone 2: klub (buat, gabung, peran, keluarkan, jejak audit) | Ya | Ya | **Ya** (uji RLS LULUS) | **Blocked** |
-| Milestone 2: foto kendaraan & logo klub (Supabase Storage) | Ya — bucket privat, unggah/ganti/hapus, foto diperkecil + dikompres otomatis di perangkat, objek yatim disapu otomatis | Ya (75 unit test) | **Ya** (uji Storage RLS LULUS + uji HTTP LULUS) | **Blocked** (belum dijalankan di HP; build19/build20 sudah memuat modul native) |
-| Milestone 2: foto profil (avatar) | Ya — bucket privat owner-only, unggah/ganti/hapus dari tab Profil, foto diperkecil otomatis | Ya (17 unit test) | **Ya** (uji HTTP Storage LULUS) | **Blocked** (uji perangkat) |
-| Milestone 2+: perjalanan, lokasi, chat, hazard, feed, musik | **Belum** | — | — | — |
+| Milestone 2: garasi (CRUD, kendaraan utama, detail privat nomor polisi) | Ya | Ya | **Ya** (uji RLS LULUS, 171 perintah) | **Ya** (dilaporkan pemilik; artefak per kasus tidak tersedia) |
+| Milestone 2: klub (buat, gabung, peran, keluarkan, jejak audit) | Ya | Ya | **Ya** (uji RLS LULUS) | **Ya** (dilaporkan pemilik) |
+| Milestone 2: foto kendaraan & logo klub (Supabase Storage) | Ya — bucket privat, unggah/ganti/hapus, foto diperkecil + dikompres otomatis di perangkat, objek yatim disapu otomatis | Ya (75 unit test) | **Ya** (uji Storage RLS LULUS + uji HTTP LULUS) | **Ya** (dilaporkan pemilik; build19/build20 memuat modul native) |
+| Milestone 2: foto profil (avatar) | Ya — bucket privat owner-only, unggah/ganti/hapus dari tab Profil, foto diperkecil otomatis | Ya (17 unit test) | **Ya** (uji HTTP Storage LULUS) | **Ya** (dilaporkan pemilik) |
+| Milestone 3: perjalanan klub (buat, undang, gabung, keluar, host memulai/menyelesaikan/membatalkan) | Ya — RPC transactional, state machine di database | Ya (27 test fitur + 7 test layar) | **Ya** (uji RLS/RPC 67 perintah) | **Blocked** (dua perangkat) |
+| Milestone 3: berbagi lokasi opt-in (foreground + background) | Ya — consent terpisah dari izin OS, sampling 15 dtk/25 m, basi 60 dtk, lokasi terakhir dihapus saat opt-out/keluar/ride final | Ya | **Ya** (uji allow/deny lokasi) | **Blocked** (izin, GPS mati, force-stop, baterai 30 menit) |
+| Milestone 3: peta konvoi | **Belum** — provider belum dipilih (ADR-064); layar menampilkan daftar posisi + status kesegaran, bukan peta tiruan | — | — | — |
+| Milestone 4+: chat, hazard, feed, musik | **Belum** | — | — | — |
 
-**Blocked** yang tersisa berarti: alur aplikasi belum pernah dijalankan terhadap project development
-nyata, dan aplikasi belum pernah dipasang di HP fisik. Project Supabase development **sudah ada**
-sejak 13 Oktober 2026, **seluruh dua belas** migration sudah diterapkan, uji RLS sudah lulus
+**Blocked** yang tersisa berarti: alur itu belum dijalankan terhadap backend nyata atau belum diuji di
+HP fisik. Status **Ya** pada kolom perangkat Milestone 2 berasal dari laporan pemilik aplikasi
+(owner-reported) bahwa build sudah dicoba di HP tanpa error yang teramati; tidak ada log, rekaman,
+atau tag rilis per kasus yang disertakan. Project Supabase development **sudah ada**
+sejak 13 Oktober 2026, **seluruh tiga belas** migration sudah diterapkan, uji RLS sudah lulus
 (ADR-035), dan lubang privasi follow serta integritas detail privat kendaraan sudah diperbaiki dengan
 uji allow/deny (ADR-039, ADR-040). Dua migration pertama adalah sejarah penyiapan awal; jumlah itu
 tidak lagi menggambarkan keadaan sekarang. Semua langkah yang dapat dijalankan tanpa backend sudah dijalankan
 — lihat [Perintah pengujian](#perintah-pengujian).
 
-Layar Milestone 2 (garasi dan klub) sepenuhnya **berfungsi**: seluruh aksinya memanggil service
-yang menembak tabel/RPC Supabase, dan setiap mutasi punya uji RLS allow/deny terhadap database
-development. Yang sengaja **tidak** ditampilkan sebagai tombol berfungsi adalah fitur perjalanan ke
-atas (mis. "Buat perjalanan"), karena belum dibangun.
+Layar Milestone 2 (garasi dan klub) dan Milestone 3 (perjalanan) sepenuhnya **berfungsi**: seluruh
+aksinya memanggil service yang menembak tabel/RPC Supabase, dan setiap mutasi punya uji RLS allow/deny
+terhadap database development. Perjalanan memiliki daftar, formulir buat/ubah, detail peserta,
+undangan, serta kontrol host untuk memulai/menyelesaikan/membatalkan. Berbagi lokasi bersifat opt-in
+per perjalanan dan terpisah dari izin OS; peta **belum** dipasang, jadi layar menampilkan daftar
+posisi dengan label live/basi/belum ada — bukan peta atau koordinat contoh.
 
 **Unggah foto kendaraan, logo klub, dan foto profil sudah berfungsi.** `vehicle-photos`,
 `club-logos`, dan `avatars` adalah bucket privat: foto kendaraan dan foto profil hanya bisa dibaca
@@ -83,7 +90,7 @@ development baru yang bersih. Audit lengkap ada di `docs/PROJECT_DECISIONS.md` (
 
 **Tindak lanjut (13 Oktober 2026, diperluas sampai 18 Oktober).** Project development bersih sudah
 dibuat dan dihubungkan lewat `.env` (URL + publishable key) dan `.env.db` (session pooler,
-`sslmode=require`). Seluruh **dua belas** migration diterapkan dengan `npx supabase link` +
+`sslmode=require`). Seluruh **tiga belas** migration diterapkan dengan `npx supabase link` +
 `npx supabase db push`; `npx supabase migration list` menunjukkan kolom Local dan Remote sama untuk
 keduabelasnya. Dua migration pertama adalah fondasi awal; sepuluh sisanya ditambahkan per milestone.
 `npm run db:test` lulus dengan kedua notice. Project lama tidak disentuh sama sekali (ADR-035).
@@ -218,14 +225,14 @@ Hasil nyata pada commit `749424c` (19 Oktober 2026, Node 24.18.1, npm 12.0.2):
 | `npm run lint`         | Exit 0.                                                       |
 | `npm run format:check` | Exit 0.                                                       |
 | `npm run deps:check`   | Exit 0 — versi dependency cocok dengan Expo SDK 57.0.30 (ADR-054). |
-| `npm test`             | **27 suite, 316 test lulus**, exit 0 (dijalankan setelah `npm ci`; sebelumnya 23 suite/250 test, kini termasuk 14 test kompresi foto, 18 test pembersihan objek yatim Storage, dan 17 test foto profil: 12 API + 5 komponen layar). Diverifikasi ulang 19 Oktober 2026. |
-| `npm run test:scripts` | **240 test lulus, exit 0** (19 Oktober 2026) — termasuk 4 test penjaga draf Milestone 3. Sebelumnya 235 test dengan satu kegagalan di checkout Windows: asersi baris pertama `CHANGELOG.md` membandingkan CRLF di disk dengan `HEADER` ber-LF. Kini akhir baris diseragamkan di batas perbandingan (`normalizeLineEndings`, ADR-063) dan ada test regresi untuk LF/CRLF/CR; asersi judul tetap ketat, file Git tidak diubah, dan `core.autocrlf` tidak disentuh. |
+| `npm test`             | **32 suite, 351 test lulus**, exit 0 (dijalankan setelah `npm ci`; termasuk suite perjalanan Milestone 3, 14 test kompresi foto, 18 test pembersihan objek yatim Storage, dan 17 test foto profil: 12 API + 5 komponen layar). Diverifikasi ulang 19 Oktober 2026. |
+| `npm run test:scripts` | **240 test lulus, exit 0** (19 Oktober 2026) — termasuk 4 test penjaga Milestone 3. Sebelumnya 235 test dengan satu kegagalan di checkout Windows: asersi baris pertama `CHANGELOG.md` membandingkan CRLF di disk dengan `HEADER` ber-LF. Kini akhir baris diseragamkan di batas perbandingan (`normalizeLineEndings`, ADR-063) dan ada test regresi untuk LF/CRLF/CR; asersi judul tetap ketat, file Git tidak diubah, dan `core.autocrlf` tidak disentuh. |
 | `npm run doctor`       | **Tidak dapat dipastikan** (19 Oktober 2026): 20 dari 21 pemeriksaan berjalan, pemeriksaan skema config gagal `TypeError: fetch failed` / `EAI_AGAIN exp.host` karena DNS lingkungan ini. Dua percobaan memberi hasil sama; bukan temuan proyek. Jalankan ulang di CI atau jaringan yang menjangkau `exp.host`. |
 | `npm run export:android` | Exit 0, bundel Hermes `entry-*.hbc` 3,8 MB. |
 | `npm run db:test`      | **Exit 0 — dua berkas, dua notice** (diulang 19 Oktober 2026): `UJI RLS PROFIL LULUS` (171 perintah: profil, follow/privasi, detail privat kendaraan, garasi, klub, konten klub, perjalanan, Storage foto/logo/avatar) dan `UJI POLICY OWNER-GUARD LULUS` (17 perintah: 18 policy wadah diperiksa, detektor diuji-diri) terhadap project development. |
 | `npm run db:types:check` | Exit 0 — `database.generated.ts` (653 baris, Supabase CLI 2.121.0) sama dengan skema project development, diverifikasi ulang 18 Oktober 2026 **tanpa link project maupun access token** (target dioper lewat `--db-url`, ADR-061). Skenario CI direproduksi lokal dengan memindahkan `supabase/.temp` (tautan CLI) — sebelumnya exit 1 dengan `Must specify one of --local, --linked, --project-id, or --db-url`. Drift yang disengaja terdeteksi (exit 1) dan menampilkan baris pertama yang berbeda. |
 | `npm run storage:test` | **Exit 0 — `UJI INTEGRASI STORAGE LULUS`** (27 langkah: unggah sebagai pemilik untuk foto kendaraan **dan** foto profil, signed URL + unduhan SHA-256, delapan penolakan lintas pengguna/anon, hapus oleh pemilik, verifikasi nol sisa) terhadap project development, 18 Oktober 2026. Dijalankan tiga kali berturut-turut tanpa sisa (satu di antaranya menyapu objek yatim yang sengaja ditinggalkan run terputus), dan sekali dengan publishable key salah (exit 1, data uji tetap dibersihkan). |
-| `npx supabase ...`     | CLI 2.121.0 (lewat `npx`, tidak masuk `package.json`). `link` + `db push` menerapkan seluruh migration (dua belas versi; `npx supabase migration list` 18 Oktober 2026 menunjukkan kolom Local dan Remote sama untuk kedua belasnya). Pada umumnya jangan menaruh connection string di argumen perintah karena npm/npx mencetak ulang baris perintahnya; pengecualian tunggal adalah `npm run db:types` (ADR-061) yang mengoperkannya sebagai `--db-url` karena itulah satu-satunya cara mengarahkan `gen types` tanpa access token mesin — perintah itu menyetel `npm_config_loglevel=error` supaya `npx` tidak mencetak ulang argumennya dan menyunting seluruh keluaran sebelum dicetak, dan keduanya diuji di `scripts/__tests__/db-types.test.mjs`. |
+| `npx supabase ...`     | CLI 2.121.0 (lewat `npx`, tidak masuk `package.json`). `link` + `db push` menerapkan seluruh migration (tiga belas versi; `npx supabase migration list` 19 Oktober 2026 menunjukkan kolom Local dan Remote sama untuk ketiga belasnya). Pada umumnya jangan menaruh connection string di argumen perintah karena npm/npx mencetak ulang baris perintahnya; pengecualian tunggal adalah `npm run db:types` (ADR-061) yang mengoperkannya sebagai `--db-url` karena itulah satu-satunya cara mengarahkan `gen types` tanpa access token mesin — perintah itu menyetel `npm_config_loglevel=error` supaya `npx` tidak mencetak ulang argumennya dan menyunting seluruh keluaran sebelum dicetak, dan keduanya diuji di `scripts/__tests__/db-types.test.mjs`. |
 | `npx expo prebuild` + `./gradlew assembleRelease` | **Berjalan lokal maupun di GitHub Actions**: Release APK run **#20** (18 Oktober 2026, commit `fa4397e`) menerbitkan `v0.1.0-build20`; run **#19** menerbitkan `v0.1.0-build19` dari `749424c`. Keduanya berisi `app-preview.apk` bertanda tangan. `npm run test:scripts` juga menguji `scripts/configure-android-release.mjs`. |
 
 `npm test` tidak menyentuh jaringan: fungsi api menerima client sebagai argumen sehingga test
@@ -592,7 +599,7 @@ scripts/        # generate-assets.mjs, db-test.mjs (runner uji RLS), verify-apk.
                 # preview lama)
 docs/           # sumber kebenaran produk
 supabase/
-  migrations/   # dua belas migration: dua berkas fondasi awal
+  migrations/   # tiga belas migration: dua berkas fondasi awal
                 # (20261013022938_initial_schema.sql, 20261013023038_auth_profile_bootstrap.sql)
                 # + sepuluh migration aditif (privasi, klub, garasi, Storage)
   tests/        # rls_profiles_test.sql (uji RLS dua akun + kontrol positif)

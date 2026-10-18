@@ -258,8 +258,7 @@ begin
     'is_club_admin',
     'is_ride_member',
     'is_ride_active_member',
-    'is_ride_host',
-    'can_publish_ride_location'
+    'is_ride_host'
   ]
   loop
     if not exists (

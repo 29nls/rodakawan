@@ -1,7 +1,16 @@
 # Laporan Milestone 2 — Garasi & Klub
 
 Status: **Implemented · Passed locally · Passed against dev backend**; **Tested on physical device**
-masih **Blocked**. Tanggal verifikasi terakhir: 2026-10-19.
+tercatat sebagai **owner-reported** (lihat catatan di bawah), bukan bukti per kasus. Tanggal verifikasi
+terakhir: 2026-10-19.
+
+> **Catatan bukti perangkat (owner-reported).** Pemilik aplikasi melaporkan bahwa build yang memuat
+> Milestone 2 sudah dicoba di perangkat tanpa galat yang teramati. Repository ini **tidak** memuat
+> artefak uji per langkah (tangkapan layar, logcat, model HP, versi Android, atau daftar akun) dan
+> tidak ada rekaman tanggal/tag yang dapat diverifikasi untuk laporan itu. Karena itu statusnya
+> ditulis sebagai laporan pemilik, bukan “seluruh checklist bagian 5 lulus”. Bukti yang dapat
+> diperiksa tetap: APK build19/build20, verifikasi tanda tangan, smoke test emulator, dan uji
+> RLS/RPC terhadap database development.
 
 Basis implementasi: `main` @ `749424c` — commit yang **sama** dengan tag rilis pertama
 [`v0.1.0-build19`](https://github.com/29nls/rodakawan/releases/tag/v0.1.0-build19). Implementasi
@@ -20,8 +29,9 @@ Bukti otomatis: CI **#26**, Database RLS **#4**, dan Release APK **#19** hijau p
 
 ## 1. Migrasi
 
-Seluruh **dua belas** migration sudah diterapkan ke project development lewat `supabase db push`;
-paritas lokal/remote diverifikasi dengan `npx supabase migration list`.
+Pada penutupan Milestone 2, seluruh **dua belas** migration sudah diterapkan ke project development
+lewat `supabase db push`; paritas lokal/remote diverifikasi dengan `npx supabase migration list`.
+Setelah Milestone 3, jumlahnya menjadi **tiga belas** (`20261019120000_ride_workflow.sql`).
 
 Dua migration pertama adalah **sejarah penyiapan awal** (skema fondasi + bootstrap profil). Angka
 "dua migration" pada dokumentasi lama hanya benar untuk titik waktu itu, bukan jumlah migration
@@ -55,7 +65,7 @@ lulus.
 | `npm run lint`           | LULUS (0 error, 0 warning)                                   |
 | `npm run format:check`   | LULUS                                                        |
 | `npm test -- --ci`       | LULUS — 27 suite / 316 test                                  |
-| `npm run test:scripts`   | LULUS — 240 test (236 + 4 penjaga draf M3; sebelumnya 235 dengan satu kegagalan CRLF) |
+| `npm run test:scripts`   | LULUS — 240 test (236 + 4 penjaga Milestone 3; sebelumnya 235 dengan satu kegagalan CRLF) |
 | `npm run db:test`        | **LULUS** — `UJI RLS PROFIL LULUS` 171 perintah + `UJI POLICY OWNER-GUARD LULUS` 17 perintah |
 | `npm run db:types:check` | LULUS — `database.generated.ts` sama dengan skema database    |
 | `npm run storage:test`   | LULUS — 27 langkah HTTP Storage, nol sisa data uji            |
@@ -105,7 +115,7 @@ Diperiksa pada kedua berkas rilis yang diunduh ulang (19 Oktober 2026):
 Yang tetap **Blocked** adalah pemakaian nyata di HP: izin galeri, pemilihan foto, hasil kompresi,
 signed URL setelah aplikasi dibuka ulang, dan penolakan lintas pengguna lewat layar.
 
-## 5. Checklist uji perangkat fisik & auth nyata (BELUM dijalankan)
+## 5. Checklist uji perangkat fisik & auth nyata (owner-reported, bukan bukti per kasus)
 
 Milik pemilik aplikasi; tidak boleh ditandai lulus berdasarkan uji unit, emulator, atau smoke test.
 

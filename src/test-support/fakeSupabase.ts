@@ -248,6 +248,10 @@ export function createQueryClient(responses: QueryResponse | QueryResponse[]): {
         order.push({ column, ascending: options?.ascending !== false });
         return builder;
       },
+      limit(_count: number) {
+        // Batas tidak memengaruhi asersi query; cukup teruskan rantai.
+        return builder;
+      },
       async single() {
         log.singleCalls += 1;
         return finish();

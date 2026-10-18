@@ -154,10 +154,12 @@ terbuka, dengan uji allow/deny yang benar-benar dijalankan di project developmen
 
 ## Milestone 2 — Garasi dan klub
 
-Status: **Implemented · Passed locally · Passed against dev backend** (dua belas migration diterapkan,
-uji RLS LULUS dengan 171 + 17 perintah termasuk Storage foto/logo/avatar dan foto profil, diverifikasi
-ulang 19 Oktober 2026); **Tested on physical device** masih **Blocked** — bukan karena APK-nya belum
-ada, tetapi karena belum dijalankan manusia di HP. Basis implementasi: `749424c` (tag
+Status: **Implemented · Passed locally · Passed against dev backend · Tested on physical device
+(owner-reported)** (tiga belas migration diterapkan, uji RLS LULUS dengan 171 + 17 + 67 perintah
+termasuk Storage foto/logo/avatar, foto profil, dan workflow perjalanan, diverifikasi ulang
+19 Oktober 2026). Pemilik aplikasi melaporkan pengujian di perangkat berjalan tanpa error yang
+teramati; tag APK dan kasus uji per kasus **tidak tersedia sebagai artefak**, jadi klaim ini dicatat
+sebagai laporan pemilik, bukan bukti uji terverifikasi. Basis implementasi: `749424c` (tag
 `v0.1.0-build19`, 105.904.027 byte, SHA-256 `775a3309…b3d9`); build terbaru: `v0.1.0-build20` dari
 `fa4397e` (105.904.031 byte, SHA-256 `a4ae87b4…fe9d`). Implementasi `cf818be`, checklist perangkat
 `1ef13a8`, perbaikan versi Expo `a9858a9`, perbaikan generator tipe `ca2461c`. CI #26/RLS #4/Release
@@ -182,27 +184,32 @@ dokumentasi `ee0a0bd`.
 
 **Exit criteria:** non-member tidak bisa membaca detail klub privat atau mengubah anggota; plat privat
 hanya terlihat owner. — **terpenuhi di lapisan database** (uji RLS allow/deny, `npm run db:test` exit 0);
-verifikasi lewat aplikasi di perangkat fisik menyusul (bagian 5 `docs/MILESTONE_2_REPORT.md`).
+verifikasi lewat aplikasi di perangkat fisik dilaporkan pemilik berjalan tanpa error (owner-reported;
+artefak per kasus tidak tersedia — bagian 5 `docs/MILESTONE_2_REPORT.md`).
 
 ## Milestone 3 — Perjalanan dan live location
 
 Rencana rinci, termasuk yang sengaja **di luar** lingkup, ada di
-[`docs/MILESTONE_3_PLAN.md`](MILESTONE_3_PLAN.md). Milestone ini **belum dimulai** dan tidak boleh
-dimulai sebelum gerbang penerimaan Milestone 2 lulus.
+[`docs/MILESTONE_3_PLAN.md`](MILESTONE_3_PLAN.md). Status: **Implemented · Passed locally ·
+Passed against dev backend**; uji dua perangkat/background/baterai masih **Blocked**. Gerbang M2
+dilaporkan lulus oleh pemilik aplikasi (owner-reported, tanpa artefak uji per kasus).
 
 Gerbang tambahan sebelum layar peta: **penyedia peta/tile belum dipilih** (ADR-009/ADR-064). Opsi,
 lisensi, kuota, privasi, dan syarat offline ada di
 [`docs/MAP_PROVIDER_DECISION.md`](MAP_PROVIDER_DECISION.md); jangan menambahkan dependency peta
-sebelum keputusan itu dicatat.
+sebelum keputusan itu dicatat. Sampai itu terjadi, layar perjalanan menampilkan **daftar posisi**
+dengan label live/basi/belum ada, bukan peta tiruan.
 
-- [ ] Create/join/leave ride.
-- [ ] State machine planned/active/completed/cancelled, ditegakkan di database.
-- [ ] Permission explainer dan location sharing control (opt-in per ride).
-- [ ] Development build dengan background location.
-- [ ] Private Realtime channel dan last-known location.
-- [ ] Map markers + stale/offline indicators (setelah provider dipilih).
-- [ ] Stop task saat keluar/opt-out/ride berakhir.
-- [ ] Test baterai/network pada perjalanan 30 menit di perangkat fisik.
+- [x] Create/join/leave ride, undangan, dan pengeluaran peserta lewat RPC.
+- [x] State machine planned/active/completed/cancelled, ditegakkan di database.
+- [x] Location sharing opt-in per ride; consent terpisah dari izin OS.
+- [x] Foreground + background location (`expo-location`/`expo-task-manager`) dengan foreground service.
+- [x] Realtime posisi lewat Postgres Changes pada `ride_locations` (RLS per baris).
+- [x] Indikator live/basi/offline dan waktu pembaruan di layar detail.
+- [x] Stop task saat keluar/opt-out/ride berakhir; baris lokasi dihapus trigger.
+- [x] Migration, RPC, tipe generated, uji RLS/RPC, dan uji Jest.
+- [ ] Map markers (setelah provider dipilih dan renderer diuji di development build).
+- [ ] Test dua perangkat, GPS mati, mode pesawat, force-stop/reboot, dan baterai/network 30 menit.
 
 **Exit criteria:** anggota sah melihat update lokasi; non-member dan `anon` ditolak; menolak berbagi
 tetap bisa ikut; izin ditolak/GPS mati/network drop dijelaskan; status final tidak bisa kembali

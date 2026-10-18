@@ -1,3 +1,4 @@
+import { useRouter } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/ui/AppText';
@@ -11,13 +12,14 @@ import { LinkRow } from '@/components/ui/LinkRow';
 import { Screen } from '@/components/ui/Screen';
 import { SectionHeader } from '@/components/ui/SectionHeader';
 import { milestoneStatusLabels, milestones } from '@/constants/roadmap';
-import { safetyCopy, unavailableCopy } from '@/constants/strings';
+import { safetyCopy } from '@/constants/strings';
 import { colors, spacing } from '@/constants/theme';
 import { useAppStatus } from '@/hooks/useAppStatus';
 
 const p0Milestones = milestones.filter((milestone) => milestone.phase === 'P0');
 
 export default function HomeScreen() {
+  const router = useRouter();
   const { appInfo, backend } = useAppStatus();
 
   return (
@@ -54,24 +56,28 @@ export default function HomeScreen() {
 
       <View style={styles.section}>
         <SectionHeader
-          subtitle="Dinonaktifkan sampai fiturnya benar-benar ada."
+          subtitle="Perjalanan klub dengan berbagi lokasi yang Anda setujui sendiri."
           title="Mulai perjalanan"
         />
         <Card>
           <View style={styles.ctaRow}>
-            <Button disabled fullWidth icon="add-circle-outline" label="Buat perjalanan" />
             <Button
-              disabled
+              fullWidth
+              icon="add-circle-outline"
+              label="Buat perjalanan"
+              onPress={() => router.push('/ride-new')}
+            />
+            <Button
               fullWidth
               icon="enter-outline"
               label="Gabung perjalanan"
+              onPress={() => router.push('/rides')}
               variant="secondary"
             />
           </View>
-          <Badge icon="construct-outline" label={unavailableCopy.badge} />
           <AppText variant="caption" tone="muted">
-            Perjalanan, titik kumpul, peserta, dan peta konvoi dibangun pada Milestone 3. Tombol ini
-            sengaja dinonaktifkan agar tidak ada aksi yang terlihat berfungsi padahal belum ada.
+            Pembuatan perjalanan memerlukan keanggotaan klub aktif. Berbagi lokasi bersifat opt-in
+            per perjalanan dan dapat dihentikan kapan saja.
           </AppText>
         </Card>
       </View>
@@ -95,7 +101,11 @@ export default function HomeScreen() {
                 </AppText>
                 <Badge
                   label={milestoneStatusLabels[milestone.status]}
-                  tone={milestone.status === 'pondasi' ? 'accent' : 'neutral'}
+                  tone={
+                    milestone.status === 'pondasi' || milestone.status === 'tersedia'
+                      ? 'accent'
+                      : 'neutral'
+                  }
                 />
               </View>
             </View>
@@ -103,7 +113,7 @@ export default function HomeScreen() {
         </Card>
         <AppText variant="caption" tone="muted">
           Fase P1 (feed klub) dan P2 (voice PTT, musik lokal) dimulai hanya setelah acceptance P0
-          lulus.
+          lulus; sisa acceptance P0 ada pada uji dua perangkat dan uji baterai.
         </AppText>
       </View>
 

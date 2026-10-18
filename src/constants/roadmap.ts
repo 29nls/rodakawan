@@ -4,7 +4,7 @@
  */
 export type MilestonePhase = 'P0' | 'P1' | 'P2';
 
-export type MilestoneStatus = 'pondasi' | 'berikutnya' | 'rencana';
+export type MilestoneStatus = 'pondasi' | 'tersedia' | 'berikutnya' | 'rencana';
 
 export type Milestone = {
   /** ID milestone, mis. "M0". */
@@ -17,6 +17,7 @@ export type Milestone = {
 
 export const milestoneStatusLabels: Record<MilestoneStatus, string> = {
   pondasi: 'Fondasi tersedia',
+  tersedia: 'Tersedia',
   berikutnya: 'Berikutnya',
   rencana: 'Direncanakan',
 };
@@ -34,28 +35,28 @@ export const milestones: readonly Milestone[] = [
     title: 'Auth, profil, privasi dasar',
     summary: 'Daftar/masuk, profil, username unik, dan pengaturan sesi.',
     phase: 'P0',
-    status: 'berikutnya',
+    status: 'tersedia',
   },
   {
     id: 'M2',
     title: 'Garasi dan klub',
     summary: 'Kendaraan, klub, permintaan bergabung, peran anggota, dan storage foto.',
     phase: 'P0',
-    status: 'rencana',
+    status: 'tersedia',
   },
   {
     id: 'M3',
     title: 'Perjalanan dan live location',
     summary: 'Buat/gabung perjalanan, berbagi lokasi opt-in, dan peta konvoi.',
     phase: 'P0',
-    status: 'rencana',
+    status: 'tersedia',
   },
   {
     id: 'M4',
     title: 'Laporan jalan dan convoy chat',
     summary: 'Laporan bahaya dengan masa berlaku, chat perjalanan, dan sistem pesan sistem.',
     phase: 'P0',
-    status: 'rencana',
+    status: 'berikutnya',
   },
   {
     id: 'M5',

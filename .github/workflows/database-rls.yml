@@ -117,9 +117,11 @@ jobs:
       # Dijalankan satu kali dan hasilnya dicetak apa adanya. Selain keluar non-nol bila
       # asersi gagal, keluaran harus memuat notice penanda dari **setiap** berkas uji:
       #
-      #   - `UJI RLS PROFIL LULUS`        — aturan izin/penolakan per tabel dan Storage
-      #   - `UJI POLICY OWNER-GUARD LULUS` — tidak ada policy wadah yang memberi akses
+      #   - `UJI RLS PROFIL LULUS`         — aturan izin/penolakan per tabel dan Storage
+      #   - `UJI POLICY OWNER-GUARD LULUS`  — tidak ada policy wadah yang memberi akses
       #     lewat kolom kepemilikan tanpa penjaga keanggotaan (ADR-060)
+      #   - `UJI RLS PERJALANAN M3 LULUS`   — state machine, consent, dan pembersihan
+      #     lokasi perjalanan (ADR-065)
       #
       # Runner "hijau palsu" (mis. berkas uji terpotong) tidak bisa lolos karena
       # `scripts/db-test.mjs` hanya melaporkan lulus bila notice itu benar-benar diterima;
@@ -138,6 +140,10 @@ jobs:
           case "${OUTPUT}" in
             *"UJI POLICY OWNER-GUARD LULUS"*) ;;
             *) MISSING="${MISSING} UJI POLICY OWNER-GUARD LULUS" ;;
+          esac
+          case "${OUTPUT}" in
+            *"UJI RLS PERJALANAN M3 LULUS"*) ;;
+            *) MISSING="${MISSING} UJI RLS PERJALANAN M3 LULUS" ;;
           esac
           if [ -n "${MISSING}" ]; then
             echo "::error::Penanda lulus berikut tidak diterima:${MISSING}. Berkas uji berhenti sebelum seluruh asersi dijalankan."

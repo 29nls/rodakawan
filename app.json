@@ -12,6 +12,7 @@
     "android": {
       "package": "com.rodakawan.app",
       "versionCode": 1,
+      "permissions": ["android.permission.POST_NOTIFICATIONS"],
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0B0D10"
@@ -41,6 +42,15 @@
           "photosPermission": "RodaKawan memakai foto dari galeri hanya untuk foto kendaraan dan logo klub yang Anda pilih sendiri.",
           "cameraPermission": false,
           "microphonePermission": false
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "RodaKawan memakai lokasi Anda hanya saat Anda menyalakan berbagi posisi di perjalanan aktif.",
+          "locationAlwaysAndWhenInUsePermission": "RodaKawan tetap mengirim posisi selama perjalanan aktif bila Anda memilih berbagi di latar belakang. Anda dapat menghentikannya kapan saja.",
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": true
         }
       ]
     ],

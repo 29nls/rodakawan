@@ -412,7 +412,21 @@ export function mapRpcError(error: unknown): AppError {
       return {
         code: 'table_missing',
         message:
-          'Backend belum memuat fungsi keanggotaan klub. Terapkan migration Milestone 2 (20261016093000_club_membership_rpc.sql) lalu coba lagi — lihat docs/SETUP_GUIDE.md.',
+          'Backend belum memuat fungsi yang dibutuhkan. Terapkan migration Milestone 2 (20261016093000_club_membership_rpc.sql) dan Milestone 3 (20261019120000_ride_workflow.sql) lalu coba lagi — lihat docs/SETUP_GUIDE.md.',
+        retryable: false,
+      };
+    case '23514':
+      return {
+        code: 'invalid_data',
+        message:
+          'Aksi ini ditolak aturan perjalanan, mis. status sudah final atau consent lokasi belum memenuhi syarat. Muat ulang data terbaru lalu coba lagi.',
+        retryable: false,
+      };
+    case '22023':
+      return {
+        code: 'invalid_data',
+        message:
+          'Permintaan ditolak karena nilainya tidak sah. Periksa kembali isian dan pilihan Anda, lalu coba lagi.',
         retryable: false,
       };
     default:

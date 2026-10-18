@@ -1,7 +1,14 @@
 # Keputusan penyedia peta/tile (Milestone 3)
 
 Status: **Belum diputuskan** — bahan keputusan, bukan keputusan. Tanggal riset: 2026-10-19.
-Pemilik keputusan: pemilik produk + engineering. ADR terkait: ADR-009, ADR-064.
+Pemilik keputusan: pemilik produk + engineering. ADR terkait: ADR-009, ADR-064, ADR-065.
+
+**Pembaruan 19 Oktober 2026:** alur perjalanan dan berbagi lokasi sudah dirilis di lapisan aplikasi
+tanpa renderer peta. Layar detail menampilkan daftar peserta beserta umur posisi dan menyatakan peta
+belum tersedia; tidak ada tile publik, URL contoh, atau marker palsu. Rekomendasi teknis yang masih
+menunggu persetujuan pemilik produk adalah **MapLibre + MapTiler Flex** (biaya/kuota jelas, atribusi
+OSM, dan paket berbayar untuk penggunaan komersial), tetapi dependency peta **belum** ditambahkan
+sampai provider, lisensi komersial, dan kredensial yang dibatasi per aplikasi disetujui.
 
 Dokumen ini tidak menambahkan dependency apa pun. Jangan memasang library peta atau memanggil tile
 provider produksi sebelum salah satu opsi di bawah dipilih dan dicatat sebagai ADR final.

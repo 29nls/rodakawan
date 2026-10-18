@@ -55,6 +55,9 @@ function RootNavigator() {
         <Stack.Screen name="vehicle" />
         <Stack.Screen name="club" />
         <Stack.Screen name="club-admin" />
+        {/* Milestone 3: perjalanan dan berbagi lokasi opt-in. */}
+        <Stack.Screen name="ride-new" />
+        <Stack.Screen name="ride" />
       </Stack.Protected>
 
       <Stack.Protected guard={resolved && session === null}>

@@ -142,6 +142,34 @@ export type MotorcyclePrivateDetailsInsert =
 export type MotorcyclePrivateDetailsUpdate =
   GeneratedTables['motorcycle_private_details']['Update'];
 
+/* --------------------------------------------------------------- perjalanan */
+
+export type RideStatus = 'planned' | 'active' | 'completed' | 'cancelled';
+export type RideVisibility = 'club' | 'invite_only' | 'public';
+export type RideActivityType = 'motorcycle' | 'cycling' | 'mixed' | 'other';
+export type RideMemberRole = 'host' | 'sweeper' | 'rider';
+export type RideMemberStatus = 'invited' | 'joined' | 'left' | 'removed';
+
+/** Baris `public.rides` dengan union yang sebenarnya dijaga CHECK constraint. */
+export type RideRow = Omit<
+  GeneratedTables['rides']['Row'],
+  'activity_type' | 'status' | 'visibility'
+> & {
+  activity_type: RideActivityType;
+  status: RideStatus;
+  visibility: RideVisibility;
+};
+
+export type RideMemberRow = Omit<
+  GeneratedTables['ride_members']['Row'],
+  'role' | 'status'
+> & {
+  role: RideMemberRole;
+  status: RideMemberStatus;
+};
+
+export type RideLocationRow = GeneratedTables['ride_locations']['Row'];
+
 /* ------------------------------------------------------------------ database */
 
 type ClubsTable = {
@@ -165,10 +193,29 @@ type ClubRoleAuditTable = {
   Relationships: GeneratedTables['club_role_audit']['Relationships'];
 };
 
-type Tables = Omit<GeneratedTables, 'clubs' | 'club_members' | 'club_role_audit'> & {
+type RidesTable = {
+  Row: RideRow;
+  Insert: GeneratedTables['rides']['Insert'];
+  Update: GeneratedTables['rides']['Update'];
+  Relationships: GeneratedTables['rides']['Relationships'];
+};
+
+type RideMembersTable = {
+  Row: RideMemberRow;
+  Insert: GeneratedTables['ride_members']['Insert'];
+  Update: GeneratedTables['ride_members']['Update'];
+  Relationships: GeneratedTables['ride_members']['Relationships'];
+};
+
+type Tables = Omit<
+  GeneratedTables,
+  'clubs' | 'club_members' | 'club_role_audit' | 'rides' | 'ride_members'
+> & {
   clubs: ClubsTable;
   club_members: ClubMembersTable;
   club_role_audit: ClubRoleAuditTable;
+  rides: RidesTable;
+  ride_members: RideMembersTable;
 };
 
 /**
@@ -187,6 +234,16 @@ type Functions = Omit<
   | 'set_club_member_role'
   | 'remove_club_member'
   | 'leave_club'
+  | 'create_ride'
+  | 'update_ride'
+  | 'invite_ride_member'
+  | 'accept_ride_invite'
+  | 'join_ride'
+  | 'leave_ride'
+  | 'remove_ride_member'
+  | 'transition_ride'
+  | 'set_ride_location_sharing'
+  | 'publish_ride_location'
 > & {
   create_club: {
     Args: {
@@ -217,6 +274,72 @@ type Functions = Omit<
   leave_club: {
     Args: { p_club_id: string };
     Returns: ClubMembershipOutcome;
+  };
+
+  /* -------------------------------------------------------------- perjalanan */
+
+  create_ride: {
+    Args: {
+      p_club_id: string;
+      p_title: string;
+      p_starts_at?: string | null;
+      p_description?: string | null;
+      p_meeting_label?: string | null;
+      p_destination_label?: string | null;
+      p_visibility?: RideVisibility;
+    };
+    Returns: RideRow;
+  };
+  update_ride: {
+    Args: {
+      p_ride_id: string;
+      p_title: string;
+      p_description?: string | null;
+      p_starts_at?: string | null;
+      p_meeting_label?: string | null;
+      p_destination_label?: string | null;
+    };
+    Returns: RideRow;
+  };
+  invite_ride_member: {
+    Args: { p_ride_id: string; p_user_id: string };
+    Returns: RideMemberStatus;
+  };
+  accept_ride_invite: {
+    Args: { p_ride_id: string };
+    Returns: 'joined';
+  };
+  join_ride: {
+    Args: { p_ride_id: string };
+    Returns: 'joined';
+  };
+  leave_ride: {
+    Args: { p_ride_id: string };
+    Returns: 'left';
+  };
+  remove_ride_member: {
+    Args: { p_ride_id: string; p_user_id: string };
+    Returns: 'removed';
+  };
+  transition_ride: {
+    Args: { p_ride_id: string; p_next: 'active' | 'completed' | 'cancelled' };
+    Returns: RideRow;
+  };
+  set_ride_location_sharing: {
+    Args: { p_ride_id: string; p_enabled: boolean };
+    Returns: boolean;
+  };
+  publish_ride_location: {
+    Args: {
+      p_ride_id: string;
+      p_latitude: number;
+      p_longitude: number;
+      p_accuracy_m?: number | null;
+      p_heading_deg?: number | null;
+      p_speed_mps?: number | null;
+      p_recorded_at?: string | null;
+    };
+    Returns: RideLocationRow;
   };
 };
 

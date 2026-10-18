@@ -82,7 +82,7 @@ Bagian ini adalah urutan yang sudah disesuaikan dengan kode di repo. Project dev
 
 ### 4.3 Jalankan migration
 
-Repository ini sekarang memuat **dua belas** migration. Dua yang pertama adalah **sejarah penyiapan
+Repository ini sekarang memuat **tiga belas** migration. Dua yang pertama adalah **sejarah penyiapan
 awal** dan urutannya penting:
 
 1. `supabase/migrations/20261013022938_initial_schema.sql` — skema fondasi (migration awal).
@@ -90,11 +90,11 @@ awal** dan urutannya penting:
    username, dan trigger `updated_at`. Migration ini idempotent (`create or replace`,
    `drop trigger if exists`) sehingga aman dijalankan ulang dan tidak menghapus data.
 
-Sepuluh migration berikutnya bersifat aditif (privasi follow, detail privat kendaraan, keanggotaan
-klub, kendaraan utama, akses perjalanan, tiga bucket Storage, dan pagar policy). Jangan menyunting
-migration yang sudah diterapkan ke remote; tambahkan migration baru. Jumlah pastinya bisa diperiksa
-dengan `ls supabase/migrations` atau `npx supabase migration list` — jangan menganggap angka di
-dokumentasi lama masih berlaku.
+Sebelas migration berikutnya bersifat aditif (privasi follow, detail privat kendaraan, keanggotaan
+klub, kendaraan utama, akses perjalanan, tiga bucket Storage, pagar policy, dan alur perjalanan M3 di
+`20261019120000_ride_workflow.sql`). Jangan menyunting migration yang sudah diterapkan ke remote;
+tambahkan migration baru. Jumlah pastinya bisa diperiksa dengan `ls supabase/migrations` atau
+`npx supabase migration list` — jangan menganggap angka di dokumentasi lama masih berlaku.
 
 **Penting:** migration awal memakai `create table if not exists`. Bila tabel `profiles` sudah ada di
 database dengan bentuk yang berbeda, tabel itu **dilewati diam-diam** lalu migration gagal di policy
@@ -274,7 +274,8 @@ Catatan penting:
 - Status saat ini: **LULUS** pada project development khusus RodaKawan (ADR-035): notice
   `UJI RLS PROFIL LULUS` diterima dan **171 perintah** selesai tanpa error (13 Oktober 2026 dengan
   88 perintah; diperluas oleh garasi/klub Milestone 2, audit policy, Storage foto/logo, dan foto
-  profil; dijalankan ulang 18 Oktober 2026 dengan **dua belas** migration diterapkan). Sebelumnya uji ini **belum pernah
+  profil; dijalankan ulang 19 Oktober 2026 dengan **tiga belas** migration diterapkan dan tiga berkas
+  uji: 171 + 17 + 67 = **255 perintah**, seluruh notice penanda diterima). Sebelumnya uji ini **belum pernah
   lulus**: pada project lama yang dipakai bersama aplikasi lain, `bootstrap_profile()` gagal
   `42703 column "display_name" of relation "profiles" does not exist` karena `public.profiles` di sana
   bukan tabel buatan migration (ADR-033). Pesan itu berguna sebagai gejala khas schema drift: lihat
@@ -314,7 +315,45 @@ generated tidak boleh disunting manual.
 5. Logout → pastikan layar privat tidak bisa dibuka kembali.
 6. **Lupa password** → selesaikan tautan reset dari email.
 
-### 4.9 Hal yang belum ada di Milestone 1
+### 4.9 Uji Milestone 3 (perjalanan dan lokasi)
+
+Migration `20261019120000_ride_workflow.sql` sudah diterapkan ke project development. Setelah menarik
+perubahan ini pada mesin lain:
+
+```bash
+npm ci
+npm_config_loglevel=error npx supabase db push --yes   # atau db push --db-url "$DATABASE_URL"
+npm run db:types                                       # tipe RPC perjalanan ikut diperbarui
+npm run db:test                                        # 3 berkas: profil, policy guard, perjalanan
+```
+
+`npm run db:test` harus mencetak tiga notice penanda: `UJI RLS PROFIL LULUS`,
+`UJI POLICY OWNER-GUARD LULUS`, dan `UJI RLS PERJALANAN M3 LULUS`. Berkas perjalanan berjalan dalam
+satu transaksi dan berakhir `ROLLBACK`, jadi tidak meninggalkan pengguna/klub/ride uji.
+
+**Dependency native.** `expo-location` dan `expo-task-manager` sudah ada di `package.json`
+(versi SDK 57). Keduanya modul native: Expo Go tidak cukup untuk menguji background location, dan
+APK/dev client harus dibangun ulang. `app.json` memuat plugin `expo-location` dengan
+`isAndroidBackgroundLocationEnabled` dan `isAndroidForegroundServiceEnabled`, serta izin
+`POST_NOTIFICATIONS` untuk notifikasi foreground service. Jangan menghapus plugin itu; tanpa plugin,
+manifest Android tidak memuat izin background/foreground service yang dibutuhkan.
+
+**Realtime.** Posisi memakai Postgres Changes pada `public.ride_locations`, bukan Broadcast. Tidak ada
+konfigurasi kanal privat yang perlu dinyalakan; RLS tabel adalah gerbangnya. Fitur Realtime harus
+aktif di project (default Supabase) dan publikasi tabel `ride_locations` sudah tersedia lewat
+Realtime publication default. Bila project memakai publication kustom, pastikan tabel itu ikut
+dipublikasikan; tanpa itu perubahan baris tidak terkirim, tetapi layar tetap dapat dimuat ulang manual.
+
+**Peta.** Jangan mengisi `EXPO_PUBLIC_MAP_STYLE_URL` dengan URL contoh dan jangan memasang renderer
+peta sebelum ADR-064 final. Build saat ini menampilkan daftar posisi + umur pembaruan, dengan keadaan
+“peta belum tersedia” yang disengaja.
+
+**Uji perangkat yang belum dijalankan.** Dua akun di dua HP: buat ride, undang, terima, mulai, nyalakan
+berbagi, matikan, keluar, selesaikan. Ulangi dengan izin background ditolak, GPS mati, mode pesawat,
+aplikasi di background, force-stop, dan reboot. Catat konsumsi baterai/data 30 menit apa adanya — lihat
+RIDE-01…LOC-10 di [`QA_TEST_PLAN.md`](QA_TEST_PLAN.md).
+
+### 4.10 Hal yang belum ada di Milestone 1
 
 - **Foto kendaraan, logo klub, dan foto profil sudah ada** lewat bucket privat `vehicle-photos`,
   `club-logos`, dan `avatars` (migration `20261017120000_private_photo_storage.sql`, perbaikan

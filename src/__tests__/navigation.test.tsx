@@ -64,6 +64,7 @@ function createFakeClient(): SupabaseClient<Database> {
     select: () => builder,
     eq: () => builder,
     order: () => builder,
+    limit: () => builder,
     insert: () => builder,
     update: () => builder,
     upsert: () => builder,
@@ -233,11 +234,22 @@ describe('area aplikasi setelah masuk', () => {
     expect(screen.getByText('Kondisi di jalan')).toBeTruthy();
   });
 
-  it('menonaktifkan aksi fitur yang belum dibangun pada Ringkasan', async () => {
-    await renderApp('/');
+  it('membuka form perjalanan dari tombol Ringkasan', async () => {
+    const { app } = await renderApp('/');
 
-    expect(screen.getByRole('button', { name: 'Buat perjalanan' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Gabung perjalanan' })).toBeDisabled();
+    await fireEvent.press(screen.getByRole('button', { name: 'Buat perjalanan' }));
+
+    await waitFor(() => expect(app.getPathname()).toBe('/ride-new'));
+    await waitFor(() => expect(screen.getByText('Belum ada klub aktif')).toBeTruthy());
+  });
+
+  it('membuka daftar perjalanan dari tombol Ringkasan', async () => {
+    const { app } = await renderApp('/');
+
+    await fireEvent.press(screen.getByRole('button', { name: 'Gabung perjalanan' }));
+
+    await waitFor(() => expect(app.getPathname()).toBe('/rides'));
+    expect(screen.getByText('Touring & konvoi')).toBeTruthy();
   });
 
   it('membuka layar Fondasi & sistem dari Ringkasan', async () => {

@@ -8,11 +8,11 @@ export const safetyCopy = {
   communityReport:
     'Informasi ini dilaporkan pengguna dan dapat berubah. Tetap patuhi rambu serta kondisi aktual di jalan.',
   noTrackingYet:
-    'Aplikasi belum memiliki fitur pelacakan. Lokasi tidak pernah dikirim tanpa tindakan Anda.',
+    'Berbagi lokasi nonaktif sampai Anda menyetujuinya pada perjalanan aktif, dan dapat dihentikan kapan saja.',
 } as const;
 
 export const unavailableCopy = {
   badge: 'Belum tersedia',
   foundationNote:
-    'Fitur ini belum dibangun. RodaKawan saat ini hanya berisi fondasi aplikasi dan struktur navigasi.',
+    'Garasi, klub, dan perjalanan sudah tersedia. Fitur yang belum dibangun tetap ditandai jelas dan tidak memakai data contoh.',
 } as const;

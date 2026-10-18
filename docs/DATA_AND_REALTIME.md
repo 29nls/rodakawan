@@ -50,7 +50,9 @@ Ini adalah pembagian operasi/logical API. Nama endpoint final dapat berupa Supab
 
 ## 4. Realtime topic dan event
 
-Semua topic terkait ride harus privat dan authorization-nya berdasarkan membership ride. Jangan menggunakan topic publik untuk data lokasi.
+**Implementasi Milestone 3 (19 Oktober 2026).** Posisi tidak dikirim lewat Broadcast. Aplikasi berlangganan **Postgres Changes** pada `public.ride_locations` dengan filter `ride_id=eq.<uuid>`; setiap baris tetap melewati RLS `ride_locations_select_active_member`, jadi non-anggota, peserta yang keluar, dan `anon` tidak menerima apa pun. Ini dipilih karena policy Broadcast privat membutuhkan `realtime.messages`, yang dimiliki `supabase_realtime_admin` dan tidak dapat diubah lewat koneksi migration project development (ADR-065). Konsekuensinya: latensi mengikuti replikasi tabel, bukan pesan aplikasi, dan tidak ada kanal publik. Tabel di bawah adalah rancangan untuk **Broadcast/presence** yang belum dipakai; jangan menganggapnya sudah aktif.
+
+Semua topic terkait ride, bila kelak dipakai, harus privat dan authorization-nya berdasarkan membership ride. Jangan menggunakan topic publik untuk data lokasi.
 
 | Topic contoh | Event | Isi |
 |---|---|---|
@@ -101,9 +103,9 @@ planned ──start by host──> active ──end by host──> completed
 ```
 
 - Tidak boleh mengubah `completed` kembali ke `active` lewat update client biasa.
-- Ride `active` memiliki participant membership dan private channel.
-- Saat complete/cancel, backend memblokir location writes baru, menutup PTT session bila ada, dan mencegah join baru sesuai kebijakan.
-- Event dan perubahan state harus idempotent, karena retry jaringan dapat mengirim request dua kali.
+- Ride `active` memiliki participant membership; tidak ada channel Broadcast yang dibuka untuk lokasi (lihat bagian 4).
+- Saat complete/cancel, backend memblokir location writes baru lewat `publish_ride_location`, menghapus seluruh baris lokasi ride itu, dan mematikan consent semua peserta. PTT belum ada pada M3.
+- Event dan perubahan state harus idempotent, karena retry jaringan dapat mengirim request dua kali. RPC memakai `select ... for update` dan upsert `(ride_id, user_id)`; transisi final ditolak jika diulang.
 
 ## 6. Expiry laporan bahaya
 

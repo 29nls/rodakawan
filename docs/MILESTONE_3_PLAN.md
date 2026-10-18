@@ -1,22 +1,21 @@
 # Rencana Milestone 3 — Perjalanan & berbagi lokasi
 
-Status: **rencana saja (belum dimulai, belum ada perubahan kode/migration)**. Tanggal: 2026-10-19.
-Dokumen ini bukan catatan hasil. Tidak ada satu pun baris di sini yang boleh dibaca sebagai "sudah
-dikerjakan".
+Status: **Implemented · Passed locally · Passed against dev backend**. Tanggal: 2026-10-19.
+**Tested on physical device: Blocked** untuk alur perjalanan dua perangkat, background/reboot, dan
+pengukuran baterai. Peta **belum dipasang** (ADR-064 belum final); layar menampilkan daftar posisi
+dan keadaan “peta belum tersedia” yang eksplisit, bukan peta tiruan.
 
-**Gerbang masuk:** Milestone 3 tidak dimulai sebelum gerbang penerimaan Milestone 2 lulus, yaitu
-seluruh checklist bagian 5 [`MILESTONE_2_REPORT.md`](MILESTONE_2_REPORT.md) dijalankan di perangkat
-fisik dengan APK `v0.1.0-build20` (baseline audit: `v0.1.0-build19`) dan dua akun nyata. Sampai itu
-terjadi, status garasi/klub adalah
-**Implemented · Passed locally · Passed against dev backend · Tested on physical device: Blocked**,
-dan tidak ada kode live-location yang ditulis.
+**Gerbang masuk:** pemilik aplikasi melaporkan bahwa Milestone 2 sudah dicoba di perangkat tanpa galat
+yang teramati. Laporan itu dicatat sebagai **owner-reported**, bukan bukti uji yang direkam repository
+(tag, tangkapan layar, dan daftar kasus per kasus tidak tersedia). Karena itu pengembangan M3 dimulai,
+tetapi status uji perangkat M2 tetap ditulis apa adanya di [`MILESTONE_2_REPORT.md`](MILESTONE_2_REPORT.md)
+dan tidak dinaikkan menjadi “seluruh checklist lulus”.
 
-Dua keputusan lain juga menggantung dan harus selesai sebelum layar peta dibangun:
-
-1. **Pemilik produk menyatakan M2 lulus di perangkat.** Tanpa itu, milestone ini tetap di tahap
-   rencana.
-2. **Penyedia peta/tile dipilih** — lihat [`MAP_PROVIDER_DECISION.md`](MAP_PROVIDER_DECISION.md) dan
-   ADR-064. Jangan menambahkan dependency peta sebelum keputusan itu dicatat.
+Keputusan yang sudah diambil untuk M3 ada di ADR-065: satu baris lokasi terakhir, consent per
+perjalanan, sampling 15 detik/25 meter, ambang basi 60 detik, pembersihan lewat trigger, RPC untuk
+seluruh mutasi, dan Realtime melalui Postgres Changes. Peta tetap ditunda karena ADR-064 belum final:
+jangan menambahkan dependency peta sebelum pemilik produk memilih provider dan kredensialnya diuji di
+development build.
 
 ## Tujuan
 
@@ -100,39 +99,40 @@ berdiri sendiri — pola itulah yang pernah membuat mantan anggota masih membaca
 8. GPS mati, izin ditolak, kehilangan jaringan, lokasi basi, dan pembatasan baterai tampil sebagai
    keadaan UI yang eksplisit.
 
-## Draf migration dan uji RLS/RPC
+## Migration dan uji RLS/RPC
 
-Dua berkas berikut adalah **draft**, bukan migration aktif:
+- [`supabase/migrations/20261019120000_ride_workflow.sql`](../supabase/migrations/20261019120000_ride_workflow.sql)
+  — migration aktif. Isinya: `create_ride`, `update_ride`, `invite_ride_member`,
+  `accept_ride_invite`, `join_ride`, `leave_ride`, `remove_ride_member`, `transition_ride`,
+  `set_ride_location_sharing`, `publish_ride_location`, dua trigger pembersihan lokasi, dan
+  pencabutan `INSERT`/`UPDATE` langsung pada `ride_locations`.
+- [`supabase/tests/rls_rides_test.sql`](../supabase/tests/rls_rides_test.sql) — uji allow/deny untuk
+  `anon`, non-anggota, anggota klub, host, undangan, consent, publikasi lokasi, dan pembersihan. Berkas
+  ini **terdaftar** di `DEFAULT_TEST_FILES` dan berjalan otomatis di workflow `Database RLS`.
 
-- [`supabase/drafts/milestone_3_ride_state.sql`](../supabase/drafts/milestone_3_ride_state.sql) —
-  RPC `transition_ride` (state machine di database), RPC `set_ride_location_sharing` (consent per
-  perjalanan), dan dua trigger yang menghapus `ride_locations` saat consent dimatikan, anggota
-  keluar, atau perjalanan selesai/dibatalkan. Tidak ada tabel atau policy baru.
-- [`supabase/tests/drafts/rls_rides_m3_draft.sql`](../supabase/tests/drafts/rls_rides_m3_draft.sql) —
-  uji allow/deny untuk `anon`, non-anggota, anggota, host, consent, dan pembersihan lokasi. Berkas ini
-  **tidak** terdaftar di `DEFAULT_TEST_FILES`; menjalankannya tanpa draf akan berhenti dengan pesan
-  paritas yang jelas.
+Validasi 19 Oktober 2026: migration diterapkan ke project development, lalu `npm run db:test`
+menjalankan tiga berkas — **171 + 17 + 67 perintah**, notice `UJI RLS PERJALANAN M3 LULUS` diterima,
+exit 0. Sebelum diterapkan, migration + uji yang sama juga dijalankan dalam satu transaksi yang
+di-ROLLBACK (118 perintah) untuk membuktikan tidak ada objek uji yang tertinggal.
 
-Cara menjalankan setelah gerbang M2 lulus dan draf diterapkan ke database **scratch/development**
-(bukan produksi):
+Penjaga statis `scripts/__tests__/milestone-3.test.mjs` memastikan migration tetap memuat RPC/trigger
+penting, uji perjalanan tetap terdaftar di runner, dan direktori draf lama tidak kembali.
 
-```powershell
-# 1. Terapkan draf ke database scratch (jangan ke project produksi).
-npx supabase db execute --file supabase/drafts/milestone_3_ride_state.sql
+## Implementasi aplikasi
 
-# 2. Jalankan hanya uji draf ini, bukan seluruh daftar default.
-npm run db:test -- --file supabase/tests/drafts/rls_rides_m3_draft.sql
-```
+| Bagian | Berkas | Status |
+| --- | --- | --- |
+| Service API perjalanan | `src/features/rides/api.ts` | Implemented · unit test |
+| Validasi formulir/jadwal | `src/features/rides/validation.ts` | Implemented · unit test |
+| Sampling & kesegaran lokasi | `src/features/rides/location.ts` | Implemented · unit test |
+| Tracking foreground/background | `src/features/rides/tracking.ts` | Implemented · belum diuji perangkat |
+| Tab daftar perjalanan | `src/app/(tabs)/rides.tsx` | Implemented · component test |
+| Buat/ubah perjalanan | `src/app/ride-new.tsx` | Implemented · belum ada component test |
+| Detail, undangan, consent, posisi | `src/app/ride.tsx` | Implemented · component test |
+| Peta | — | **Belum**; layar menampilkan daftar + label kesegaran |
 
-Validasi 19 Oktober 2026: draf dan ujinya dijalankan bersama dalam **satu transaksi yang di-ROLLBACK**
-terhadap project development — 77 perintah, notice `UJI RLS PERJALANAN M3 LULUS` diterima, lalu
-diperiksa bahwa tidak ada fungsi, trigger, tabel konteks, atau baris ride uji yang tertinggal. Ini
-membuktikan perilaku draf, bukan menerapkannya secara permanen.
-
-Jangan menyalin draf ke `supabase/migrations/` atau menambahkannya ke `DEFAULT_TEST_FILES` sebelum
-gerbang M2 lulus. `scripts/__tests__/milestone-3-draft.test.mjs` memeriksa bahwa tidak ada migration
-aktif yang memuat RPC M3 dan berkas uji draf tidak masuk daftar runner, sehingga aktivasi tidak bisa
-terjadi diam-diam.
+Tidak ada tombol demo. Setiap tombol memanggil RPC/service nyata; tombol yang tidak relevan dengan
+peran/status disembunyikan, tetapi otorisasi tetap diputuskan database.
 
 ## Perangkat dan platform
 

@@ -8,6 +8,22 @@ sedangkan build preview (`v<versi>-build<N>`) diringkas di dalam blok yang bisa 
 versi adalah tautan ke halaman rilisnya di GitHub, sehingga riwayat ini bisa dinavigasi langsung
 dari berkas.
 
+## Belum dirilis — Milestone 3
+
+- Perjalanan klub: buat/ubah, undang, terima undangan, gabung, keluar, keluarkan peserta, dan
+  kontrol host untuk memulai/menyelesaikan/membatalkan. Seluruh mutasi lewat RPC transactional dengan
+  state machine di database; klien tidak menulis `rides`/`ride_members` langsung.
+- Berbagi lokasi opt-in per perjalanan: consent terpisah dari izin Android, satu baris lokasi terakhir
+  per peserta (tanpa riwayat GPS), sampling 15 detik/25 meter, marker basi setelah 60 detik, dan
+  penghapusan otomatis saat opt-out, keluar, dikeluarkan, atau perjalanan final.
+- Realtime posisi lewat Postgres Changes pada `ride_locations` (RLS per baris), bukan kanal publik.
+- `expo-location` + `expo-task-manager` dengan foreground service Android; izin background diminta
+  terpisah setelah penjelasan.
+- Migration `20261019120000_ride_workflow.sql`, tipe database diperbarui, uji RLS/RPC perjalanan
+  (**67 perintah**), dan uji Jest untuk API/validasi/kesegaran/UI.
+- **Belum:** renderer peta (ADR-064), uji dua perangkat, GPS mati/mode pesawat/force-stop/reboot, dan
+  pengukuran baterai 30 menit.
+
 ## [v0.1.0-build20](https://github.com/29nls/rodakawan/releases/tag/v0.1.0-build20) — 2026-10-18 · pratinjau
 
 <details>

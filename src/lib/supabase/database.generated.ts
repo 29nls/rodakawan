@@ -493,11 +493,46 @@ isOneToOne: false
             "accept_follow_request":
 { Args: { "p_follower_id": string }; Returns: boolean
                            },
+"accept_ride_invite":
+{ Args: { "p_ride_id": string }; Returns: string
+                           },
 "can_publish_ride_location":
 { Args: { "p_ride_id": string }; Returns: boolean
                            },
 "create_club":
 { Args: { "p_description"?: string,"p_join_policy"?: string,"p_name": string,"p_slug"?: string,"p_visibility"?: string }; Returns: Json
+                           },
+"create_ride":
+{ Args: { "p_club_id": string,"p_description"?: string,"p_destination_label"?: string,"p_meeting_label"?: string,"p_starts_at"?: string,"p_title": string,"p_visibility"?: string }; Returns: {
+              "activity_type": string,
+"club_id": string | null,
+"created_at": string,
+"created_by": string,
+"description": string | null,
+"destination_label": string | null,
+"destination_lat": number | null,
+"destination_lng": number | null,
+"ended_at": string | null,
+"id": string,
+"invite_code": string | null,
+"meeting_label": string | null,
+"meeting_lat": number | null,
+"meeting_lng": number | null,
+"started_at": string | null,
+"starts_at": string | null,
+"status": string,
+"title": string,
+"updated_at": string,
+"visibility": string
+            }
+                          SetofOptions: {
+        from: "*"
+        to: "rides"
+        isOneToOne: true
+        isSetofReturn: false
+      } },
+"invite_ride_member":
+{ Args: { "p_ride_id": string,"p_user_id": string }; Returns: string
                            },
 "is_club_admin":
 { Args: { "p_club_id": string }; Returns: boolean
@@ -514,11 +549,38 @@ isOneToOne: false
 "is_ride_member":
 { Args: { "p_ride_id": string }; Returns: boolean
                            },
+"join_ride":
+{ Args: { "p_ride_id": string }; Returns: string
+                           },
 "leave_club":
 { Args: { "p_club_id": string }; Returns: string
                            },
+"leave_ride":
+{ Args: { "p_ride_id": string }; Returns: string
+                           },
+"publish_ride_location":
+{ Args: { "p_accuracy_m"?: number,"p_heading_deg"?: number,"p_latitude": number,"p_longitude": number,"p_recorded_at"?: string,"p_ride_id": string,"p_speed_mps"?: number }; Returns: {
+              "accuracy_m": number | null,
+"heading_deg": number | null,
+"latitude": number,
+"longitude": number,
+"recorded_at": string,
+"ride_id": string,
+"speed_mps": number | null,
+"updated_at": string,
+"user_id": string
+            }
+                          SetofOptions: {
+        from: "*"
+        to: "ride_locations"
+        isOneToOne: true
+        isSetofReturn: false
+      } },
 "remove_club_member":
 { Args: { "p_club_id": string,"p_user_id": string }; Returns: string
+                           },
+"remove_ride_member":
+{ Args: { "p_ride_id": string,"p_user_id": string }; Returns: string
                            },
 "request_club_membership":
 { Args: { "p_club_id": string }; Returns: string
@@ -528,7 +590,68 @@ isOneToOne: false
                            },
 "set_club_member_role":
 { Args: { "p_club_id": string,"p_role": string,"p_user_id": string }; Returns: string
-                           }
+                           },
+"set_ride_location_sharing":
+{ Args: { "p_enabled": boolean,"p_ride_id": string }; Returns: boolean
+                           },
+"transition_ride":
+{ Args: { "p_next": string,"p_ride_id": string }; Returns: {
+              "activity_type": string,
+"club_id": string | null,
+"created_at": string,
+"created_by": string,
+"description": string | null,
+"destination_label": string | null,
+"destination_lat": number | null,
+"destination_lng": number | null,
+"ended_at": string | null,
+"id": string,
+"invite_code": string | null,
+"meeting_label": string | null,
+"meeting_lat": number | null,
+"meeting_lng": number | null,
+"started_at": string | null,
+"starts_at": string | null,
+"status": string,
+"title": string,
+"updated_at": string,
+"visibility": string
+            }
+                          SetofOptions: {
+        from: "*"
+        to: "rides"
+        isOneToOne: true
+        isSetofReturn: false
+      } },
+"update_ride":
+{ Args: { "p_description"?: string,"p_destination_label"?: string,"p_meeting_label"?: string,"p_ride_id": string,"p_starts_at"?: string,"p_title": string }; Returns: {
+              "activity_type": string,
+"club_id": string | null,
+"created_at": string,
+"created_by": string,
+"description": string | null,
+"destination_label": string | null,
+"destination_lat": number | null,
+"destination_lng": number | null,
+"ended_at": string | null,
+"id": string,
+"invite_code": string | null,
+"meeting_label": string | null,
+"meeting_lat": number | null,
+"meeting_lng": number | null,
+"started_at": string | null,
+"starts_at": string | null,
+"status": string,
+"title": string,
+"updated_at": string,
+"visibility": string
+            }
+                          SetofOptions: {
+        from: "*"
+        to: "rides"
+        isOneToOne: true
+        isSetofReturn: false
+      } }
           }
           Enums: {
             [_ in never]: never

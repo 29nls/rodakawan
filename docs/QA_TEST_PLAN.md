@@ -64,17 +64,24 @@
 | CLUB-15 | Ubah peran atau keluarkan anggota | Owner dapat menaikkan/menurunkan peran dan mengeluarkan anggota; mencabut akses data klub; owner terakhir ditolak database. |
 | CLUB-11 | Unggah/ganti/hapus logo klub | Owner/admin berhasil; member biasa dan non-anggota ditolak; logo klub privat tidak terbaca non-anggota; logo klub publik tetap terlihat. |
 | CLUB-16 | Cari, filter, dan paginasi daftar anggota | Pencarian mencocokkan user ID/peran/status tanpa membedakan huruf besar-kecil; filter status dan peran dapat digabung; hasil dipotong 5 baris per halaman dan nomor halaman dijepit setelah anggota disetujui/dikeluarkan. |
-| RIDE-01 | Creator membuat ride | Ride status `planned`, host membership tersedia. |
-| RIDE-02 | Host memulai ride | State menjadi `active`; hanya anggota sah bergabung channel. |
-| RIDE-03 | User non-member join private channel | Join ditolak. |
-| LOC-01 | Peserta memberi izin foreground dan mengaktifkan sharing | Marker peserta lain bergerak dengan timestamp. |
-| LOC-02 | Permission lokasi ditolak | Fitur menjelaskan akibatnya dan tidak mengklaim sharing aktif. |
-| LOC-03 | GPS dimatikan | UI menyatakan lokasi tidak tersedia; tidak memakai koordinat lama sebagai live. |
-| LOC-04 | Data tidak masuk 30 detik | Marker ditandai stale dengan last-updated. |
-| LOC-05 | Pengguna stop sharing | Update berhenti dan status peserta berubah. |
-| LOC-06 | User keluar / ride diakhiri | Server menolak update selanjutnya dan channel tertutup untuk akses yang tidak lagi sah. |
-| LOC-07 | Payload mengklaim userId milik peserta lain | Server mengabaikan/menolak; identity berasal dari session. |
-| LOC-08 | Lompatan GPS tak wajar / timestamp masa depan | Di-filter/ditandai dan tidak merusak peta. |
+| RIDE-01 | Creator membuat ride dari klub aktif | Ride `planned`, pembuat otomatis `host/joined`, consent lokasi tetap `false`. |
+| RIDE-02 | Host memulai / menyelesaikan / membatalkan | State hanya `planned→active→completed` atau `planned/active→cancelled`; `started_at`/`ended_at` diisi server. |
+| RIDE-03 | Anggota biasa atau non-anggota memindahkan status | Ditolak RPC (`42501`), bukan hanya tombol yang disembunyikan. |
+| RIDE-04 | Undangan `invite_only` | Undangan host berstatus `invited`; target menerima; `join_ride` langsung ditolak sebelum menerima. |
+| RIDE-05 | Host mengeluarkan peserta | Status `removed`, lokasi peserta langsung hilang, akses baca lokasi hilang. |
+| RIDE-06 | Host mencoba keluar sebelum final | Ditolak `23514`; host harus menyelesaikan/membatalkan dulu. |
+| RIDE-07 | Ride final | Tidak bisa kembali `active`/`cancelled`; seluruh `ride_locations` terhapus dan consent dimatikan. |
+| RIDE-08 | REST langsung ke `ride_locations` | `INSERT`/`UPDATE` ditolak karena grant dicabut; hanya RPC `publish_ride_location` yang sah. |
+| LOC-01 | Peserta memberi izin foreground lalu menyalakan sharing | Consent database aktif, task berjalan, peserta lain melihat posisi + timestamp. |
+| LOC-02 | Permission lokasi ditolak | UI menjelaskan akibatnya, consent tidak dinyalakan, pelacakan tidak dimulai, tetapi peserta tetap bisa ikut ride. |
+| LOC-03 | GPS dimatikan / tidak ada fix | UI menyatakan lokasi belum tersedia; tidak memakai koordinat lama sebagai live. |
+| LOC-04 | Tidak ada update >60 detik | Label berubah menjadi “Basi” dengan waktu pembaruan terakhir. |
+| LOC-05 | Pengguna stop sharing | Task berhenti, RPC consent `false`, baris lokasi pengguna terhapus, status peserta berubah. |
+| LOC-06 | Peserta keluar / ride selesai | Task berhenti, server menolak update berikutnya, baris lokasi dihapus, langganan tidak lagi menerima baris. |
+| LOC-07 | Payload mengklaim `user_id` peserta lain | Tidak mungkin lewat RPC (server memakai `auth.uid()`); REST langsung ditolak grant. |
+| LOC-08 | Koordinat di luar rentang / timestamp masa depan / fix basi | Ditolak `publish_ride_location` dengan `22023`; tidak ada baris yang tersimpan. |
+| LOC-09 | Izin background ditolak setelah foreground | Foreground tetap berjalan; UI menyatakan pembaruan berhenti saat aplikasi ditutup, bukan mengklaim background aktif. |
+| LOC-10 | Aplikasi di background, mode pesawat, force-stop, reboot | Catat perilaku nyata per perangkat; aplikasi tidak boleh mengklaim pelacakan tanpa jeda saat task mati. |
 | HAZ-01 | Buat laporan valid | Report terlihat pada peta/list untuk audience yang sesuai. |
 | HAZ-02 | Report kedaluwarsa | Tidak ditampilkan sebagai bahaya aktif. |
 | HAZ-03 | Spam report berulang | Rate limit atau langkah mitigasi diterapkan. |
@@ -145,7 +152,7 @@ Jangan rilis jika ditemukan salah satu:
 - Permission request menyesatkan pengguna atau kontrol stop-sharing tidak berfungsi.
 - Peringatan bahaya kedaluwarsa masih tampil sebagai aktif tanpa indikator.
 
-## 9. Status otomatisasi dan verifikasi (Milestone 1 + 1.5)
+## 9. Status otomatisasi dan verifikasi (Milestone 1–3)
 
 Istilah status yang dipakai: **Implemented**, **Passed locally**, **Passed against dev backend**,
 **Tested on physical device**, **Blocked**.
@@ -165,13 +172,16 @@ Yang **sudah otomatis** (`npm test`, jaringan dimatikan; client Supabase diganti
 | `src/__tests__/navigation.test.tsx` | Rute asli: gerbang awal, alur auth, area privat, dan tidak ada redirect loop. |
 | `src/features/garage/__tests__/*.test.ts` | Validasi kendaraan (selaras CHECK constraint) dan API garasi: tambah, ubah, jadikan utama, hapus, pemetaan galat. |
 | `src/features/clubs/__tests__/*.test.ts` | Validasi klub, jelajah/buat klub, dan alur keanggotaan lewat RPC (ajukan, batalkan, tinjau, peran, keluarkan, keluar). |
+| `src/features/rides/__tests__/*.test.ts` | Validasi perjalanan/jadwal, kebijakan sampling & kesegaran lokasi, API perjalanan (RPC, konsent, Postgres Changes tanpa `user_id` klien). |
+| `src/__tests__/rides-list.test.tsx` | Tab Perjalanan: daftar nyata, status, keadaan kosong, dan aksi buat. |
+| `src/__tests__/ride-detail.test.tsx` | Detail perjalanan: consent lokasi, penolakan izin, undangan, dan pembatasan non-anggota. |
 | `src/components/ui/__tests__/*` | Perilaku dasar komponen yang dipakai form (tombol, field). |
 
 Hasil terakhir dijalankan (19 Oktober 2026, Node 24.18.1, npm 12.0.2, setelah `npm ci` dari
 `package-lock.json`):
-`npm test -- --ci` → **27 suite, 316 test lulus** (termasuk 14 test kompresi foto, 18 test
+`npm test -- --ci` → **32 suite, 351 test lulus** (termasuk suite perjalanan Milestone 3, 14 test kompresi foto, 18 test
 pembersihan objek yatim, dan 17 test foto profil: 12 API + 5 komponen layar); `npm run test:scripts`
-→ **240 test lulus, exit 0** (termasuk 4 test penjaga draf Milestone 3);
+→ **240 test lulus, exit 0** (termasuk 4 test penjaga Milestone 3);
 `npm run deps:check`, `npm run typecheck`, `npm run lint`, `npm run format:check`, dan
 `npm run export:android` semuanya exit 0. `npm run doctor` **tidak dapat dipastikan**: 20 dari 21
 pemeriksaan berjalan, pemeriksaan skema config gagal `EAI_AGAIN exp.host` karena DNS lingkungan ini
@@ -182,15 +192,15 @@ melaporkan 228/229 (lalu 234/235) karena asersi baris pertama `CHANGELOG.md` mem
 disk (`core.autocrlf=true`) dengan `HEADER` ber-LF. Perbaikannya **bukan** menonaktifkan asersi atau
 mengubah `core.autocrlf`, melainkan menyeragamkan akhir baris di batas perbandingan
 (`normalizeLineEndings`), ditambah test regresi untuk input LF/CRLF/CR dan test bahwa judul yang
-diubah tetap ditolak (ADR-063). Versi sekarang: **240/240 lulus** (empat di antaranya penjaga draf
-Milestone 3 di `scripts/__tests__/milestone-3-draft.test.mjs`).
+diubah tetap ditolak (ADR-063). Versi sekarang: **240/240 lulus** (empat di antaranya penjaga
+Milestone 3 di `scripts/__tests__/milestone-3.test.mjs`).
 
 Yang **sudah diverifikasi terhadap dev backend** (13 Oktober 2026, project development khusus
 RodaKawan — ADR-035; diperluas pada Milestone 1.6):
 
 - `supabase/tests/rls_profiles_test.sql` — `npm run db:test` mencetak notice `UJI RLS PROFIL LULUS`
-  (**171 perintah**, exit 0) pada database development yang memuat dua belas migration; dijalankan
-  ulang 18 Oktober 2026 dengan hasil yang sama.
+  (**171 perintah**, exit 0) pada database development yang memuat tiga belas migration; dijalankan
+  ulang 19 Oktober 2026 dengan hasil yang sama (termasuk `rls_rides_test.sql`: 67 perintah).
 - `supabase/tests/rls_policy_guard_test.sql` (SEC-01, 18 Oktober 2026) — notice
   `UJI POLICY OWNER-GUARD LULUS`, **17 perintah**, exit 0. Yang dibuktikan: **18 policy wadah**
   diperiksa dan tidak ada temuan kepemilikan tanpa penjaga di luar daftar pengecualian; detektornya
@@ -291,11 +301,11 @@ Yang **masih Blocked** (butuh perangkat / alur aplikasi / akun):
 - PROF-07 — butuh sesi nyata yang kedaluwarsa.
 - Alur follow dari **aplikasi** (kirim permintaan, terima permintaan) belum ada; yang terbukti baru
   aturan dan fungsi di database.
-- **GAR-01…GAR-04 dan CLUB-01…CLUB-10 lewat aplikasi di perangkat fisik** — butuh APK dari commit
-  Milestone 2 (`fa4397e`, rilis `v0.1.0-build20`; baseline `749424c`/build19) dan dua akun nyata.
-  Aturan di database sudah lulus;
-  yang belum dibuktikan adalah alur layarnya (bagian 5 `docs/MILESTONE_2_REPORT.md` memuat
-  checklist-nya).
+- **GAR-01…GAR-04 dan CLUB-01…CLUB-10 — bukti per langkah** masih Blocked, meskipun pemilik
+  aplikasi melaporkan build sudah dicoba di HP tanpa error yang teramati (owner-reported, tanpa tag
+  rilis/kasus uji per kasus). APK yang dimaksud: `fa4397e`, rilis `v0.1.0-build20`; baseline
+  `749424c`/build19. Aturan di database sudah lulus; yang belum terdokumentasi adalah bukti alur
+  layarnya (bagian 5 `docs/MILESTONE_2_REPORT.md` memuat checklist-nya).
   Bukti tiap langkah direkam otomatis oleh `node scripts/device-checklist.mjs` (tangkapan layar,
   hierarki UI, logcat, identitas perangkat dan APK); penilaian langkah tetap dilakukan manusia.
 - **GAR-05 / CLUB-11 lewat aplikasi di perangkat** — logika unggah/ganti/hapus, kompresi otomatis
