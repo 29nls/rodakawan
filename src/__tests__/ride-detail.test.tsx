@@ -9,6 +9,7 @@ import {
 } from '@/features/rides/api';
 import {
   isRideLocationTrackingActive,
+  readTrackedRideId,
   requestBackgroundPermission,
   requestForegroundPermission,
   startRideLocationTracking,
@@ -51,8 +52,10 @@ jest.mock('@/features/rides/tracking', () => ({
   getForegroundPermissionState: jest.fn(async () => 'undetermined'),
   getBackgroundPermissionState: jest.fn(async () => 'denied'),
   isRideLocationTrackingActive: jest.fn(async () => false),
+  readTrackedRideId: jest.fn(() => null),
   requestForegroundPermission: jest.fn(async () => 'granted'),
   requestBackgroundPermission: jest.fn(async () => 'granted'),
+  requestTrackingNotificationPermission: jest.fn(async () => 'granted'),
   startRideLocationTracking: jest.fn(async () => ({ ok: true })),
   stopRideLocationTracking: jest.fn(async () => undefined),
 }));
@@ -69,6 +72,7 @@ const mockedForeground = jest.mocked(requestForegroundPermission);
 const mockedBackground = jest.mocked(requestBackgroundPermission);
 const mockedTrackingActive = jest.mocked(isRideLocationTrackingActive);
 const mockedStop = jest.mocked(stopRideLocationTracking);
+const mockedTrackedRide = jest.mocked(readTrackedRideId);
 
 const USER_ID = '11111111-1111-1111-1111-111111111111';
 const OTHER_ID = '22222222-2222-2222-2222-222222222222';
@@ -180,6 +184,7 @@ describe('detail perjalanan', () => {
     mockedBackground.mockResolvedValue('granted');
     mockedTrackingActive.mockResolvedValue(false);
     mockedStop.mockResolvedValue(undefined);
+    mockedTrackedRide.mockReturnValue(null);
   });
 
   it('menyalakan consent lalu memulai pelacakan perangkat', async () => {
@@ -234,6 +239,29 @@ describe('detail perjalanan', () => {
     await waitFor(() => {
       expect(mockedAccept).toHaveBeenCalled();
     });
+  });
+
+  it('menghentikan task yang masih berjalan saat perjalanan sudah final', async () => {
+    const details = buildDetails();
+    details.ride = { ...details.ride, status: 'completed' };
+    mockedDetails.mockResolvedValue({ ok: true, data: details });
+    mockedTrackedRide.mockReturnValue(details.ride.id);
+
+    await render(<RideScreen />);
+
+    await waitFor(() => expect(mockedStop).toHaveBeenCalled());
+  });
+
+  it('tidak menghentikan task milik perjalanan lain', async () => {
+    const details = buildDetails();
+    details.ride = { ...details.ride, status: 'completed' };
+    mockedDetails.mockResolvedValue({ ok: true, data: details });
+    mockedTrackedRide.mockReturnValue('perjalanan-lain');
+
+    await render(<RideScreen />);
+
+    expect(await screen.findByText('Kopdar Sabtu')).toBeTruthy();
+    await waitFor(() => expect(mockedStop).not.toHaveBeenCalled());
   });
 
   it('non-anggota hanya melihat penjelasan, bukan lokasi peserta', async () => {

@@ -43,8 +43,10 @@ import {
   getBackgroundPermissionState,
   getForegroundPermissionState,
   isRideLocationTrackingActive,
+  readTrackedRideId,
   requestBackgroundPermission,
   requestForegroundPermission,
+  requestTrackingNotificationPermission,
   startRideLocationTracking,
   stopRideLocationTracking,
 } from '@/features/rides/tracking';
@@ -169,9 +171,16 @@ export default function RideScreen() {
     return () => subscription.unsubscribe();
   }, [backend, isActive, isMember, rideId]);
 
-  // Perjalanan final: hentikan task lokal; server sudah menghapus baris lokasi.
+  // Hanya hentikan task milik perjalanan ini. Membuka detail perjalanan lain
+  // tidak boleh mematikan berbagi yang sedang berjalan di perjalanan sendiri.
+  const trackingEligible =
+    ride?.status === 'active' &&
+    membership?.status === 'joined' &&
+    membership?.sharing_location === true;
+
   useEffect(() => {
-    if (!ride || (ride.status !== 'completed' && ride.status !== 'cancelled')) return;
+    if (state.status !== 'ready' || trackingEligible) return;
+    if (readTrackedRideId() !== rideId) return;
 
     let active = true;
 
@@ -183,7 +192,7 @@ export default function RideScreen() {
     return () => {
       active = false;
     };
-  }, [ride]);
+  }, [rideId, state.status, trackingEligible]);
 
   async function run(action: () => Promise<{ ok: boolean; error?: AppError }>, success: string) {
     setBusy(true);
@@ -223,9 +232,15 @@ export default function RideScreen() {
     setNotice(null);
     setActionError(null);
 
-    if (membership?.sharing_location) {
+    // Hentikan task hanya bila task itu memang milik perjalanan ini. Pengguna
+    // dapat menjadi peserta beberapa perjalanan, dan meninggalkan perjalanan B
+    // tidak boleh mematikan berbagi di perjalanan A.
+    if (readTrackedRideId() === rideId) {
       await stopRideLocationTracking();
       setTrackingActive(false);
+    }
+
+    if (membership?.sharing_location) {
       const revoked = await setRideLocationSharing(backend.client, rideId, false);
       if (!revoked.ok) {
         setBusy(false);
@@ -438,6 +453,17 @@ export default function RideScreen() {
 
     setBusy(true);
     setActionError(null);
+
+    // Notifikasi foreground service adalah tanda bahwa lokasi masih dibagikan.
+    // Tanpa izinnya, jangan minta izin latar belakang yang tidak bisa ditampilkan.
+    const notifications = await requestTrackingNotificationPermission();
+    if (notifications !== 'granted') {
+      setBusy(false);
+      setNotice(
+        'Izin notifikasi tidak diberikan. Berbagi tetap berjalan selama aplikasi terbuka; notifikasi status wajib terlihat sebelum berbagi di latar belakang dapat dinyalakan.',
+      );
+      return;
+    }
 
     const permission = await requestBackgroundPermission();
     setBackgroundPermission(permission);

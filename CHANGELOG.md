@@ -30,7 +30,12 @@ dari berkas.
   penghapusan otomatis saat opt-out, keluar, dikeluarkan, atau perjalanan final.
 - Realtime posisi lewat Postgres Changes pada `ride_locations` (RLS per baris), bukan kanal publik.
 - `expo-location` + `expo-task-manager` dengan foreground service Android; izin background diminta
-  terpisah setelah penjelasan.
+  terpisah setelah penjelasan, dan izin notifikasi Android 13+ diminta lebih dulu agar tanda
+  berbagi tetap terlihat.
+- Task lokasi berhenti sendiri saat server menolak secara permanen (consent dicabut, peserta
+  dikeluarkan, atau perjalanan final), memakai penjaga agar batch tidak tumpang tindih, dan tidak
+  meninggalkan ride id tertinggal bila task gagal dimulai. Membuka detail perjalanan lain tidak
+  lagi menghentikan task yang sedang berjalan di perjalanan sendiri.
 - Migration `20261019120000_ride_workflow.sql`, tipe database diperbarui, uji RLS/RPC perjalanan
   (**67 perintah**), dan uji Jest untuk API/validasi/kesegaran/UI.
 - **Belum:** renderer peta (ADR-064), uji dua perangkat, GPS mati/mode pesawat/force-stop/reboot, dan

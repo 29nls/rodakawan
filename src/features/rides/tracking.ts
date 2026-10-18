@@ -14,6 +14,7 @@
 
 import * as Location from 'expo-location';
 import * as TaskManager from 'expo-task-manager';
+import { PermissionsAndroid, Platform } from 'react-native';
 
 import { publishRideLocation } from '@/features/rides/api';
 import {
@@ -49,6 +50,7 @@ export function readTrackedRideId(): string | null {
 }
 
 let lastSent: PreviousLocation | null = null;
+let publishing = false;
 
 function toPermissionState(status: Location.PermissionStatus): TrackingPermissionState {
   if (status === Location.PermissionStatus.GRANTED) return 'granted';
@@ -82,48 +84,82 @@ export async function isRideLocationTrackingActive(): Promise<boolean> {
   return TaskManager.isTaskRegisteredAsync(RIDE_LOCATION_TASK);
 }
 
+/**
+ * Izin notifikasi Android 13+ untuk notifikasi foreground service.
+ *
+ * Notifikasi itu adalah tanda berkelanjutan bahwa lokasi masih dibagikan;
+ * tanpa izinnya, berbagi latar belakang tidak dinyalakan. Ini bukan izin
+ * lokasi dan tidak pernah menyalakan pelacakan dengan sendirinya.
+ */
+export async function requestTrackingNotificationPermission(): Promise<TrackingPermissionState> {
+  if (Platform.OS !== 'android' || Number(Platform.Version) < 33) return 'granted';
+
+  const permission = PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS;
+  if (!permission) return 'denied';
+
+  if (await PermissionsAndroid.check(permission)) return 'granted';
+
+  const result = await PermissionsAndroid.request(permission);
+  return result === PermissionsAndroid.RESULTS.GRANTED ? 'granted' : 'denied';
+}
+
 if (!TaskManager.isTaskDefined(RIDE_LOCATION_TASK)) {
   TaskManager.defineTask<{ locations?: Location.LocationObject[] }>(
     RIDE_LOCATION_TASK,
     async ({ data, error }) => {
-      if (error) return;
+      if (error || publishing) return;
 
       const rideId = readTrackedRideId();
       const client = getSupabaseClient();
       if (!rideId || !client) return;
 
-      const now = Date.now();
-      for (const location of data.locations ?? []) {
-        const fix = {
-          latitude: location.coords.latitude,
-          longitude: location.coords.longitude,
-          accuracy: location.coords.accuracy ?? null,
-          heading: location.coords.heading ?? null,
-          speed: location.coords.speed ?? null,
-          recordedAt: location.timestamp,
-        };
+      // Satu batch diproses pada satu waktu. Tanpa penjaga ini, dua pemanggilan
+      // task yang berdekatan bisa mengirim posisi yang sama dan saling menimpa
+      // `lastSent`. Seluruh isi dibungkus `finally` agar penjaga selalu lepas.
+      publishing = true;
+      try {
+        const now = Date.now();
+        for (const location of data.locations ?? []) {
+          const fix = {
+            latitude: location.coords.latitude,
+            longitude: location.coords.longitude,
+            accuracy: location.coords.accuracy ?? null,
+            heading: location.coords.heading ?? null,
+            speed: location.coords.speed ?? null,
+            recordedAt: location.timestamp,
+          };
 
-        const decision = shouldPublishLocation(fix, lastSent, now);
-        if (!decision.publish) continue;
+          const decision = shouldPublishLocation(fix, lastSent, now);
+          if (!decision.publish) continue;
 
-        const result = await publishRideLocation(client, rideId, {
-          latitude: fix.latitude,
-          longitude: fix.longitude,
-          accuracy: fix.accuracy,
-          heading: fix.heading,
-          speed: fix.speed,
-          recordedAt: new Date(fix.recordedAt).toISOString(),
-        });
-
-        // Kegagalan (mis. consent sudah dimatikan di server) sengaja tidak
-        // dicatat koordinatnya; task berhenti mengirim sampai update berikutnya.
-        if (result.ok) {
-          lastSent = {
+          const result = await publishRideLocation(client, rideId, {
             latitude: fix.latitude,
             longitude: fix.longitude,
-            sentAt: now,
-          };
+            accuracy: fix.accuracy,
+            heading: fix.heading,
+            speed: fix.speed,
+            recordedAt: new Date(fix.recordedAt).toISOString(),
+          });
+
+          if (result.ok) {
+            lastSent = {
+              latitude: fix.latitude,
+              longitude: fix.longitude,
+              sentAt: now,
+            };
+            continue;
+          }
+
+          // Kegagalan yang tidak dapat dicoba ulang berarti consent dicabut,
+          // peserta dikeluarkan, atau perjalanan sudah final. Task harus benar-
+          // benar berhenti, bukan terus membangunkan GPS setiap 15 detik.
+          if (!result.error.retryable) {
+            await stopRideLocationTracking();
+            return;
+          }
         }
+      } finally {
+        publishing = false;
       }
     },
   );
@@ -168,6 +204,10 @@ export async function startRideLocationTracking(rideId: string): Promise<Trackin
 
     return { ok: true };
   } catch {
+    // Jangan tinggalkan ride id yang membuat task berikutnya mengira masih
+    // melacak perjalanan yang gagal dimulai.
+    rememberTrackedRide(null);
+    lastSent = null;
     return {
       ok: false,
       message:

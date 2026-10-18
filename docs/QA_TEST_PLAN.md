@@ -179,7 +179,7 @@ Yang **sudah otomatis** (`npm test`, jaringan dimatikan; client Supabase diganti
 
 Hasil terakhir dijalankan (19 Oktober 2026, Node 24.18.1, npm 12.0.2, setelah `npm ci` dari
 `package-lock.json`):
-`npm test -- --ci` → **32 suite, 351 test lulus** (termasuk suite perjalanan Milestone 3, 14 test kompresi foto, 18 test
+`npm test -- --ci` → **32 suite, 353 test lulus** (termasuk suite perjalanan Milestone 3 dan 2 test siklus task lokasi, 14 test kompresi foto, 18 test
 pembersihan objek yatim, dan 17 test foto profil: 12 API + 5 komponen layar); `npm run test:scripts`
 → **240 test lulus, exit 0** (termasuk 4 test penjaga Milestone 3);
 `npm run deps:check`, `npm run typecheck`, `npm run lint`, `npm run format:check`, dan
