@@ -8,6 +8,26 @@ sedangkan build preview (`v<versi>-build<N>`) diringkas di dalam blok yang bisa 
 versi adalah tautan ke halaman rilisnya di GitHub, sehingga riwayat ini bisa dinavigasi langsung
 dari berkas.
 
+## [v0.1.0-build18](https://github.com/29nls/rodakawan/releases/tag/v0.1.0-build18) — 2026-10-18 · pratinjau
+
+<details>
+<summary>Catatan rilis pratinjau</summary>
+
+### Fitur
+
+- add image size shim for Jest tests to support Promise-based Image.getSize (`575b166`)
+
+### Perubahan lain
+
+- catat bahwa uji RLS kini berjalan otomatis di CI (`efcf203`)
+- tambahkan newline akhir berkas ci.yml (`b68f562`)
+- jalankan uji RLS otomatis saat file database berubah (`21e49d1`)
+- sebut ketiga run CI yang hijau, bukan hanya satu commit (`217cff3`)
+- tunjuk APK preview yang bisa membuktikan Milestone 2 (`ab3a9a8`)
+- sinkronkan status Milestone 2 dengan bukti yang diverifikasi ulang (`95ec43a`)
+
+</details>
+
 ## [v0.1.0-build11](https://github.com/29nls/rodakawan/releases/tag/v0.1.0-build11) — 2026-10-16 · pratinjau
 
 <details>
