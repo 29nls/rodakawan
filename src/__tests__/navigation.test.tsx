@@ -63,6 +63,13 @@ function createFakeClient(): SupabaseClient<Database> {
   const builder = {
     select: () => builder,
     eq: () => builder,
+    gt: () => builder,
+    gte: () => builder,
+    lt: () => builder,
+    lte: () => builder,
+    is: () => builder,
+    in: () => builder,
+    or: () => builder,
     order: () => builder,
     limit: () => builder,
     insert: () => builder,

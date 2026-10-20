@@ -1,10 +1,35 @@
+/**
+ * Layanan laporan bahaya jalan (Milestone 4).
+ *
+ * Aturan penting:
+ * - identitas pelapor tidak pernah dikirim dari sini; database memakai `auth.uid()`;
+ * - `expires_at` tidak pernah dikirim klien — server menghitungnya dari
+ *   `created_at` lewat trigger `hazard_reports_expiry_guard`;
+ * - jalur tulis hanya RPC `create_hazard`/`update_hazard`/`remove_hazard`/
+ *   `confirm_hazard`, karena INSERT/UPDATE/DELETE langsung sudah dicabut
+ *   (ADR-066). Validasi di sini hanya untuk umpan balik cepat; database tetap
+ *   memeriksa ulang semuanya.
+ * - `clientReportId` dipakai sebagai kunci idempotensi: percobaan ulang setelah
+ *   jaringan putus mengembalikan laporan yang sama, bukan laporan kedua.
+ */
+
 import type { SupabaseClient } from '@supabase/supabase-js';
 
-import { mapRpcError, mapTableError, type AppError } from '@/features/auth/errors';
+import { NETWORK_APP_ERROR, type AppError } from '@/features/auth/errors';
+import { mapHazardError } from '@/features/hazards/errors';
+import { isHazardActive } from '@/features/hazards/geo';
+import {
+  HAZARD_CATEGORIES,
+  HAZARD_SEVERITIES,
+  type HazardCategory,
+  type HazardSeverity,
+} from '@/features/hazards/labels';
 import type { Database } from '@/lib/supabase/database.types';
 
 export type HazardClient = SupabaseClient<Database>;
-export type ApiResult<T> = { ok: true; data: T } | { ok: false; error: AppError };
+
+export type HazardResult<T> = { ok: true; data: T } | { ok: false; error: AppError };
+
 export type HazardRow = {
   id: string;
   reporter_id: string;
@@ -14,262 +39,242 @@ export type HazardRow = {
   severity: string;
   latitude: number;
   longitude: number;
+  status: string;
   expires_at: string;
-  status: string;
   created_at: string;
-  client_report_id: string | null;
   updated_at: string | null;
+  client_report_id: string | null;
 };
-export type HazardSummary = {
-  id: string;
-  category: string;
-  severity: string;
-  status: string;
-  created_at: string;
-};
+
 export type HazardCreateInput = {
-  category: string;
-  severity: string;
+  category: HazardCategory;
+  severity: HazardSeverity;
   latitude: number;
   longitude: number;
   description?: string;
   rideId?: string;
+  /** UUID dari aplikasi; dipertahankan saat pengiriman diulang. */
   clientReportId?: string;
 };
+
 export type HazardUpdateInput = {
-  severity?: string;
+  severity: HazardSeverity;
   description?: string;
 };
+
 export type HazardFilters = {
-  category?: string;
-  severity?: string;
-  status?: string;
-  searchLat?: number;
-  searchLng?: number;
-  radiusM?: number;
+  category?: HazardCategory | 'all';
+  severity?: HazardSeverity | 'all';
 };
 
-function hazardInvalidCategory(message: string): AppError {
-  return { code: 'invalid_category', message, retryable: false };
+export const MAX_HAZARD_DESCRIPTION_LENGTH = 1000;
+/** Selaras dengan jendela edit di `update_hazard`/`remove_hazard`. */
+export const HAZARD_EDIT_WINDOW_MS = 15 * 60 * 1000;
+export const HAZARD_LIST_LIMIT = 50;
+
+const ACTIVE_HAZARD_COLUMNS =
+  'id, reporter_id, ride_id, category, description, severity, latitude, longitude, status, expires_at, created_at, updated_at, client_report_id';
+
+function invalidCoordinates(): AppError {
+  return {
+    code: 'invalid_coordinates',
+    message:
+      'Koordinat laporan tidak valid. Isi lintang antara -90 dan 90 serta bujur antara -180 dan 180, atau pakai lokasi saat ini.',
+    retryable: false,
+  };
 }
 
-function hazardInvalidSeverity(message: string): AppError {
-  return { code: 'invalid_severity', message, retryable: false };
+/** Bungkus pemanggilan Supabase supaya kegagalan jaringan tidak menjadi exception. */
+async function call<T>(
+  action: () => PromiseLike<{ data: T | null; error: unknown }>,
+): Promise<HazardResult<T>> {
+  try {
+    const { data, error } = await action();
+    if (error) return { ok: false, error: mapHazardError(error) };
+    if (data === null || data === undefined) return { ok: false, error: NETWORK_APP_ERROR };
+    return { ok: true, data };
+  } catch (error) {
+    return { ok: false, error: mapHazardError(error) };
+  }
 }
 
-function hazardInvalidCoordinates(message: string): AppError {
-  return { code: 'invalid_coordinates', message, retryable: false };
+/** Apakah pelapor masih boleh mengubah/melepas laporan (status + jendela 15 menit). */
+export function canEditHazard(
+  hazard: Pick<HazardRow, 'status' | 'created_at'>,
+  now: number = Date.now(),
+): boolean {
+  if (hazard.status !== 'active') return false;
+  const createdAt = Date.parse(hazard.created_at);
+  if (Number.isNaN(createdAt)) return false;
+  return now - createdAt <= HAZARD_EDIT_WINDOW_MS;
 }
 
-function hazardInvalidDescription(message: string): AppError {
-  return { code: 'invalid_description', message, retryable: false };
-}
+/**
+ * Daftar laporan aktif. Laporan kedaluwarsa disaring di query (`status` dan
+ * `expires_at`), jadi laporan yang sapuan `expire_hazard_reports` belum
+ * menyentuhnya tetap tidak pernah tampil sebagai aktif.
+ */
+export async function getActiveHazards(
+  client: HazardClient,
+  filters: HazardFilters = {},
+): Promise<HazardResult<HazardRow[]>> {
+  try {
+    let query = client
+      .from('hazard_reports')
+      .select(ACTIVE_HAZARD_COLUMNS)
+      .eq('status', 'active')
+      .gt('expires_at', new Date().toISOString())
+      .order('created_at', { ascending: false })
+      .limit(HAZARD_LIST_LIMIT);
 
-function hazardRateLimitMessage(): string {
-  return 'Terlalu banyak laporan dalam waktu singkat. Coba lagi nanti.';
-}
+    if (filters.category && filters.category !== 'all') {
+      query = query.eq('category', filters.category);
+    }
+    if (filters.severity && filters.severity !== 'all') {
+      query = query.eq('severity', filters.severity);
+    }
 
-function hazardDuplicateNearbyMessage(): string {
-  return 'Laporan serupa baru saja dikirim di sekitar titik ini.';
+    const { data, error } = await query;
+    if (error) return { ok: false, error: mapHazardError(error) };
+
+    const rows = ((data ?? []) as unknown as HazardRow[]).filter((row) => isHazardActive(row));
+    return { ok: true, data: rows };
+  } catch (error) {
+    return { ok: false, error: mapHazardError(error) };
+  }
 }
 
 export async function createHazard(
   client: HazardClient,
   input: HazardCreateInput,
-): Promise<ApiResult<HazardRow>> {
-  const validCategories = [
-    'pothole',
-    'crash',
-    'traffic',
-    'weather',
-    'flood',
-    'road_block',
-    'traffic_enforcement',
-    'other',
-  ];
-  if (!validCategories.includes(input.category)) {
+): Promise<HazardResult<HazardRow>> {
+  if (!HAZARD_CATEGORIES.some((item) => item.value === input.category)) {
     return {
       ok: false,
-      error: hazardInvalidCategory('Kategori laporan tidak dikenal: ' + input.category),
+      error: {
+        code: 'invalid_category',
+        message: 'Kategori laporan tidak dikenal. Pilih salah satu kategori yang tersedia.',
+        retryable: false,
+      },
     };
   }
 
-  const validSeverities = ['info', 'moderate', 'high', 'critical'];
-  if (!validSeverities.includes(input.severity)) {
+  if (!HAZARD_SEVERITIES.some((item) => item.value === input.severity)) {
     return {
       ok: false,
-      error: hazardInvalidSeverity('Tingkat keparahan tidak dikenal: ' + input.severity),
+      error: {
+        code: 'invalid_severity',
+        message: 'Tingkat keparahan tidak dikenal. Pilih Info, Sedang, Tinggi, atau Kritis.',
+        retryable: false,
+      },
     };
   }
 
-  if (input.latitude < -90 || input.latitude > 90) {
-    return { ok: false, error: hazardInvalidCoordinates('Lintang laporan tidak valid') };
-  }
-  if (input.longitude < -180 || input.longitude > 180) {
-    return { ok: false, error: hazardInvalidCoordinates('Bujur laporan tidak valid') };
+  if (
+    !Number.isFinite(input.latitude) ||
+    !Number.isFinite(input.longitude) ||
+    input.latitude < -90 ||
+    input.latitude > 90 ||
+    input.longitude < -180 ||
+    input.longitude > 180
+  ) {
+    return { ok: false, error: invalidCoordinates() };
   }
 
-  if (input.description && input.description.length > 1000) {
+  const description = input.description?.trim() ? input.description.trim() : null;
+  if (description !== null && description.length > MAX_HAZARD_DESCRIPTION_LENGTH) {
     return {
       ok: false,
-      error: hazardInvalidDescription('Deskripsi laporan maksimal 1000 karakter'),
+      error: {
+        code: 'invalid_description',
+        message: 'Deskripsi laporan maksimal 1000 karakter. Pendekkan dulu, lalu kirim lagi.',
+        retryable: false,
+      },
     };
   }
 
-  if (input.rideId) {
-    const { data, error } = await client
-      .from('rides')
-      .select('id')
-      .eq('id', input.rideId)
-      .maybeSingle();
-
-    if (error) return { ok: false, error: mapTableError(error) };
-    if (!data) {
-      return {
-        ok: false,
-        error: {
-          code: 'not_found',
-          message: 'Perjalanan untuk laporan ini tidak ditemukan',
-          retryable: false,
-        },
-      };
-    }
-
-    const { data: userData } = await client.auth.getUser();
-    if (!userData?.user?.id) {
-      return {
-        ok: false,
-        error: {
-          code: 'chat_unauthenticated',
-          message: 'Mengirim laporan membutuhkan sesi',
-          retryable: false,
-        },
-      };
-    }
-
-    const { data: member, error: memberError } = await client
-      .from('ride_members')
-      .select('role, status')
-      .eq('ride_id', input.rideId)
-      .eq('user_id', userData.user.id)
-      .maybeSingle();
-
-    if (memberError) return { ok: false, error: mapTableError(memberError) };
-    if (!member || ((member as any).role !== 'host' && (member as any).status !== 'joined')) {
-      return {
-        ok: false,
-        error: {
-          code: 'not_authorized',
-          message: 'Hanya peserta perjalanan yang dapat menautkan laporan ke perjalanan itu',
-          retryable: false,
-        },
-      };
-    }
-  }
-
-  const { data, error } = await (client.rpc as any)('create_hazard', {
-    p_category: input.category,
-    p_severity: input.severity,
-    p_latitude: input.latitude,
-    p_longitude: input.longitude,
-    p_description: input.description ?? null,
-    p_ride_id: input.rideId ?? null,
-    p_client_report_id: input.clientReportId ?? null,
-  });
-
-  if (error) {
-    const detail = (error as any).details || (error as any).detail || '';
-    if (typeof detail === 'string' && detail.includes('hazard_rate_limit')) {
-      return {
-        ok: false,
-        error: { code: 'rate_limited', message: hazardRateLimitMessage(), retryable: true },
-      };
-    }
-    if (typeof detail === 'string' && detail.includes('hazard_duplicate_nearby')) {
-      return {
-        ok: false,
-        error: { code: 'duplicate', message: hazardDuplicateNearbyMessage(), retryable: false },
-      };
-    }
-    return { ok: false, error: mapRpcError(error) };
-  }
-
-  return { ok: true, data: data as HazardRow };
+  return call(async () =>
+    (client.rpc as any)('create_hazard', {
+      p_category: input.category,
+      p_severity: input.severity,
+      p_latitude: input.latitude,
+      p_longitude: input.longitude,
+      p_description: description,
+      p_ride_id: input.rideId ?? null,
+      p_client_report_id: input.clientReportId ?? null,
+    }),
+  ) as Promise<HazardResult<HazardRow>>;
 }
 
 export async function updateHazard(
   client: HazardClient,
   hazardId: string,
   input: HazardUpdateInput,
-): Promise<ApiResult<HazardRow>> {
-  const { data, error } = await (client.rpc as any)('update_hazard', {
-    p_hazard_id: hazardId,
-    p_severity: input.severity,
-    p_description: input.description ?? null,
-  });
+): Promise<HazardResult<HazardRow>> {
+  if (!HAZARD_SEVERITIES.some((item) => item.value === input.severity)) {
+    return {
+      ok: false,
+      error: {
+        code: 'invalid_severity',
+        message: 'Tingkat keparahan tidak dikenal. Pilih Info, Sedang, Tinggi, atau Kritis.',
+        retryable: false,
+      },
+    };
+  }
 
-  if (error) return { ok: false, error: mapRpcError(error) };
+  const description = input.description?.trim() ? input.description.trim() : null;
+  if (description !== null && description.length > MAX_HAZARD_DESCRIPTION_LENGTH) {
+    return {
+      ok: false,
+      error: {
+        code: 'invalid_description',
+        message: 'Deskripsi laporan maksimal 1000 karakter. Pendekkan dulu, lalu kirim lagi.',
+        retryable: false,
+      },
+    };
+  }
 
-  return { ok: true, data: data as HazardRow };
+  return call(async () =>
+    (client.rpc as any)('update_hazard', {
+      p_hazard_id: hazardId,
+      p_severity: input.severity,
+      p_description: description,
+    }),
+  ) as Promise<HazardResult<HazardRow>>;
 }
 
+/** Lepas laporan (status `removed`, bukan hapus baris) sesuai kebijakan server. */
 export async function removeHazard(
   client: HazardClient,
   hazardId: string,
-): Promise<ApiResult<HazardRow>> {
-  const { data, error } = await (client.rpc as any)('remove_hazard', {
-    p_hazard_id: hazardId,
-  });
-
-  if (error) return { ok: false, error: mapRpcError(error) };
-
-  return { ok: true, data: data as HazardRow };
+): Promise<HazardResult<HazardRow>> {
+  return call(async () =>
+    (client.rpc as any)('remove_hazard', { p_hazard_id: hazardId }),
+  ) as Promise<HazardResult<HazardRow>>;
 }
 
+/** Konfirmasi "masih ada"; server menolak konfirmasi ganda dan laporan kedaluwarsa. */
 export async function confirmHazard(
   client: HazardClient,
   hazardId: string,
-): Promise<ApiResult<{ total: number }>> {
-  const { data, error } = await (client.rpc as any)('confirm_hazard', {
-    p_hazard_id: hazardId,
-  });
+): Promise<HazardResult<{ total: number }>> {
+  const result = await call<number>(async () =>
+    (client.rpc as any)('confirm_hazard', { p_hazard_id: hazardId }),
+  );
 
-  if (error) return { ok: false, error: mapRpcError(error) };
-
-  return { ok: true, data: { total: (data as number) || 0 } };
+  if (!result.ok) return result;
+  return { ok: true, data: { total: typeof result.data === 'number' ? result.data : 0 } };
 }
 
+/**
+ * Sapuan laporan kedaluwarsa (maintenance). Aman dipanggil kapan pun: pembacaan
+ * sudah menyaring `expires_at`, dan fungsi ini hanya merapikan `status`.
+ */
 export async function expireHazardReports(
   client: HazardClient,
-): Promise<ApiResult<{ count: number }>> {
-  const { data, error } = await (client.rpc as any)('expire_hazard_reports', {});
+): Promise<HazardResult<{ count: number }>> {
+  const result = await call<number>(async () => (client.rpc as any)('expire_hazard_reports', {}));
 
-  if (error) return { ok: false, error: mapRpcError(error) };
-
-  return { ok: true, data: { count: (data as number) || 0 } };
-}
-
-export async function getActiveHazards(
-  client: HazardClient,
-  filters: HazardFilters = {},
-): Promise<ApiResult<HazardRow[]>> {
-  let query = client
-    .from('hazard_reports')
-    .select('*')
-    .eq('status', 'active')
-    .gt('expires_at', new Date().toISOString())
-    .order('created_at', { ascending: false });
-
-  if (filters.category) {
-    query = query.eq('category', filters.category);
-  }
-  if (filters.severity) {
-    query = query.eq('severity', filters.severity);
-  }
-
-  const { data, error } = await query;
-
-  if (error) return { ok: false, error: mapTableError(error) };
-
-  return { ok: true, data: (data || []) as HazardRow[] };
+  if (!result.ok) return result;
+  return { ok: true, data: { count: typeof result.data === 'number' ? result.data : 0 } };
 }

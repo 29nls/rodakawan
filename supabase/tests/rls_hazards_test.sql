@@ -9,7 +9,8 @@
 begin;
 
 -- 0. Paritas: berhenti dengan pesan jelas bila migration belum diterapkan.
-do $$\ndeclare
+do $$
+declare
   v_missing text[] := array[]::text[];
 begin
   if to_regprocedure('public.create_hazard(text, text, double precision, double precision, text, uuid, uuid)') is null then
@@ -37,7 +38,9 @@ begin
   end if;
 
   if array_length(v_missing, 1) is not null then
-    raise exception 'UJI GAGAL (migration M4 belum diterapkan): objek berikut belum ada — %. Terapkan supabase/migrations/20261020090000_hazard_reports_m4.sql lebih dulu.',\n      array_to_string(v_missing, ', ');\n  end if;
+    raise exception 'UJI GAGAL (migration M4 belum diterapkan): objek berikut belum ada — %. Terapkan supabase/migrations/20261020090000_hazard_reports_m4.sql lebih dulu.',
+      array_to_string(v_missing, ', ');
+  end if;
 end;
 $$;
 
@@ -57,37 +60,38 @@ insert into auth.users (
   '11111111-1111-1111-1111-111111111111',
   '00000000-0000-0000-0000-000000000000',
   'authenticated', 'authenticated', 'm4.a@contoh.test', now(),
-  '{\"provider\":\"email\",\"providers\":[\"email\"]}',
-  '{\"username\":\"m4_user_a\",\"display_name\":\"M4 User A\"}',
+  '{"provider":"email","providers":["email"]}',
+  '{"username":"m4_user_a","display_name":"M4 User A"}',
   now(), now()
 ), (
   '22222222-2222-2222-2222-222222222222',
   '00000000-0000-0000-0000-000000000000',
   'authenticated', 'authenticated', 'm4.b@contoh.test', now(),
-  '{\"provider\":\"email\",\"providers\":[\"email\"]}',
-  '{\"username\":\"m4_user_b\",\"display_name\":\"M4 User B\"}',
+  '{"provider":"email","providers":["email"]}',
+  '{"username":"m4_user_b","display_name":"M4 User B"}',
   now(), now()
 ), (
   '33333333-3333-3333-3333-333333333333',
   '00000000-0000-0000-0000-000000000000',
   'authenticated', 'authenticated', 'm4.c@contoh.test', now(),
-  '{\"provider\":\"email\",\"providers\":[\"email\"]}',
-  '{\"username\":\"m4_user_c\",\"display_name\":\"M4 User C\"}',
+  '{"provider":"email","providers":["email"]}',
+  '{"username":"m4_user_c","display_name":"M4 User C"}',
   now(), now()
 ), (
   '44444444-4444-4444-4444-444444444444',
   '00000000-0000-0000-0000-000000000000',
   'authenticated', 'authenticated', 'm4.d@contoh.test', now(),
-  '{\"provider\":\"email\",\"providers\":[\"email\"]}',
-  '{\"username\":\"m4_user_d\",\"display_name\":\"M4 User D\"}',
+  '{"provider":"email","providers":["email"]}',
+  '{"username":"m4_user_d","display_name":"M4 User D"}',
   now(), now()
 );
 
 -- 3. Klub privat dibuat A.
 set local role authenticated;
-set local request.jwt.claims = '{\"sub\":\"11111111-1111-1111-1111-111111111111\",\"role\":\"authenticated\"}';
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
 
-do $$\ndeclare
+do $$
+declare
   v_club jsonb;
 begin
   v_club := public.create_club(
@@ -102,9 +106,10 @@ begin
 end;
 $$;
 
-set local request.jwt.claims = '{\"sub\":\"22222222-2222-2222-2222-222222222222\",\"role\":\"authenticated\"}';
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
 
-do $$\ndeclare
+do $$
+declare
   v_club uuid;
 begin
   select club_id into v_club from public.uji_m4_konteks where nama = 'klub';
@@ -112,9 +117,10 @@ begin
 end;
 $$;
 
-set local request.jwt.claims = '{\"sub\":\"44444444-4444-4444-4444-444444444444\",\"role\":\"authenticated\"}';
+set local request.jwt.claims = '{"sub":"44444444-4444-4444-4444-444444444444","role":"authenticated"}';
 
-do $$\ndeclare
+do $$
+declare
   v_club uuid;
 begin
   select club_id into v_club from public.uji_m4_konteks where nama = 'klub';
@@ -122,9 +128,10 @@ begin
 end;
 $$;
 
-set local request.jwt.claims = '{\"sub\":\"11111111-1111-1111-1111-111111111111\",\"role\":\"authenticated\"}';
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
 
-do $$\ndeclare
+do $$
+declare
   v_club uuid;
 begin
   select club_id into v_club from public.uji_m4_konteks where nama = 'klub';
@@ -134,9 +141,10 @@ end;
 $$;
 
 -- 4. Pembuatan laporan hanya untuk anggota klub.
-set local request.jwt.claims = '{\"sub\":\"33333333-3333-3333-3333-333333333333\",\"role\":\"authenticated\"}';
+set local request.jwt.claims = '{"sub":"33333333-3333-3333-3333-333333333333","role":"authenticated"}';
 
-do $$\ndeclare
+do $$
+declare
   v_club uuid;
 begin
   select club_id into v_club from public.uji_m4_konteks where nama = 'klub';
@@ -150,9 +158,10 @@ end;
 $$;
 
 -- 5. Hanya pelapor yang boleh membaca laporannya sendiri (policy reporter).
-set local request.jwt.claims = '{\"sub\":\"11111111-1111-1111-1111-111111111111\",\"role\":\"authenticated\"}';
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
 
-do $$\ndeclare
+do $$
+declare
   v_hazard uuid;
 begin
   select id into v_hazard from public.hazard_reports where reporter_id = auth.uid() limit 1;
@@ -167,9 +176,10 @@ end;
 $$;
 
 -- 6. Non-anggota tidak boleh membaca laporan aktif klub.
-set local request.jwt.claims = '{\"sub\":\"33333333-3333-3333-3333-333333333333\",\"role\":\"authenticated\"}';
+set local request.jwt.claims = '{"sub":"33333333-3333-3333-3333-333333333333","role":"authenticated"}';
 
-do $$\ndeclare
+do $$
+declare
   v_count int;
 begin
   select count(*) into v_count from public.hazard_reports h
@@ -185,9 +195,10 @@ end;
 $$;
 
 -- 7. Hanya host/anggota ride yang boleh menautkan laporan ke perjalanan.
-set local request.jwt.claims = '{\"sub\":\"33333333-3333-3333-3333-333333333333\",\"role\":\"authenticated\"}';
+set local request.jwt.claims = '{"sub":"33333333-3333-3333-3333-333333333333","role":"authenticated"}';
 
-do $$\ndeclare
+do $$
+declare
   v_club uuid;
   v_hazard uuid;
 begin
@@ -203,9 +214,10 @@ end;
 $$;
 
 -- 8. RPC create_hazard idempoten via client_report_id.
-set local request.jwt.claims = '{\"sub\":\"11111111-1111-1111-1111-111111111111\",\"role\":\"authenticated\"}';
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
 
-do $$\ndeclare
+do $$
+declare
   v_hazard1 public.hazard_reports;
   v_hazard2 public.hazard_reports;
   v_same_id uuid;
@@ -221,9 +233,10 @@ end;
 $$;
 
 -- 9. Rate limit create_hazard: 5 laporan / 10 menit.
-set local request.jwt.claims = '{\"sub\":\"11111111-1111-1111-1111-111111111111\",\"role\":\"authenticated\"}';
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
 
-do $$\ndeclare
+do $$
+declare
   v_i int;
   v_exc exception;
 begin
@@ -245,9 +258,10 @@ end;
 $$;
 
 -- 10. Konfirmasi laporan: satu konfirmasi per pengguna per laporan.
-set local request.jwt.claims = '{\"sub\":\"11111111-1111-1111-1111-111111111111\",\"role\":\"authenticated\"}';
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
 
-do $$\ndeclare
+do $$
+declare
   v_hazard uuid;
   v_total int;
 begin
@@ -274,9 +288,10 @@ end;
 $$;
 
 -- 11. Rate limit konfirmasi: 10 konfirmasi per jam per pengguna.
-set local request.jwt.claims = '{\"sub\":\"11111111-1111-1111-1111-111111111111\",\"role\":\"authenticated\"}';
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
 
-do $$\ndeclare
+do $$
+declare
   v_hazard uuid;
   v_i int;
   v_exc exception;
@@ -301,9 +316,10 @@ end;
 $$;
 
 -- 12. Hanya pelapor yang boleh mengubah laporan (15 menit window).
-set local request.jwt.claims = '{\"sub\":\"11111111-1111-1111-1111-111111111111\",\"role\":\"authenticated\"}';
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
 
-do $$\ndeclare
+do $$
+declare
   v_hazard uuid;
   v_updated public.hazard_reports;
 begin
@@ -329,9 +345,10 @@ end;
 $$;
 
 -- 13. Hanya pelapor yang boleh melepas laporan (15 menit window).
-set local request.jwt.claims = '{\"sub\":\"11111111-1111-1111-1111-111111111111\",\"role\":\"authenticated\"}';
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
 
-do $$\ndeclare
+do $$
+declare
   v_hazard uuid;
   v_removed public.hazard_reports;
 begin
@@ -357,16 +374,17 @@ end;
 $$;
 
 -- 14. RPC update_hazard hanya untuk pelapor, hanya active, 15 menit window.
-set local request.jwt.claims = '{\"sub\":\"33333333-3333-3333-3333-333333333333\",\"role\":\"authenticated\"}';
+set local request.jwt.claims = '{"sub":"33333333-3333-3333-3333-333333333333","role":"authenticated"}';
 
-do $$\ndeclare
+do $$
+declare
   v_hazard uuid;
 begin
   -- User C membuat laporan
   v_hazard := public.create_hazard('crash', 'high', -6.3, 106.9, 'Kecelakaan parang', null, null);
 
   -- User A (host) mencoba mengubah laporan user C -> harus gagal
-  set local request.jwt.claims = '{\"sub\":\"11111111-1111-1111-1111-111111111111\",\"role\":\"authenticated\"}';
+  set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
   begin
     perform public.update_hazard(v_hazard.id, 'moderate', 'Dicoba host');
     raise exception 'UJI GAGAL: host boleh mengubah laporan orang lain';
@@ -380,7 +398,8 @@ $$;
 set local role anon;
 set local request.jwt.claims = '{}';
 
-do $$\ndeclare
+do $$
+declare
   v_count int;
 begin
   select count(*) into v_count from public.hazard_reports h
@@ -397,6 +416,10 @@ $$;
 
 reset role;
 
-do $$\nbegin\n  raise notice 'UJI RLS LAKUAN M4 LULUS: hazard RLS, RPC, expiry, confirm, rate limit semuanya lolos uji';\nend;\n$$;
+do $$
+begin
+  raise notice 'UJI RLS LAKUAN M4 LULUS: hazard RLS, RPC, expiry, confirm, rate limit semuanya lolos uji';
+end;
+$$;
 
 rollback;

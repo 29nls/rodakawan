@@ -26,25 +26,15 @@ export type AppErrorCode =
   | 'invalid_coordinates'
   | 'invalid_description'
   | 'duplicate'
-  /** Chat message specific codes. */
+  /** Chat konvoi: pelanggaran kontrak pesan, batas laju, dan otorisasi. */
   | 'chat_trim_invalid'
   | 'chat_rate_limit'
   | 'chat_edit_window'
-  | 'chat_not_authorized'
-  | 'chat_not_found'
-  /** Authentication/authorization codes for chat. */
-  | 'chat_unauthenticated'
-  | 'chat_ride_not_found'
   | 'chat_ride_final'
   | 'chat_not_member'
-  | 'message_type'
   | 'chat_message_not_found'
   | 'chat_not_sender'
-  | 'chat_system_message'
-  /** Report content specific codes. */
-  | 'report_invalid_target_type'
-  | 'report_invalid_reason'
-  | 'report_target_not_found';
+  | 'chat_system_message';
 
 export type AppError = {
   code: AppErrorCode;
@@ -417,9 +407,14 @@ export function mapRpcError(error: unknown): AppError {
       return mapTableError(error);
   }
 }
-/** Error ketika hasil query tidak ditemukan (PGRST116 atau data kosong). */
+/**
+ * Update/delete tidak mengenai baris apa pun: barisnya tidak ada, bukan milik
+ * akun ini, atau policy RLS menolaknya. Dipakai bersama `mapTableError` untuk
+ * menghindari "sukses palsu" ketika 0 baris terpengaruh.
+ */
 export const ROW_NOT_APPLIED_ERROR: AppError = {
-  code: 'not_found',
-  message: 'Data tidak ditemukan.',
+  code: 'not_authorized',
+  message:
+    'Perubahan tidak diterapkan: data ini bukan milik akun Anda, atau sesi Anda sudah berakhir. Muat ulang lalu coba lagi.',
   retryable: false,
 };

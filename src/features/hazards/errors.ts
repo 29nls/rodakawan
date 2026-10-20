@@ -1,127 +1,131 @@
-/** Mapping kesalahan RPC laporan bahaya ke `AppError` aplikasi.
- * Konteks: error dari RPC `public.create_hazard`, `public.update_hazard`,
- * `public.remove_hazard`, `public.confirm_hazard`, dan `public.expire_hazard_reports`
- * dipetakan menggunakan kontrak `detail = '<tag>'` di masing-masing fungsi.
- * Lihat `supabase/migrations/20261020090000_hazard_reports_m4.sql` untuk detail tag error.
+/**
+ * Pemetaan galat RPC laporan bahaya menjadi `AppError`.
+ *
+ * Kontrak dengan database: setiap `raise exception` di
+ * `supabase/migrations/20261020090000_hazard_reports_m4.sql` mengisi
+ * `detail` dengan tag mesin yang stabil (`hazard_rate_limit`, …). Teks
+ * `message` milik database boleh berubah, jadi aplikasi tidak memakainya untuk
+ * mengambil keputusan dan tidak menampilkannya apa adanya: pesan di bawah ini
+ * yang dilihat pengguna.
+ *
+ * Tag yang tidak dikenal jatuh ke `mapRpcError` supaya kegagalan jaringan,
+ * fungsi yang belum dimigrasikan (`PGRST202`), dan penolakan RLS tetap
+ * diterjemahkan dengan benar.
  */
 
-import type { AppError } from '@/features/auth/errors';
+import { mapRpcError, type AppError } from '@/features/auth/errors';
 
-/** Mapping error RPC laporan bahaya.
- * Setiap kunci sesuai dengan `detail` yang diterbitkan oleh fungsi database.
- */
-export function mapHazardRpcError(error: any): AppError {
-  const detail = error?.detail ?? error?.details ?? '';
-  const message = error?.message ?? 'Terjadi kesalahan tak terduga';
+function tagOf(error: unknown): string {
+  if (typeof error !== 'object' || error === null) return '';
+  const like = error as { detail?: unknown; details?: unknown };
+  const detail = like.detail ?? like.details;
+  return typeof detail === 'string' ? detail : '';
+}
 
-  if (typeof detail === 'string') {
-    if (detail.includes('hazard_unauthenticated')) {
-      return {
-        code: 'chat_unauthenticated',
-        message: 'Mengirim laporan bahaya membutuhkan sesi',
-        retryable: false,
-      };
-    }
-    if (detail.includes('hazard_invalid_category')) {
-      return {
-        code: 'invalid_category',
-        message: detail.replace('kategori laporan tidak dikenal: ', ''),
-        retryable: false,
-      };
-    }
-    if (detail.includes('hazard_invalid_severity')) {
-      return {
-        code: 'invalid_severity',
-        message: detail.replace('tingkat keparahan tidak dikenal: ', ''),
-        retryable: false,
-      };
-    }
-    if (detail.includes('hazard_invalid_coordinates')) {
-      return {
-        code: 'invalid_coordinates',
-        message: detail.replace('lintang/bujur laporan tidak valid', ''),
-        retryable: false,
-      };
-    }
-    if (detail.includes('hazard_invalid_description')) {
-      return {
-        code: 'invalid_description',
-        message: detail.replace('deskripsi laporan maksimal 1000 karakter', ''),
-        retryable: false,
-      };
-    }
-    if (detail.includes('hazard_ride_not_found')) {
-      return {
-        code: 'not_found',
-        message: detail.replace('perjalanan untuk laporan ini tidak ditemukan', ''),
-        retryable: false,
-      };
-    }
-    if (detail.includes('hazard_ride_not_member')) {
-      return {
-        code: 'not_authorized',
-        message: detail.replace(
-          'hanya peserta perjalanan yang dapat menautkan laporan ke perjalanan itu',
-          '',
-        ),
-        retryable: false,
-      };
-    }
-    if (detail.includes('hazard_rate_limit')) {
-      return {
-        code: 'rate_limited',
-        message: detail.replace('Terlalu banyak laporan dalam waktu singkat. Coba lagi nanti.', ''),
-        retryable: true,
-      };
-    }
-    if (detail.includes('hazard_duplicate_nearby')) {
-      return {
-        code: 'duplicate',
-        message: detail.replace('Laporan serupa baru saja dikirim di sekitar titik ini.', ''),
-        retryable: false,
-      };
-    }
-    if (detail.includes('hazard_not_found')) {
-      return { code: 'not_found', message: 'Laporan bahaya tidak ditemukan', retryable: false };
-    }
-    if (detail.includes('hazard_not_active')) {
-      return { code: 'not_authorized', message: 'Laporan ini sudah tidak aktif', retryable: false };
-    }
-    if (detail.includes('hazard_edit_window')) {
-      return {
-        code: 'not_authorized',
-        message: 'Jendela pengubahan laporan sudah lewat (15 menit sejak dilaporkan)',
-        retryable: false,
-      };
-    }
-    if (detail.includes('hazard_expired')) {
-      return { code: 'not_authorized', message: 'Laporan ini sudah kedaluwarsa', retryable: false };
-    }
-    if (detail.includes('hazard_already_confirmed')) {
-      return {
-        code: 'not_authorized',
-        message: 'Anda sudah mengonfirmasi laporan ini',
-        retryable: false,
-      };
-    }
-    if (detail.includes('hazard_confirm_rate_limit')) {
-      return {
-        code: 'rate_limited',
-        message: detail.replace(
-          'Terlalu banyak konfirmasi dalam waktu singkat. Coba lagi nanti.',
-          '',
-        ),
-        retryable: true,
-      };
-    }
-    if (detail.includes('hazard_expiry_immutable')) {
-      return {
-        code: 'not_authorized',
-        message: 'Masa berlaku laporan dihitung server dan tidak dapat diubah',
-        retryable: false,
-      };
-    }
+/** Pemetaan tag → `AppError`. Diekspor agar bisa diuji tanpa client Supabase. */
+export const HAZARD_ERROR_TAGS: Record<string, AppError> = {
+  hazard_unauthenticated: {
+    code: 'not_authorized',
+    message: 'Masuk dulu untuk mengirim atau mengubah laporan bahaya.',
+    retryable: false,
+  },
+  hazard_invalid_category: {
+    code: 'invalid_category',
+    message: 'Kategori laporan tidak dikenal. Pilih salah satu kategori yang tersedia.',
+    retryable: false,
+  },
+  hazard_invalid_severity: {
+    code: 'invalid_severity',
+    message: 'Tingkat keparahan tidak dikenal. Pilih Info, Sedang, Tinggi, atau Kritis.',
+    retryable: false,
+  },
+  hazard_invalid_coordinates: {
+    code: 'invalid_coordinates',
+    message:
+      'Koordinat laporan tidak valid. Isi lintang antara -90 dan 90 serta bujur antara -180 dan 180, atau pakai lokasi saat ini.',
+    retryable: false,
+  },
+  hazard_invalid_description: {
+    code: 'invalid_description',
+    message: 'Deskripsi laporan maksimal 1000 karakter. Pendekkan dulu, lalu kirim lagi.',
+    retryable: false,
+  },
+  hazard_ride_not_found: {
+    code: 'not_found',
+    message: 'Perjalanan untuk laporan ini tidak ditemukan. Muat ulang daftar perjalanan Anda.',
+    retryable: false,
+  },
+  hazard_ride_not_member: {
+    code: 'not_authorized',
+    message:
+      'Hanya peserta perjalanan yang dapat menautkan laporan ke perjalanan itu. Bergabung dulu, atau kosongkan ID perjalanan.',
+    retryable: false,
+  },
+  hazard_rate_limit: {
+    code: 'rate_limited',
+    message:
+      'Terlalu banyak laporan dalam waktu singkat (maksimal 5 per 10 menit). Tunggu sebentar, lalu coba lagi.',
+    retryable: true,
+  },
+  hazard_duplicate_nearby: {
+    code: 'duplicate',
+    message:
+      'Laporan serupa baru saja dikirim di sekitar titik ini. Konfirmasi laporan yang ada, atau pilih kategori lain.',
+    retryable: false,
+  },
+  hazard_not_found: {
+    code: 'not_found',
+    message: 'Laporan ini tidak ditemukan. Muat ulang daftar laporan bahaya.',
+    retryable: false,
+  },
+  hazard_not_reporter: {
+    code: 'not_authorized',
+    message: 'Hanya pelapor yang dapat mengubah atau melepas laporan ini.',
+    retryable: false,
+  },
+  hazard_not_active: {
+    code: 'conflict',
+    message: 'Laporan ini sudah tidak aktif (kedaluwarsa, dilepas, atau diselesaikan).',
+    retryable: false,
+  },
+  hazard_edit_window: {
+    code: 'conflict',
+    message:
+      'Jendela pengubahan laporan sudah lewat (15 menit sejak dilaporkan). Kirim laporan baru bila kondisinya masih ada.',
+    retryable: false,
+  },
+  hazard_expired: {
+    code: 'conflict',
+    message:
+      'Laporan ini sudah kedaluwarsa, jadi tidak bisa dikonfirmasi. Laporkan ulang bila kondisinya masih ada.',
+    retryable: false,
+  },
+  hazard_already_confirmed: {
+    code: 'conflict',
+    message: 'Anda sudah mengonfirmasi laporan ini sebelumnya.',
+    retryable: false,
+  },
+  hazard_confirm_rate_limit: {
+    code: 'rate_limited',
+    message:
+      'Terlalu banyak konfirmasi dalam waktu singkat (maksimal 10 per jam). Tunggu sebentar, lalu coba lagi.',
+    retryable: true,
+  },
+  hazard_expiry_immutable: {
+    code: 'invalid_data',
+    message: 'Masa berlaku laporan dihitung server dan tidak dapat diubah dari aplikasi.',
+    retryable: false,
+  },
+};
+
+/** Terjemahkan galat RPC laporan bahaya/konten; tag tak dikenal memakai `mapRpcError`. */
+export function mapHazardError(error: unknown): AppError {
+  const tag = tagOf(error);
+  if (tag.length === 0) return mapRpcError(error);
+
+  for (const [key, mapped] of Object.entries(HAZARD_ERROR_TAGS)) {
+    if (tag.includes(key)) return mapped;
   }
 
-  return { code: 'unknown', message, retryable: false };
+  return mapRpcError(error);
 }

@@ -244,6 +244,36 @@ export function createQueryClient(responses: QueryResponse | QueryResponse[]): {
         filters.push({ column, value });
         return builder;
       },
+      /** Perbandingan PostgREST: hanya dicatat, cukup untuk membuktikan bentuk query. */
+      gt(column: string, value: unknown) {
+        filters.push({ column, value: { op: 'gt', value } });
+        return builder;
+      },
+      gte(column: string, value: unknown) {
+        filters.push({ column, value: { op: 'gte', value } });
+        return builder;
+      },
+      lt(column: string, value: unknown) {
+        filters.push({ column, value: { op: 'lt', value } });
+        return builder;
+      },
+      lte(column: string, value: unknown) {
+        filters.push({ column, value: { op: 'lte', value } });
+        return builder;
+      },
+      is(column: string, value: unknown) {
+        filters.push({ column, value: { op: 'is', value } });
+        return builder;
+      },
+      in(column: string, values: readonly unknown[]) {
+        filters.push({ column, value: { op: 'in', value: values } });
+        return builder;
+      },
+      /** Kunci keyset `or=...` dicatat sebagai filter bernama `or`. */
+      or(expression: string) {
+        filters.push({ column: 'or', value: expression });
+        return builder;
+      },
       order(column: string, options?: { ascending?: boolean }) {
         order.push({ column, ascending: options?.ascending !== false });
         return builder;

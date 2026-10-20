@@ -9,7 +9,8 @@
 begin;
 
 -- 0. Paritas: berhenti dengan pesan jelas bila migration belum diterapkan.
-do $$\ndeclare
+do $$
+declare
   v_missing text[] := array[]::text[];
 begin
   if to_regprocedure('public.send_chat_message(uuid, text, uuid)') is null then
@@ -37,7 +38,9 @@ begin
   end if;
 
   if array_length(v_missing, 1) is not null then
-    raise exception 'UJI GAGAL (migration M4 belum diterapkan): objek berikut belum ada — %. Terapkan supabase/migrations/20261020100000_convoy_chat_m4.sql lebih dulu.',\n      array_to_string(v_missing, ', ');\n  end if;
+    raise exception 'UJI GAGAL (migration M4 belum diterapkan): objek berikut belum ada — %. Terapkan supabase/migrations/20261020100000_convoy_chat_m4.sql lebih dulu.',
+      array_to_string(v_missing, ', ');
+  end if;
 end;
 $$;
 
@@ -57,37 +60,38 @@ insert into auth.users (
   '11111111-1111-1111-1111-111111111111',
   '00000000-0000-0000-0000-000000000000',
   'authenticated', 'authenticated', 'm4.chat.a@contoh.test', now(),
-  '{\"provider\":\"email\",\"providers\":[\"email\"]}',
-  '{\"username\":\"m4_cha\",\"display_name\":\"M4 Chat A\"}',
+  '{"provider":"email","providers":["email"]}',
+  '{"username":"m4_cha","display_name":"M4 Chat A"}',
   now(), now()
 ), (
   '22222222-2222-2222-2222-222222222222',
   '00000000-0000-0000-0000-000000000000',
   'authenticated', 'authenticated', 'm4.chat.b@contoh.test', now(),
-  '{\"provider\":\"email\",\"providers\":[\"email\"]}',
-  '{\"username\":\"m4_ach\",\"display_name\":\"M4 Chat B\"}',
+  '{"provider":"email","providers":["email"]}',
+  '{"username":"m4_ach","display_name":"M4 Chat B"}',
   now(), now()
 ), (
   '33333333-3333-3333-3333-333333333333',
   '00000000-0000-0000-0000-000000000000',
   'authenticated', 'authenticated', 'm4.chat.c@contoh.test', now(),
-  '{\"provider\":\"email\",\"providers\":[\"email\"]}',
-  '{\"username\":\"m4_ach\",\"display_name\":\"M4 Chat C\"}',
+  '{"provider":"email","providers":["email"]}',
+  '{"username":"m4_ach","display_name":"M4 Chat C"}',
   now(), now()
 ), (
   '44444444-4444-4444-4444-444444444444',
   '00000000-0000-0000-0000-000000000000',
   'authenticated', 'authenticated', 'm4.chat.d@contoh.test', now(),
-  '{\"provider\":\"email\",\"providers\":[\"email\"]}',
-  '{\"username\":\"m4_chatd\",\"display_name\":\"M4 Chat D\"}',
+  '{"provider":"email","providers":["email"]}',
+  '{"username":"m4_chatd","display_name":"M4 Chat D"}',
   now(), now()
 );
 
 -- 3. Klub privat dibuat A.
 set local role authenticated;
-set local request.jwt.claims = '{\"sub\":\"11111111-1111-1111-1111-111111111111\",\"role\":\"authenticated\"}';
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
 
-do $$\ndeclare
+do $$
+declare
   v_club jsonb;
 begin
   v_club := public.create_club(
@@ -102,9 +106,10 @@ begin
 end;
 $$;
 
-set local request.jwt.claims = '{\"sub\":\"22222222-2222-2222-2222-222222222222\",\"role\":\"authenticated\"}';
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
 
-do $$\ndeclare
+do $$
+declare
   v_club uuid;
 begin
   select club_id into v_club from public.uji_m4_chat_konteks where nama = 'klub';
@@ -112,9 +117,10 @@ begin
 end;
 $$;
 
-set local request.jwt.claims = '{\"sub\":\"44444444-4444-4444-4444-444444444444\",\"role\":\"authenticated\"}';
+set local request.jwt.claims = '{"sub":"44444444-4444-4444-4444-444444444444","role":"authenticated"}';
 
-do $$\ndeclare
+do $$
+declare
   v_club uuid;
 begin
   select club_id into v_club from public.uji_m4_chat_konteks where nama = 'klub';
@@ -122,9 +128,10 @@ begin
 end;
 $$;
 
-set local request.jwt.claims = '{\"sub\":\"11111111-1111-1111-1111-111111111111\",\"role\":\"authenticated\"}';
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
 
-do $$\ndeclare
+do $$
+declare
   v_club uuid;
 begin
   select club_id into v_club from public.uji_m4_chat_konteks where nama = 'klub';
@@ -134,9 +141,10 @@ end;
 $$;
 
 -- 4. Pembuatan perjalanan hanya untuk anggota klub.
-set local request.jwt.claims = '{\"sub\":\"33333333-3333-3333-3333-333333333333\",\"role\":\"authenticated\"}';
+set local request.jwt.claims = '{"sub":"33333333-3333-3333-3333-333333333333","role":"authenticated"}';
 
-do $$\ndeclare
+do $$
+declare
   v_club uuid;
   v_ride public.rides;
 begin
@@ -150,9 +158,10 @@ end;
 $$;
 
 -- 5. Cek bahwa hanya anggota join ride yang boleh kirim pesan.
-set local request.jwt.claims = '{\"sub\":\"11111111-1111-1111-1111-111111111111\",\"role\":\"authenticated\"}';
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
 
-do $$\ndeclare
+do $$
+declare
   v_ride uuid;
   v_msg public.chat_messages;
 begin
@@ -165,9 +174,10 @@ end;
 $$;
 
 -- 6. Non-anggota tidak boleh kirim pesan.
-set local request.jwt.claims = '{\"sub\":\"33333333-3333-3333-3333-333333333333\",\"role\":\"authenticated\"}';
+set local request.jwt.claims = '{"sub":"33333333-3333-3333-3333-333333333333","role":"authenticated"}';
 
-do $$\ndeclare
+do $$
+declare
   v_ride uuid;
 begin
   select ride_id into v_ride from public.uji_m4_chat_konteks where nama = 'klub';
@@ -181,9 +191,10 @@ end;
 $$;
 
 -- 7. Kirim pesan ketika ride final -> harus gagal.
-set local request.jwt.claims = '{\"sub\":\"11111111-1111-1111-1111-111111111111\",\"role\":\"authenticated\"}';
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
 
-do $$\ndeclare
+do $$
+declare
   v_ride uuid;
 begin
   select ride_id into v_ride from public.uji_m4_chat_konteks where nama = 'klub';
@@ -199,9 +210,10 @@ end;
 $$;
 
 -- 8. Idempotensi kirim pesan via client_message_id.
-set local request.jwt.claims = '{\"sub\":\"11111111-1111-1111-1111-111111111111\",\"role\":\"authenticated\"}';
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
 
-do $$\ndeclare
+do $$
+declare
   v_msg1 public.chat_messages;
   v_msg2 public.chat_messages;
 begin
@@ -216,9 +228,10 @@ end;
 $$;
 
 -- 9. Rate limit: 20 pesan/60 detik per pengguna.
-set local request.jwt.claims = '{\"sub\":\"11111111-1111-1111-1111-111111111111\",\"role\":\"authenticated\"}';
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
 
-do $$\ndeclare
+do $$
+declare
   v_i int;
   v_exc exception;
 begin
@@ -240,9 +253,10 @@ end;
 $$;
 
 -- 10. Ubah pesan: hanya pengirim, 15 menit window.
-set local request.jwt.claims = '{\"sub\":\"11111111-1111-1111-1111-111111111111\",\"role\":\"authenticated\"}';
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
 
-do $$\ndeclare
+do $$
+declare
   v_msg uuid;
 begin
   v_msg := public.send_chat_message(v_ride, 'Pesan original', null);
@@ -262,14 +276,15 @@ end;
 $$;
 
 -- 11. Hanya pengirim yang boleh mengubah pesan lain.
-set local request.jwt.claims = '{\"sub\":\"33333333-3333-3333-3333-333333333333\",\"role\":\"authenticated\"}';
+set local request.jwt.claims = '{"sub":"33333333-3333-3333-3333-333333333333","role":"authenticated"}';
 
-do $$\ndeclare
+do $$
+declare
   v_msg uuid;
 begin
   v_msg := public.send_chat_message(v_ride, 'Pesan user C', null);
   -- User A (host) coba ubah pesan user C
-  set local request.jwt.claims = '{\"sub\":\"11111111-1111-1111-1111-111111111111\",\"role\":\"authenticated\"}';
+  set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
   begin
     perform public.edit_chat_message(v_msg.id, 'Diubah oleh host');
     raise exception 'UJI GAGAL: host boleh mengubah pesan orang lain';
@@ -280,9 +295,10 @@ end;
 $$;
 
 -- 12. Sistem pesan mulai perjalanan.
-set local request.jwt.claims = '{\"sub\":\"11111111-1111-1111-1111-111111111111\",\"role\":\"authenticated\"}';
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
 
-do $$\ndeclare
+do $$
+declare
   v_ride uuid;
 begin
   select ride_id into v_ride from public.uji_m4_chat_konteks where nama = 'klub';
@@ -292,9 +308,10 @@ end;
 $$;
 
 -- 13. Sistem pesan bergabung/keluar.
-set local request.jwt.claims = '{\"sub\":\"11111111-1111-1111-1111-111111111111\",\"role\":\"authenticated\"}';
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
 
-do $$\ndeclare
+do $$
+declare
   v_ride uuid;
 begin
   select ride_id into v_ride from public.uji_m4_chat_konteks where nama = 'klub';
@@ -304,9 +321,10 @@ end;
 $$;
 
 -- 14. Laporan konten untuk chat_message.
-set local request.jwt.claims = '{\"sub\":\"11111111-1111-1111-1111-111111111111\",\"role\":\"authenticated\"}';
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
 
-do $$\ndeclare
+do $$
+declare
   v_ride uuid;
   v_msg uuid;
   v_report public.content_reports;
@@ -324,7 +342,8 @@ $$;
 set local role anon;
 set local request.jwt.claims = '{}';
 
-do $$\ndeclare
+do $$
+declare
   v_count int;
 begin
   select count(*) into v_count from public.chat_messages
@@ -339,6 +358,10 @@ $$;
 
 reset role;
 
-do $$\nbegin\n  raise notice 'UJI RLS CHAT M4 LULUS: chat RLS, RPC, idempotensi, sistem pesan, rate limit semuanya lolos uji';\nend;\n$$;
+do $$
+begin
+  raise notice 'UJI RLS CHAT M4 LULUS: chat RLS, RPC, idempotensi, sistem pesan, rate limit semuanya lolos uji';
+end;
+$$;
 
 rollback;

@@ -246,10 +246,13 @@ begin
   end if;
 
   -- Prefilter kotak + haversine (tanpa PostGIS) untuk radius ±50 m.
+  -- Laporan yang sudah lewat `expires_at` tetapi belum tersapu tidak boleh
+  -- memblokir laporan baru sebagai "duplikat": kondisinya sudah tidak berlaku.
   select id into v_duplicate
     from public.hazard_reports
    where category = v_category
      and status = 'active'
+     and expires_at > now()
      and created_at >= now() - v_dup_window
      and abs(latitude - p_latitude) <= v_dup_radius_m / 111320.0
      and abs(longitude - p_longitude)

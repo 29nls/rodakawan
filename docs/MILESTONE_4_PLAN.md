@@ -1,8 +1,27 @@
 # Rencana Milestone 4 — Laporan bahaya jalan & chat konvoi
 
-Status: **Belum dimulai** (rencana, bukan implementasi). Tanggal: 2026-10-20.
-Dokumen ini tidak menambahkan tabel, RPC, layar, atau tombol apa pun. Di aplikasi saat ini **tidak
-ada** placeholder M4: tab Peringatan masih menyatakan fitur belum tersedia.
+Status: **Diimplementasikan (kode), backend belum diterapkan.** Rencana ditulis 2026-10-20; implementasi
+21 Oktober 2026. Pemilik produk memilih jalur 2 di bawah: keputusan peta (ADR-064) dan uji perangkat
+khusus M3 **ditunda eksplisit**, dan M4 dikerjakan **tanpa marker peta**.
+
+Yang sudah ada di repository:
+
+- migration `supabase/migrations/20261020090000_hazard_reports_m4.sql` (bahaya) dan
+  `20261020100000_convoy_chat_m4.sql` (chat, pesan sistem, moderasi) — **belum diterapkan** ke project
+development;
+- `src/features/hazards/{api,errors,geo,labels}.ts` + tab `src/app/(tabs)/hazards.tsx`;
+- `src/features/chat/{api,errors}.ts` + `src/features/chat/ChatPanel.tsx`, dipasang di
+  `src/app/ride.tsx`;
+- `src/features/moderation/{api,errors}.ts` (RPC `report_content`);
+- uji Jest: 29 test hazard, 25 test API chat, 9 test panel chat, 6 test layar Peringatan;
+- berkas uji SQL `supabase/tests/rls_hazards_test.sql` dan `supabase/tests/rls_chat_test.sql`
+  (**belum dieksekusi** karena tidak ada target database yang terkonfirmasi).
+
+Status per butir: Implemented = ya; Passed locally (Jest/typecheck/lint) = ya; Passed against dev
+backend = **belum**; Tested on physical device = **belum**; Deferred by owner = peta + uji perangkat M3.
+
+Detail keputusan ada di ADR-066 (`docs/PROJECT_DECISIONS.md`) dan langkah penerapan di
+`docs/SETUP_GUIDE.md` bagian 4.
 
 **Gerbang masuk.** M4 hanya dimulai setelah salah satu dari dua hal terjadi:
 

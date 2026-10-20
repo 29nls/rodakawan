@@ -8,6 +8,40 @@ sedangkan build preview (`v<versi>-build<N>`) diringkas di dalam blok yang bisa 
 versi adalah tautan ke halaman rilisnya di GitHub, sehingga riwayat ini bisa dinavigasi langsung
 dari berkas.
 
+## Belum dirilis — Milestone 4 (21 Oktober 2026)
+
+Catatan manual; belum ada tag rilis yang memuat perubahan ini. Rilis berikutnya akan disisipkan di atas
+bagian ini oleh workflow rilis.
+
+### Fitur
+
+- Laporan bahaya jalan: buat, filter kategori/keparahan, ubah/lepas dalam 15 menit, konfirmasi
+  "masih ada", dan lapor penyalahgunaan. Masa berlaku dihitung server per kategori; tanpa peta
+  (ADR-064 masih Proposed), daftar memakai label area perkiraan dari koordinat.
+- Chat konvoi di detail perjalanan: riwayat 50 pesan + muat pesan lama (keyset), kirim idempoten,
+  ubah/hapus 15 menit, pesan sistem untuk mulai/selesai/batal dan perubahan peserta, realtime
+  Postgres Changes, serta penyembunyian pesan dari pengguna yang diblokir.
+- Migration `20261020090000_hazard_reports_m4.sql` dan `20261020100000_convoy_chat_m4.sql`:
+  RPC `security definer`, idempotensi, batas laju, deteksi duplikat, trigger expiry/pesan sistem, dan
+  pencabutan jalur tulis langsung. **Belum diterapkan** ke project development.
+
+### Perbaikan
+
+- `ROW_NOT_APPLIED_ERROR` dikembalikan ke `not_authorized`; sebelumnya (commit `2b84ec4`) berubah
+  menjadi `not_found` dan membuat empat test garasi/klub gagal serta pesan yang tidak bisa
+  ditindaklanjuti.
+- Tab Peringatan tidak lagi melempar exception ketika client mengembalikan galat; kegagalan muat
+  ditampilkan sebagai state error.
+- Akhiran baris CRLF pada lima berkas dinormalkan ke LF dan dua pelanggaran `react-hooks` di
+  `ChatPanel.tsx` diperbaiki, sehingga `npm run lint` dan `npm run format:check` kembali exit 0
+  (CI `#37` sebelumnya gagal di langkah Lint).
+
+### Catatan
+
+- API chat/hazard yang lama (`getChatHistory`, `insertRideSystemMessage`, `filterActiveMembers`) diganti;
+  `insert_ride_system_message` sengaja tidak punya grant untuk `authenticated`.
+- Belum ada rilis APK yang memuat Milestone 4; build terbaru tetap `v0.1.0-build28` (`794d473`).
+
 ## [v0.1.0-build28](https://github.com/29nls/rodakawan/releases/tag/v0.1.0-build28) — 2026-10-20 · pratinjau
 
 <details>

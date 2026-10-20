@@ -38,17 +38,23 @@ Istilah status dipakai konsisten di seluruh dokumentasi:
 | Milestone 3: perjalanan klub (buat, undang, gabung, keluar, host memulai/menyelesaikan/membatalkan) | Ya — RPC transactional, state machine di database | Ya (27 test fitur + 20 test layar, termasuk 11 test formulir buat/ubah) | **Ya** (uji RLS/RPC 67 perintah) | **Blocked** (dua perangkat) |
 | Milestone 3: berbagi lokasi opt-in (foreground + background) | Ya — consent terpisah dari izin OS, sampling 15 dtk/25 m, basi 60 dtk, lokasi terakhir dihapus saat opt-out/keluar/ride final | Ya | **Ya** (uji allow/deny lokasi) | **Blocked** (izin, GPS mati, force-stop, baterai 30 menit) |
 | Milestone 3: peta konvoi | **Belum** — ADR-064 masih **Proposed** (rekomendasi MapLibre + MapTiler Flex, riset ulang 20 Oktober 2026); layar menampilkan daftar posisi + status kesegaran, bukan peta tiruan | — | — | — |
-| Milestone 4+: chat, hazard, feed, musik | **Belum** | — | — | — |
+| Milestone 4: laporan bahaya jalan (buat, filter, ubah/lepas, konfirmasi, laporkan) | Ya — RPC transaksional, expiry dihitung server, idempotensi + rate limit + deteksi duplikat di database; tanpa peta, daftar memakai label area perkiraan | Ya (29 test fitur + 6 test layar) | **Blocked** — migration M4 belum diterapkan ke project development | **Blocked** (belum ada build perangkat) |
+| Milestone 4: chat konvoi (teks, ubah/hapus 15 menit, pesan sistem, realtime, laporkan, blokir) | Ya — Postgres Changes pada `chat_messages`, keyset pagination, idempotensi `client_message_id`, panel chat di detail perjalanan | Ya (25 test API + 9 test panel) | **Blocked** — migration M4 belum diterapkan | **Blocked** |
+| Milestone 4: moderasi (`content_reports`, `user_blocks`) | Ya — RPC `report_content`, pesan dari pengguna yang diblokir disembunyikan di UI; tidak ada peran moderator global baru | Ya | **Blocked** | — |
+| Milestone 5+: feed, musik, voice PTT | **Belum** | — | — | — |
 
 **Blocked** yang tersisa berarti: alur itu belum dijalankan terhadap backend nyata atau belum diuji di
 HP fisik. Status **Ya** pada kolom perangkat Milestone 2 berasal dari laporan pemilik aplikasi
 (owner-reported) bahwa build sudah dicoba di HP tanpa error yang teramati; tidak ada log, rekaman,
 atau tag rilis per kasus yang disertakan. Project Supabase development **sudah ada**
-sejak 13 Oktober 2026, **seluruh tiga belas** migration sudah diterapkan, uji RLS sudah lulus
-(ADR-035), dan lubang privasi follow serta integritas detail privat kendaraan sudah diperbaiki dengan
-uji allow/deny (ADR-039, ADR-040). Dua migration pertama adalah sejarah penyiapan awal; jumlah itu
-tidak lagi menggambarkan keadaan sekarang. Semua langkah yang dapat dijalankan tanpa backend sudah dijalankan
-— lihat [Perintah pengujian](#perintah-pengujian).
+sejak 13 Oktober 2026, **tiga belas** migration (sampai `20261019120000_ride_workflow.sql`) sudah
+diterapkan, uji RLS sudah lulus (ADR-035), dan lubang privasi follow serta integritas detail privat
+kendaraan sudah diperbaiki dengan uji allow/deny (ADR-039, ADR-040). Dua migration Milestone 4 —
+`20261020090000_hazard_reports_m4.sql` dan `20261020100000_convoy_chat_m4.sql` — **belum diterapkan**
+ke project development mana pun; karena itu seluruh status “Dev backend” untuk hazard dan chat tetap
+**Blocked**, bukan lulus. Langkah penerapannya ada di
+[`docs/SETUP_GUIDE.md`](docs/SETUP_GUIDE.md#4-menerapkan-migration). Semua langkah yang dapat
+dijalankan tanpa backend sudah dijalankan — lihat [Perintah pengujian](#perintah-pengujian).
 
 Layar Milestone 2 (garasi dan klub) dan Milestone 3 (perjalanan) sepenuhnya **berfungsi**: seluruh
 aksinya memanggil service yang menembak tabel/RPC Supabase, dan setiap mutasi punya uji RLS allow/deny
@@ -56,6 +62,14 @@ terhadap database development. Perjalanan memiliki daftar, formulir buat/ubah, d
 undangan, serta kontrol host untuk memulai/menyelesaikan/membatalkan. Berbagi lokasi bersifat opt-in
 per perjalanan dan terpisah dari izin OS; peta **belum** dipasang, jadi layar menampilkan daftar
 posisi dengan label live/basi/belum ada — bukan peta atau koordinat contoh.
+
+Milestone 4 juga **berfungsi di aplikasi**, tetapi backend-nya belum diverifikasi: tab **Peringatan**
+memuat daftar laporan aktif dengan filter kategori/keparahan, formulir lapor (izin lokasi hanya
+diminta saat tombol “Gunakan lokasi saat ini” ditekan), ubah/lepas oleh pelapor dalam 15 menit,
+konfirmasi “masih ada”, dan lapor penyalahgunaan; detail perjalanan memuat **chat konvoi** dengan
+riwayat 50 pesan, “muat pesan lama”, ubah/hapus 15 menit, pesan sistem, dan pembaruan realtime.
+Karena ADR-064 belum disetujui, laporan bahaya **tidak** digambar di peta: setiap laporan menampilkan
+label area perkiraan (±1 km) dari koordinatnya, tanpa tile, marker, atau koordinat contoh.
 
 **Unggah foto kendaraan, logo klub, dan foto profil sudah berfungsi.** `vehicle-photos`,
 `club-logos`, dan `avatars` adalah bucket privat: foto kendaraan dan foto profil hanya bisa dibaca
@@ -217,7 +231,22 @@ yang menyeluruh tetap dijalankan di CI. Bila daftar versi resmi Expo tidak terja
 (sedang offline), pemeriksaan melaporkan bahwa hasilnya **tidak bisa dipastikan** dengan
 `::warning::` dan tidak menggagalkan `npm test` — lulus hanya dilaporkan bila benar-benar diperiksa.
 
-Hasil nyata pada commit `749424c` (19 Oktober 2026, Node 24.18.1, npm 12.0.2):
+Hasil nyata pada **21 Oktober 2026** (Windows, Node 24.x, npm 12.x) setelah pekerjaan Milestone 4 di
+`2b84ec4` + perbaikan lokal yang belum di-commit saat tabel ini ditulis:
+
+| Perintah | Hasil |
+| --- | --- |
+| `npm run typecheck` | Exit 0. |
+| `npm run lint` | Exit 0 setelah memperbaiki 430 galat `prettier/prettier` (akhiran baris CRLF pada lima berkas) dan dua pelanggaran `react-hooks` di `ChatPanel.tsx`. |
+| `npm run format:check` | Exit 0. |
+| `npm test -- --ci` | **41 suite, 460 test lulus**, exit 0 — termasuk 25 test API chat, 9 test panel chat, 29 test hazard (API + label area), dan 6 test layar Peringatan. |
+| `npm run test:scripts` | **240 test lulus**, exit 0. |
+| `npm run doctor` | **Tidak dapat dipastikan**: pemeriksaan skema config gagal `TypeError: fetch failed` / `EAI_AGAIN exp.host` (DNS lingkungan ini), 1 dari 21 pemeriksaan gagal. Bukan temuan proyek. |
+| `npm run export:android` | Exit 0, bundel Hermes `entry-*.hbc` 4 MB. |
+| `npm run db:test` | **Exit 1 — `ECONNREFUSED`**. `.env.db` di mesin ini menunjuk `postgres@localhost:5432`, bukan project development `xvmcpfkkveeaevfcvfug`, dan tidak ada server lokal. Uji RLS Milestone 4 **belum dijalankan**. |
+| `npm run db:types:check`, `npm run storage:test` | **Tidak dijalankan** — membutuhkan connection string project development yang terkonfirmasi. |
+
+Hasil historis pada commit `749424c` (19 Oktober 2026, Node 24.18.1, npm 12.0.2):
 
 | Perintah               | Hasil                                                        |
 | ---------------------- | ------------------------------------------------------------ |
@@ -453,10 +482,15 @@ tanpa filter).
   tidak ikut muncul sebagai “perubahan” di catatan rilis maupun entri berikutnya. Rinciannya di
   [`docs/SETUP_GUIDE.md`](docs/SETUP_GUIDE.md) bagian 6.8.
 
-Status per 20 Oktober 2026: pada `b0c8361` (lapisan provider peta), CI **39399665027** dan Release APK
-**#26** hijau, menerbitkan tag `v0.1.0-build26`; `origin/main` kini `001774a` (pencatatan rilis itu di
-`CHANGELOG.md`). Sebelumnya, pada `df75ba1`, CI **#30** dan Release APK **#23** hijau (tag
-`v0.1.0-build23`), dan Database RLS **#5** hijau pada merge `7cce0ef`.
+Status per 21 Oktober 2026: rilis pratinjau terbaru adalah `v0.1.0-build28` dari commit sumber
+`794d473` (Release APK **#28** hijau, CI **#35** hijau). `origin/main` kini **`2b84ec4`** — dua commit
+Milestone 4 sudah ter-push **tanpa tag rilis**, jadi build28 **belum** memuat hazard/chat.
+Isu **#37** (CI untuk `2b84ec4`) **gagal** di langkah Lint, dan Database RLS **#7** untuk `b6b6e7f`
+**gagal**; penyebab lokal yang direproduksi adalah 430 galat `prettier/prettier` (akhiran baris CRLF)
+dan regresi `ROW_NOT_APPLIED_ERROR` yang mengubah kode galat 0-baris menjadi `not_found` — keduanya
+sudah diperbaiki dan diverifikasi ulang di mesin ini, tetapi **CI untuk commit perbaikan belum
+berjalan** karena commit itu belum di-push. Sebelumnya, pada `b0c8361`, CI dan Release APK #26 hijau
+(tag `v0.1.0-build26`), dan pada `df75ba1`, Release APK #23 hijau (tag `v0.1.0-build23`).
 
 Uji RLS berjalan **di GitHub Actions**, bukan hanya lokal: workflow `database-rls` memverifikasi
 connection string menunjuk project development sebelum menyentuh database, lalu menolak lulus bila
@@ -465,8 +499,13 @@ terakhir (`gen types` tanpa target, ADR-061); perbaikannya ada di `ca2461c` dan 
 Workflow `ci.yml` tetap bebas secret Supabase.
 
 Kedua alur rilis **sudah berjalan di GitHub**. APK preview terbaru adalah
-[v0.1.0-build26](https://github.com/29nls/rodakawan/releases/tag/v0.1.0-build26) (20 Oktober 2026,
-commit `b0c8361`): `app-preview.apk`, 106.524.231 byte, SHA-256
+[v0.1.0-build28](https://github.com/29nls/rodakawan/releases/tag/v0.1.0-build28) (20 Oktober 2026,
+commit `794d473`): `app-preview.apk`, **106.526.367** byte, SHA-256
+`91d11ec4efc73fa262a8749a7585d88fcde5ddb21888dece9a2198ecc07e22bc` (dibaca dari metadata aset
+GitHub Releases), dari Release APK **#28** yang hijau. APK build28 **belum** diunduh ulang di mesin ini,
+jadi perubahan byte-nya tidak diverifikasi lokal. Sebelumnya,
+[v0.1.0-build26](https://github.com/29nls/rodakawan/releases/tag/v0.1.0-build26) dari `b0c8361`:
+`app-preview.apk`, 106.524.231 byte, SHA-256
 `97e702628109fed3c4d38e93c103c33cde713f423ceff9fc35f642348b6c2432`, sertifikat
 `3ea8bb4745b638be8fddf71e15edd9786d45aac65c0384b87be8fa2c32b3b14d` — nilai itu adalah digest aset
 dan sertifikat yang dicetak workflow rilis; uji nyala di emulator ikut lulus, tetapi berkasnya **belum**

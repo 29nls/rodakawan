@@ -1,277 +1,364 @@
+/**
+ * Layanan chat konvoi (Milestone 4).
+ *
+ * Prinsip yang dijaga di sini:
+ * - pesan baru hanya dianggap terkirim setelah server mengembalikan barisnya;
+ * - `clientMessageId` membuat pengiriman ulang idempoten (unique index
+ *   `(ride_id, sender_id, client_message_id)`), jadi retry setelah jaringan
+ *   putus tidak menggandakan pesan;
+ * - riwayat memakai keyset pagination `(created_at, id)` — bukan offset — supaya
+ *   pesan baru yang masuk saat pengguna memuat pesan lama tidak menggeser
+ *   halaman dan tidak membuat baris terlewat;
+ * - pesan sistem tidak punya jalur tulis klien: pembuatnya trigger database
+ *   (`insert_ride_system_message` dicabut dari `authenticated`);
+ * - isi pesan yang sudah dihapus tidak pernah dikirim ke UI (`redactChatMessage`).
+ */
+
 import type { SupabaseClient } from '@supabase/supabase-js';
 
-import { mapRpcError, mapTableError, type AppError } from '@/features/auth/errors';
+import { NETWORK_APP_ERROR, type AppError } from '@/features/auth/errors';
+import { mapChatError } from '@/features/chat/errors';
+import { reportContent, type ContentReportReason } from '@/features/moderation/api';
 import type { Database } from '@/lib/supabase/database.types';
 
 export type ChatClient = SupabaseClient<Database>;
-export type ApiResult<T> = { ok: true; data: T } | { ok: false; error: AppError };
+
+export type ChatResult<T> = { ok: true; data: T } | { ok: false; error: AppError };
+
+export type ChatMessageType = 'text' | 'system';
+
 export type ChatMessageRow = {
   id: string;
   ride_id: string;
   sender_id: string;
-  message_type: 'text' | 'system';
+  message_type: ChatMessageType;
   content: string;
+  created_at: string;
   edited_at: string | null;
-  created_at: string;
-  deleted_at?: string | null;
-};
-export type SystemMessageRow = {
-  id: string;
-  ride_id: string;
-  sender_id: string | null;
-  message_type: 'system';
-  content: string;
-  created_at: string;
-};
-export type ChatFilters = {
-  rideId?: string;
-  searchAfter?: { id: string; created_at: string };
+  deleted_at: string | null;
+  client_message_id: string | null;
 };
 
-function chatTrimInvalidMessage(): string {
-  return 'Pesan harus 1-2000 karakter setelah ditrim.';
-}
+/** Pesan yang aman ditampilkan: isi pesan terhapus sudah dikosongkan. */
+export type ChatMessage = ChatMessageRow & { deleted: boolean };
 
-function chatRateLimitMessage(): string {
-  return 'Terlalu banyak pesan dalam waktu singkat. Coba lagi sebentar lagi.';
-}
+export type ChatCursor = { created_at: string; id: string };
 
-function chatEditWindowMessage(): string {
-  return 'Jendela pengubahan pesan sudah lewat (15 menit sejak dikirim)';
-}
+export type ChatPage = {
+  /** Urut lama → baru, siap dirender. */
+  messages: ChatMessage[];
+  /** `true` bila masih ada pesan lebih lama di server. */
+  hasMore: boolean;
+};
 
-function chatNotSenderMessage(): string {
-  return 'Hanya pengirim yang dapat mengubah/hapus pesannya';
-}
+export type ChatPageOptions = {
+  limit?: number;
+  /** Ambil pesan yang lebih lama dari baris ini (keyset). */
+  before?: ChatCursor | null;
+};
 
-function chatSystemMessageMessage(): string {
-  return 'Pesan sistem tidak dapat diubah/hapus';
-}
+export const MAX_CHAT_CONTENT_LENGTH = 2000;
+export const CHAT_PAGE_SIZE = 50;
+/** Selaras dengan `edit_chat_message`/`delete_chat_message` di database. */
+export const CHAT_EDIT_WINDOW_MS = 15 * 60 * 1000;
 
-export async function sendChatMessage(
-  client: ChatClient,
-  rideId: string,
-  content: string,
-  clientMessageId?: string,
-): Promise<ApiResult<ChatMessageRow>> {
-  // Validasi konten (1-2000 karakter)
-  if (content.length < 1 || content.length > 2000) {
-    return {
-      ok: false,
-      error: { code: 'chat_trim_invalid', message: chatTrimInvalidMessage(), retryable: false },
-    };
-  }
+const CHAT_COLUMNS =
+  'id, ride_id, sender_id, message_type, content, created_at, edited_at, deleted_at, client_message_id';
 
-  const { data, error } = await (client.rpc as any)('send_chat_message', {
-    p_ride_id: rideId,
-    p_content: content,
-    p_client_message_id: clientMessageId ?? null,
-  });
+/** Validasi isi pesan: 1–2000 karakter **setelah** trim. */
+export function validateChatContent(raw: string): ChatResult<string> {
+  const content = raw.trim();
 
-  if (error) {
-    const detail = (error as any).details || (error as any).detail || '';
-    // Deteksi rate limit
-    if (typeof detail === 'string' && detail.includes('chat_rate_limit')) {
-      return {
-        ok: false,
-        error: { code: 'chat_rate_limit', message: chatRateLimitMessage(), retryable: true },
-      };
-    }
-    // Deteksi ride final
-    if (typeof detail === 'string' && detail.includes('chat_ride_final')) {
-      return {
-        ok: false,
-        error: {
-          code: 'chat_ride_final',
-          message: 'Perjalanan ini sudah selesai, pesan baru tidak dapat dikirim',
-          retryable: false,
-        },
-      };
-    }
-    return { ok: false, error: mapRpcError(error) };
-  }
-
-  return { ok: true, data: data as ChatMessageRow };
-}
-
-/** Ubah pesan. Hanya pengirim, hanya `message_type = 'text'`, tidak boleh sudah dihapus, maksimal 15 menit sejak `created_at`. */
-export async function editChatMessage(
-  client: ChatClient,
-  messageId: string,
-  content: string,
-): Promise<ApiResult<ChatMessageRow>> {
-  // Validasi konten (1-2000 karakter)
-  if (content.length < 1 || content.length > 2000) {
-    return {
-      ok: false,
-      error: { code: 'chat_trim_invalid', message: chatTrimInvalidMessage(), retryable: false },
-    };
-  }
-
-  const { data, error } = await (client.rpc as any)('edit_chat_message', {
-    p_message_id: messageId,
-    p_content: content,
-  });
-
-  if (error) {
-    const detail = (error as any).details || (error as any).detail || '';
-    // Deteksi jendela edit
-    if (typeof detail === 'string' && detail.includes('jendela edit')) {
-      return {
-        ok: false,
-        error: { code: 'chat_edit_window', message: chatEditWindowMessage(), retryable: false },
-      };
-    }
-    // Deteksi pesan sistem
-    if (typeof detail === 'string' && detail.includes('chat_system_message')) {
-      return {
-        ok: false,
-        error: {
-          code: 'chat_system_message',
-          message: chatSystemMessageMessage(),
-          retryable: false,
-        },
-      };
-    }
-    // Deteksi bukan pengirim
-    if (typeof detail === 'string' && detail.includes('chat_not_sender')) {
-      return {
-        ok: false,
-        error: { code: 'chat_not_sender', message: chatNotSenderMessage(), retryable: false },
-      };
-    }
-    return { ok: false, error: mapRpcError(error) };
-  }
-
-  return { ok: true, data: data as ChatMessageRow };
-}
-
-/** Hapus (soft delete) pesan: `deleted_at`, baris tetap ada untuk moderasi. Idempoten: menghapus pesan yang sudah terhapus mengembalikan baris yang sama. */
-export async function deleteChatMessage(
-  client: ChatClient,
-  messageId: string,
-): Promise<ApiResult<ChatMessageRow>> {
-  const { data, error } = await (client.rpc as any)('delete_chat_message', {
-    p_message_id: messageId,
-  });
-
-  if (error) {
-    const detail = (error as any).details || (error as any).detail || '';
-    // Deteksi rate limit
-    if (typeof detail === 'string' && detail.includes('chat_rate_limit')) {
-      return {
-        ok: false,
-        error: { code: 'chat_rate_limit', message: chatRateLimitMessage(), retryable: true },
-      };
-    }
-    // Deteksi jendela edit
-    if (typeof detail === 'string' && detail.includes('jendela edit')) {
-      return {
-        ok: false,
-        error: { code: 'chat_edit_window', message: chatEditWindowMessage(), retryable: false },
-      };
-    }
-    // Deteksi pesan sistem
-    if (typeof detail === 'string' && detail.includes('chat_system_message')) {
-      return {
-        ok: false,
-        error: {
-          code: 'chat_system_message',
-          message: chatSystemMessageMessage(),
-          retryable: false,
-        },
-      };
-    }
-    // Deteksi bukan pengirim
-    if (typeof detail === 'string' && detail.includes('chat_not_sender')) {
-      return {
-        ok: false,
-        error: { code: 'chat_not_sender', message: chatNotSenderMessage(), retryable: false },
-      };
-    }
-    return { ok: false, error: mapRpcError(error) };
-  }
-
-  return { ok: true, data: data as ChatMessageRow };
-}
-
-/** Dapatkan riwayat pesan. Menggunakan keyset pagination dengan ordering berdasarkan created_at dan id. */
-export async function getChatHistory(
-  client: ChatClient,
-  rideId: string,
-  hasMore: boolean = false,
-): Promise<ApiResult<ChatMessageRow[]>> {
-  let query = client
-    .from('chat_messages')
-    .select('id, ride_id, sender_id, message_type, content, edited_at, created_at')
-    .eq('ride_id', rideId)
-    .is('deleted_at', null)
-    .order('created_at', { ascending: false })
-    .order('id', { ascending: false });
-
-  if (hasMore) {
-    // Ambil lebih sedikit untuk membuat space di UI
-    query = query.limit(20);
-  } else {
-    // Ambil pesan terbaru 50
-    query = query.limit(50);
-  }
-
-  const { data, error } = await query;
-
-  if (error) return { ok: false, error: mapTableError(error) };
-
-  return { ok: true, data: (data || []) as ChatMessageRow[] };
-}
-
-/** Kirim pesan sistem untuk transisi ride/membership. */
-export async function insertRideSystemMessage(
-  client: ChatClient,
-  rideId: string,
-  type:
-    | 'ride_started'
-    | 'ride_completed'
-    | 'ride_cancelled'
-    | 'member_joined'
-    | 'member_left'
-    | 'member_removed',
-  content: string,
-): Promise<ApiResult<SystemMessageRow>> {
-  const { data, error } = await (client.rpc as any)('insert_ride_system_message', {
-    p_ride_id: rideId,
-    p_content: content,
-  });
-
-  if (error) return { ok: false, error: mapRpcError(error) };
-
-  return { ok: true, data: data as SystemMessageRow };
-}
-
-/** Filtri pesan: hanya anggota join aktif yang bisa membaca */
-export async function filterActiveMembers(
-  client: ChatClient,
-  rideId: string,
-  userId: string,
-): Promise<ApiResult<boolean>> {
-  const { data, error } = await client
-    .from('ride_members')
-    .select('status')
-    .eq('ride_id', rideId)
-    .eq('user_id', userId)
-    .single();
-
-  if (error) return { ok: false, error: mapTableError(error) };
-
-  if (!data || (data as any).status !== 'joined') {
+  if (content.length < 1) {
     return {
       ok: false,
       error: {
-        code: 'chat_not_member',
-        message: 'Anda bukan anggota aktif perjalanan ini',
+        code: 'chat_trim_invalid',
+        message: 'Pesan tidak boleh kosong. Tulis sesuatu dulu, lalu kirim.',
         retryable: false,
       },
     };
   }
 
-  return { ok: true, data: true };
+  if (content.length > MAX_CHAT_CONTENT_LENGTH) {
+    return {
+      ok: false,
+      error: {
+        code: 'chat_trim_invalid',
+        message: `Pesan maksimal ${MAX_CHAT_CONTENT_LENGTH} karakter. Pendekkan dulu, lalu kirim.`,
+        retryable: false,
+      },
+    };
+  }
+
+  return { ok: true, data: content };
+}
+
+function toChatMessage(row: ChatMessageRow): ChatMessage {
+  const deleted = row.deleted_at !== null && row.deleted_at !== undefined;
+  return { ...row, content: deleted ? '' : row.content, deleted };
+}
+
+/** Apakah pengguna masih boleh mengubah/menghapus pesan ini. */
+export function canEditChatMessage(
+  message: Pick<ChatMessageRow, 'message_type' | 'sender_id' | 'created_at' | 'deleted_at'>,
+  userId: string | null,
+  now: number = Date.now(),
+): boolean {
+  if (!userId || message.sender_id !== userId) return false;
+  if (message.message_type !== 'text') return false;
+  if (message.deleted_at) return false;
+
+  const createdAt = Date.parse(message.created_at);
+  if (Number.isNaN(createdAt)) return false;
+  return now - createdAt <= CHAT_EDIT_WINDOW_MS;
+}
+
+/** Ride final tidak menerima pesan baru (sama dengan aturan `send_chat_message`). */
+export function chatAcceptsNewMessages(rideStatus: string): boolean {
+  return rideStatus !== 'completed' && rideStatus !== 'cancelled';
+}
+
+async function callRows(
+  action: () => PromiseLike<{ data: unknown; error: unknown }>,
+): Promise<ChatResult<ChatMessageRow>> {
+  try {
+    const { data, error } = await action();
+    if (error) return { ok: false, error: mapChatError(error) };
+    if (!data) return { ok: false, error: NETWORK_APP_ERROR };
+    return { ok: true, data: data as ChatMessageRow };
+  } catch (error) {
+    return { ok: false, error: mapChatError(error) };
+  }
+}
+
+export async function sendChatMessage(
+  client: ChatClient,
+  input: { rideId: string; content: string; clientMessageId: string },
+): Promise<ChatResult<ChatMessage>> {
+  const validated = validateChatContent(input.content);
+  if (!validated.ok) return validated;
+
+  const result = await callRows(async () =>
+    (client.rpc as any)('send_chat_message', {
+      p_ride_id: input.rideId,
+      p_content: validated.data,
+      p_client_message_id: input.clientMessageId,
+    }),
+  );
+
+  if (!result.ok) return result;
+  return { ok: true, data: toChatMessage(result.data) };
+}
+
+export async function editChatMessage(
+  client: ChatClient,
+  input: { messageId: string; content: string },
+): Promise<ChatResult<ChatMessage>> {
+  const validated = validateChatContent(input.content);
+  if (!validated.ok) return validated;
+
+  const result = await callRows(async () =>
+    (client.rpc as any)('edit_chat_message', {
+      p_message_id: input.messageId,
+      p_content: validated.data,
+    }),
+  );
+
+  if (!result.ok) return result;
+  return { ok: true, data: toChatMessage(result.data) };
+}
+
+/** Soft delete: baris tetap ada untuk moderasi, isinya tidak lagi ditampilkan. */
+export async function deleteChatMessage(
+  client: ChatClient,
+  messageId: string,
+): Promise<ChatResult<ChatMessage>> {
+  const result = await callRows(async () =>
+    (client.rpc as any)('delete_chat_message', { p_message_id: messageId }),
+  );
+
+  if (!result.ok) return result;
+  return { ok: true, data: toChatMessage(result.data) };
+}
+
+/**
+ * Satu halaman riwayat chat.
+ *
+ * Kueri mengambil `limit + 1` baris untuk mengetahui apakah masih ada halaman
+ * lebih lama, lalu hasilnya dibalik menjadi urutan lama → baru.
+ */
+export async function getChatMessages(
+  client: ChatClient,
+  rideId: string,
+  options: ChatPageOptions = {},
+): Promise<ChatResult<ChatPage>> {
+  const limit = options.limit ?? CHAT_PAGE_SIZE;
+
+  try {
+    let query = client
+      .from('chat_messages')
+      .select(CHAT_COLUMNS)
+      .eq('ride_id', rideId)
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: false })
+      .limit(limit + 1);
+
+    if (options.before) {
+      const createdAt = options.before.created_at;
+      const id = options.before.id;
+      // Keyset: lebih lama dari cursor, atau timestamp sama dengan id lebih kecil.
+      query = query.or(
+        `created_at.lt."${createdAt}",and(created_at.eq."${createdAt}",id.lt."${id}")`,
+      );
+    }
+
+    const { data, error } = await query;
+    if (error) return { ok: false, error: mapChatError(error) };
+
+    const rows = ((data ?? []) as unknown as ChatMessageRow[]).map(toChatMessage);
+    const hasMore = rows.length > limit;
+    const page = hasMore ? rows.slice(0, limit) : rows;
+
+    return { ok: true, data: { messages: page.slice().reverse(), hasMore } };
+  } catch (error) {
+    return { ok: false, error: mapChatError(error) };
+  }
+}
+
+/**
+ * Gabungkan pesan baru/realtime ke daftar yang sudah ada tanpa duplikat.
+ *
+ * Identitas pesan adalah `id` server, bukan `client_message_id`, sehingga pesan
+ * optimistis yang sudah dikonfirmasi server tidak muncul dua kali. Hasil selalu
+ * diurutkan lama → baru dan tidak pernah memuat isi pesan terhapus.
+ */
+export function mergeChatMessages(
+  existing: readonly ChatMessage[],
+  incoming: readonly ChatMessageRow[],
+): ChatMessage[] {
+  const byId = new Map<string, ChatMessage>();
+
+  for (const message of existing) byId.set(message.id, message);
+  for (const row of incoming) {
+    const next = toChatMessage(row);
+    const previous = byId.get(next.id);
+    // Baris hasil realtime bisa lebih lama dari versi lokal; jangan menurunkan versi.
+    if (previous && previous.edited_at && !next.edited_at && !next.deleted) {
+      byId.set(next.id, { ...next, edited_at: previous.edited_at, content: previous.content });
+      continue;
+    }
+    byId.set(next.id, next);
+  }
+
+  return [...byId.values()].sort((a, b) => {
+    const diff = Date.parse(a.created_at) - Date.parse(b.created_at);
+    if (diff !== 0) return diff;
+    return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+  });
+}
+
+export type ChatSubscriptionHandlers = {
+  onInsert?: (message: ChatMessage) => void;
+  onUpdate?: (message: ChatMessage) => void;
+  onDelete?: (messageId: string) => void;
+  /** Status channel Supabase: `SUBSCRIBED`, `CHANNEL_ERROR`, `TIMED_OUT`, `CLOSED`. */
+  onStatus?: (status: string) => void;
+};
+
+export type ChatSubscription = { unsubscribe: () => void };
+
+/**
+ * Langganan Postgres Changes untuk satu perjalanan.
+ *
+ * Bukan Broadcast publik: setiap baris tetap melewati policy SELECT
+ * `chat_select_ride_member` sebelum dikirim, jadi non-anggota, peserta yang
+ * keluar, dan peserta yang dikeluarkan tidak menerima baris apa pun.
+ */
+export function subscribeChatMessages(
+  client: ChatClient,
+  rideId: string,
+  handlers: ChatSubscriptionHandlers,
+): ChatSubscription {
+  const channel = client
+    .channel(`ride-chat:${rideId}`)
+    .on(
+      'postgres_changes',
+      { event: 'INSERT', schema: 'public', table: 'chat_messages', filter: `ride_id=eq.${rideId}` },
+      (payload) => {
+        const row = payload.new as ChatMessageRow | undefined;
+        if (!row || row.ride_id !== rideId) return;
+        handlers.onInsert?.(toChatMessage(row));
+      },
+    )
+    .on(
+      'postgres_changes',
+      { event: 'UPDATE', schema: 'public', table: 'chat_messages', filter: `ride_id=eq.${rideId}` },
+      (payload) => {
+        const row = payload.new as ChatMessageRow | undefined;
+        if (!row || row.ride_id !== rideId) return;
+        handlers.onUpdate?.(toChatMessage(row));
+      },
+    )
+    .on(
+      'postgres_changes',
+      { event: 'DELETE', schema: 'public', table: 'chat_messages', filter: `ride_id=eq.${rideId}` },
+      (payload) => {
+        const row = payload.old as { id?: string } | undefined;
+        if (row?.id) handlers.onDelete?.(row.id);
+      },
+    )
+    .subscribe((status) => handlers.onStatus?.(status));
+
+  return {
+    unsubscribe: () => {
+      void client.removeChannel(channel);
+    },
+  };
+}
+
+/**
+ * Daftar pengguna yang diblokir oleh sesi ini.
+ *
+ * `user_blocks` hanya punya policy SELECT untuk `blocker_id = auth.uid()`, jadi
+ * hubungan blokir tidak pernah terbaca dari sisi lain. Bila tabel belum ada di
+ * backend, hasilnya daftar kosong — chat tetap bisa dipakai.
+ */
+export async function getBlockedUserIds(client: ChatClient): Promise<string[]> {
+  try {
+    const { data, error } = await client.from('user_blocks').select('blocked_id');
+    if (error || !data) return [];
+    return (data as { blocked_id: string }[]).map((row) => row.blocked_id);
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Tandai pesan dari pengguna yang diblokir. Isi pesan tidak ditampilkan, tetapi
+ * barisnya tetap ada supaya urutan dan konteks percakapan tidak berubah.
+ */
+export function hiddenByBlock(
+  message: Pick<ChatMessage, 'sender_id'>,
+  blockedUserIds: readonly string[],
+): boolean {
+  return blockedUserIds.includes(message.sender_id);
+}
+
+/** Laporkan pesan chat melalui RPC moderasi yang sama dengan laporan bahaya. */
+export async function reportChatMessage(
+  client: ChatClient,
+  messageId: string,
+  reason: ContentReportReason,
+  details?: string,
+): Promise<ChatResult<{ id: string }>> {
+  const result = await reportContent(client, {
+    targetType: 'chat_message',
+    targetId: messageId,
+    reason,
+    details,
+  });
+
+  if (!result.ok) return result;
+  return { ok: true, data: { id: result.data.id } };
 }

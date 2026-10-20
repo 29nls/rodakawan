@@ -142,6 +142,49 @@ Jangan mengadopsi retensi tabel ini secara otomatis; tetapkan dasar, kebutuhan, 
 
 Matrix ini harus disesuaikan dengan kebijakan final, lalu diimplementasikan menjadi automated DB/RLS tests untuk allowed dan denied cases.
 
+### 8.1 Milestone 4 — jalur tulis hazard dan chat (21 Oktober 2026)
+
+Perubahan yang **sudah ditulis** di migration (belum diterapkan ke project development):
+
+- `INSERT`/`UPDATE`/`DELETE` langsung pada `public.hazard_reports` dan `public.chat_messages`
+  **dicabut** dari `authenticated` dan `anon`. Seluruh mutasi lewat RPC `security definer` dengan
+  `set search_path = ''` dan grant hanya `authenticated`. Alasannya sama dengan ADR-065: rate limit,
+  deteksi duplikat, jendela edit, dan expiry server tidak mungkin ditegakkan bila REST biasa masih
+  bisa menulis.
+- Policy yang dimusnahkan: `hazards_insert_self`, `chat_insert_self_member`, `chat_update_own_text`,
+  `chat_delete_own`. Policy baca **tidak diubah**: `hazards_select_current_or_reporter` dan
+  `chat_select_ride_member` (`is_ride_member` = `ride_members.status = 'joined'`).
+- Tabel baru `public.hazard_confirmations` (PK `(hazard_id, user_id)`, RLS aktif, hanya policy
+  `SELECT`, tanpa INSERT/UPDATE/DELETE klien). Satu konfirmasi per pengguna per laporan; konfirmasi
+  tidak memperpanjang `expires_at` dan tidak dapat dicabut.
+- Identitas pelapor/pengirim **tidak pernah** menjadi argumen RPC: selalu `auth.uid()`.
+- `expires_at` dihitung trigger `hazard_reports_expiry_guard` dari `created_at` + `hazard_expiry_seconds`;
+  percobaan mengubah `expires_at` ditolak (`hazard_expiry_immutable`).
+- Batas laju di database: 5 laporan/10 menit/pengguna, duplikat kategori sama dalam ±50 m/10 menit,
+  10 konfirmasi/jam/pengguna, 20 pesan teks/60 detik/pengguna, edit/hapus 15 menit, dan
+  `completed`/`cancelled` menolak pesan baru.
+- Idempotensi: unique index `(reporter_id, client_report_id)` dan
+  `(ride_id, sender_id, client_message_id)` parsial; retry mengembalikan baris yang sama.
+- Pesan sistem hanya dibuat trigger (`insert_ride_system_message`, grant dicabut dari `authenticated`),
+  sehingga klien tidak bisa menyisipkan pesan `message_type = 'system'` palsu. Isinya dibatasi
+  1–200 karakter dan tidak memuat koordinat.
+- Moderasi memakai `content_reports` lama lewat RPC `report_content`. Pelapor dari `auth.uid()`;
+  target pesan chat hanya bisa dilaporkan bila pelapor melihat pesan itu (anggota ride), sehingga
+  fungsi ini tidak menjadi oracle keberadaan pesan ride lain. Laporan **tidak** menghapus konten.
+- Pemblokiran: `user_blocks` tetap hanya dapat dibaca `blocker_id = auth.uid()`. Aplikasi menyembunyikan
+  isi pesan dari pengguna yang diblokir di klien; tidak ada policy baru, dan hubungan blokir tidak
+  dikirim ke pengguna lain.
+- Realtime: `chat_messages` dan `ride_locations` ditambahkan ke publication `supabase_realtime`.
+  Setiap baris tetap melewati policy `SELECT` tabelnya sebelum dikirim; tidak ada Broadcast publik.
+
+**Batas yang harus disebut terbuka:** (1) policy baca hazard adalah data komunitas — pelapor melihat
+laporannya sendiri walau sudah kedaluwarsa, dan pengguna terautentikasi mana pun melihat laporan aktif;
+(2) belum ada peran moderator global, jadi `status = 'removed'` oleh selain pelapor hanya lewat
+dashboard tepercaya; (3) uji allow/deny M4 (`supabase/tests/rls_hazards_test.sql`,
+`rls_chat_test.sql`) belum pernah dieksekusi, sehingga jaminan di atas masih **klaim desain**, bukan
+hasil pengujian; (4) penyembunyian pesan terblokir terjadi di klien, jadi isi pesan tetap terkirim ke
+perangkat pengguna yang memblokir (bukan kebocoran ke pihak lain, tetapi bukan penyaringan server).
+
 ## 9. Security release checklist
 
 Status per Milestone 1.5 (diperbarui pada milestone ini). Istilah status: **Implemented**,

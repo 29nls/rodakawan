@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, StyleSheet, TextInput, View } from 'react-native';
+import { Alert, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/ui/AppText';
 import { Badge, type BadgeTone } from '@/components/ui/Badge';
@@ -51,7 +51,7 @@ import {
   startRideLocationTracking,
   stopRideLocationTracking,
 } from '@/features/rides/tracking';
-import { getChatHistory, sendChatMessage, type ChatMessageRow } from '@/features/chat/api';
+import { ChatPanel } from '@/features/chat/ChatPanel';
 import { formatRideSchedule } from '@/features/rides/validation';
 import { readPublicEnv } from '@/lib/env';
 import type {
@@ -136,6 +136,14 @@ export default function RideScreen() {
   const isHost = membership?.role === 'host' && membership.status === 'joined';
   const isMember = membership?.status === 'joined';
   const isActive = ride?.status === 'active';
+
+  // Nama pengirim untuk chat diambil dari daftar peserta yang sudah dimuat,
+  // supaya panel chat tidak melakukan query profil tambahan.
+  const senderNames = useMemo(() => {
+    const names: Record<string, string> = {};
+    for (const member of details?.members ?? []) names[member.user_id] = memberName(member);
+    return names;
+  }, [details?.members]);
 
   // Jam untuk label kesegaran; tidak memanggil jaringan.
   useEffect(() => {
@@ -770,32 +778,15 @@ export default function RideScreen() {
         </Card>
       ) : null}
 
-      {(ride.status === 'planned' || ride.status === 'active') && isMember ? (
-        <Card>
-          <SectionHeader
-            subtitle="Obrolan untuk anggota aktif perjalanan. Hanya anggota join yang dapat mengirim/baca."
-            title="Chat Konvoi"
-          />
-          <View style={styles.chatContainer}>
-            <AppText tone="secondary">
-              Chat konvoi tersedia. Fitur lengkap sedang dikembangkan.
-            </AppText>
-          </View>
-          <View style={styles.chatInputRow}>
-            <TextInput
-              style={styles.chatInput}
-              placeholder="Ketik pesan..."
-              multiline
-              editable={false}
-            />
-            <Button
-              icon="send-outline"
-              label="Kirim"
-              onPress={() => setNotice('Fitur chat lengkap akan tersedia segera.')}
-              variant="primary"
-            />
-          </View>
-        </Card>
+      {backend.available ? (
+        <ChatPanel
+          client={backend.client}
+          isActiveMember={Boolean(isMember)}
+          rideId={ride.id}
+          rideStatus={ride.status}
+          senderNames={senderNames}
+          userId={userId ?? ''}
+        />
       ) : null}
 
       <Card>
@@ -957,29 +948,5 @@ const styles = StyleSheet.create({
   memberActions: {
     alignItems: 'flex-end',
     gap: spacing.xs,
-  },
-  chatContainer: {
-    minHeight: 120,
-    maxHeight: 300,
-    padding: spacing.sm,
-    backgroundColor: colors.background.elevated,
-    borderRadius: spacing.sm,
-    gap: spacing.sm,
-  },
-  chatInputRow: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    alignItems: 'flex-end',
-  },
-  chatInput: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: colors.border.subtle,
-    borderRadius: spacing.sm,
-    padding: spacing.sm,
-    backgroundColor: colors.background.base,
-    minHeight: 40,
-    maxHeight: 120,
-    color: colors.text.primary,
   },
 });

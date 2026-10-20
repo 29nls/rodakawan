@@ -227,19 +227,33 @@ aktif; tracking tidak berjalan tanpa ride aktif dan opt-in.
 
 ## Milestone 4 — Hazard reports dan convoy chat
 
-**Status: belum dimulai.** Rencana rinci (kategori, RLS, rate limit, sistem pesan, urutan kerja, dan
-kriteria penerimaan) ada di [`docs/MILESTONE_4_PLAN.md`](MILESTONE_4_PLAN.md). Gerbangnya: keputusan
-provider peta (ADR-064) dan uji perangkat khusus M3 harus selesai atau ditunda eksplisit oleh pemilik
-produk lebih dulu. Tidak ada layar, tombol, atau placeholder M4 di aplikasi saat ini.
+**Status: diimplementasikan dan lulus lokal; backend belum diterapkan.** Pemilik produk memilih jalur
+kedua [`docs/MILESTONE_4_PLAN.md`](MILESTONE_4_PLAN.md): menunda keputusan peta (ADR-064) dan uji
+perangkat khusus M3, lalu mengerjakan M4 **tanpa marker peta**. Penundaan itu bukan bukti bahwa uji
+M3 sudah lulus.
 
-- [ ] CRUD report dan expiry rules.
-- [ ] Marker/list/filter laporan.
-- [ ] Report abuse/confirm report.
-- [ ] Chat persisted + realtime events.
-- [ ] System messages untuk start/end/member changes.
-- [ ] Rate limits dan error states.
+- [x] CRUD report dan expiry rules — RPC `create_hazard`/`update_hazard`/`remove_hazard`/
+      `confirm_hazard`/`expire_hazard_reports`; `expires_at` dihitung trigger dari `created_at`.
+- [x] List/filter laporan — tab Peringatan, filter kategori + keparahan, label area perkiraan dari
+      koordinat. **Tanpa peta** (ADR-064 masih Proposed); tidak ada marker atau tile tiruan.
+- [x] Report abuse/confirm report — `report_content` (tabel `content_reports` lama), satu konfirmasi
+      per pengguna per laporan.
+- [x] Chat persisted + realtime events — `chat_messages` + Postgres Changes, keyset pagination,
+      idempotensi `client_message_id`, panel chat di detail perjalanan.
+- [x] System messages untuk start/end/member changes — trigger `rides_system_message` dan
+      `ride_members_system_message`, transaksional dengan mutasinya.
+- [x] Rate limits dan error states — 5 laporan/10 menit, duplikat 50 m/10 menit, 10 konfirmasi/jam,
+      20 pesan/60 detik; semuanya di database, bukan UI.
 
-**Exit criteria:** report kedaluwarsa tidak aktif; chat tidak dapat dibaca non-member; retry tidak membuat duplicate message.
+**Belum (blocked):** migration `20261020090000_hazard_reports_m4.sql` dan
+`20261020100000_convoy_chat_m4.sql` belum diterapkan ke project development, jadi uji RLS/RPC M4
+(`supabase/tests/rls_hazards_test.sql`, `supabase/tests/rls_chat_test.sql`) belum pernah dijalankan
+dan realtime lintas perangkat belum dibuktikan. CI untuk `2b84ec4` juga gagal di Lint; perbaikannya
+sudah diverifikasi lokal tetapi belum di-push.
+
+**Exit criteria:** report kedaluwarsa tidak aktif; chat tidak dapat dibaca non-member; retry tidak
+membuat duplicate message. Ketiganya **dirancang dan diuji di database**, tetapi baru terbukti setelah
+migration diterapkan dan `npm run db:test -- --file …` hijau.
 
 ## Milestone 5 — Push, polish dan beta
 

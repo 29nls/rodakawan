@@ -1,6 +1,12 @@
 # Rencana Milestone 3 — Perjalanan & berbagi lokasi
 
 Status: **Implemented · Passed locally · Passed against dev backend**. Tanggal: 2026-10-20.
+
+> **Pembaruan 21 Oktober 2026:** pemilik produk menyatakan uji perangkat khusus M3 **ditunda**
+> (dua perangkat, izin dicabut, GPS mati/mode pesawat, force-stop/reboot, baterai 30 menit) dan
+> ADR-064 tetap **Proposed**, lalu Milestone 4 dikerjakan tanpa marker peta. Penundaan ini **bukan**
+> bukti bahwa uji tersebut lulus: statusnya tetap **Deferred by owner** dan tidak boleh dinaikkan tanpa
+> bukti. Lihat ADR-066 dan `docs/QA_TEST_PLAN.md` bagian 8a.
 **Tested on physical device: Blocked** untuk alur perjalanan dua perangkat, background/reboot, dan
 pengukuran baterai. Pemilik aplikasi melaporkan build `v0.1.0-build23` dipakai tanpa galat yang
 teramati (**owner-reported**); laporan itu tidak menaikkan status uji perangkat khusus di atas karena

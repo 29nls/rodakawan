@@ -152,6 +152,28 @@ Jangan rilis jika ditemukan salah satu:
 - Permission request menyesatkan pengguna atau kontrol stop-sharing tidak berfungsi.
 - Peringatan bahaya kedaluwarsa masih tampil sebagai aktif tanpa indikator.
 
+## 8a. Status otomatisasi dan verifikasi (Milestone 4)
+
+Ditambahkan 21 Oktober 2026. Status yang dipakai sama dengan bagian 9, ditambah **Deferred by owner**.
+
+| Area | Implemented | Passed locally | Dev backend | Perangkat fisik |
+| --- | --- | --- | --- | --- |
+| Hazard: RPC + expiry server + idempotensi + rate limit + duplikat | Ya | Ya (29 test) | **Blocked** (migration belum diterapkan) | — |
+| Hazard: tab Peringatan (filter, form, ubah/lepas, konfirmasi, lapor) | Ya | Ya (6 test layar) | **Blocked** | **Blocked** |
+| Chat: RPC + keyset pagination + pesan sistem + realtime + blokir | Ya | Ya (25 test API + 9 test panel) | **Blocked** | **Blocked** |
+| Uji RLS/RPC SQL M4 | Ya (berkas siap) | — | **Blocked** (`npm run db:test` gagal `ECONNREFUSED`; `.env.db` menunjuk localhost) | — |
+| Peta/marker hazard | **Deferred by owner** — ADR-064 masih Proposed | — | — | — |
+| Uji M3 dua perangkat, izin dicabut, GPS mati, force-stop/reboot, baterai 30 menit | **Deferred by owner** — bukan lulus | — | — | **Blocked** |
+
+Perintah yang benar-benar dijalankan pada 21 Oktober 2026: `npm run typecheck` (0), `npm run lint`
+(0 setelah 430 galat CRLF diperbaiki), `npm run format:check` (0), `npm test -- --ci` (**41 suite /
+460 test lulus**), `npm run test:scripts` (**240 lulus**), `npm run export:android` (0), `npm run doctor`
+(gagal karena DNS `exp.host`), `npm run db:test` (exit 1, `ECONNREFUSED`).
+
+Uji manual yang **belum** dilakukan dan tidak boleh dianggap lulus: dua perangkat pada chat yang sama,
+realtime saat koneksi putus/nyambung ulang, izin lokasi ditolak saat melapor, GPS mati, laporan
+duplikat nyata dalam radius 50 m, dan moderasi laporan penyalahgunaan oleh peninjau.
+
 ## 9. Status otomatisasi dan verifikasi (Milestone 1–3)
 
 Istilah status yang dipakai: **Implemented**, **Passed locally**, **Passed against dev backend**,
