@@ -1,8 +1,10 @@
 # Rencana Milestone 3 — Perjalanan & berbagi lokasi
 
-Status: **Implemented · Passed locally · Passed against dev backend**. Tanggal: 2026-10-19.
+Status: **Implemented · Passed locally · Passed against dev backend**. Tanggal: 2026-10-20.
 **Tested on physical device: Blocked** untuk alur perjalanan dua perangkat, background/reboot, dan
-pengukuran baterai. Peta **belum dipasang** (ADR-064 belum final); layar menampilkan daftar posisi
+pengukuran baterai. Pemilik aplikasi melaporkan build `v0.1.0-build23` dipakai tanpa galat yang
+teramati (**owner-reported**); laporan itu tidak menaikkan status uji perangkat khusus di atas karena
+tidak disertai bukti per kasus. Peta **belum dipasang** (ADR-064 masih **Proposed**); layar menampilkan daftar posisi
 dan keadaan “peta belum tersedia” yang eksplisit, bukan peta tiruan.
 
 **Gerbang masuk:** pemilik aplikasi melaporkan bahwa Milestone 2 sudah dicoba di perangkat tanpa galat
@@ -15,7 +17,9 @@ Keputusan yang sudah diambil untuk M3 ada di ADR-065: satu baris lokasi terakhir
 perjalanan, sampling 15 detik/25 meter, ambang basi 60 detik, pembersihan lewat trigger, RPC untuk
 seluruh mutasi, dan Realtime melalui Postgres Changes. Peta tetap ditunda karena ADR-064 belum final:
 jangan menambahkan dependency peta sebelum pemilik produk memilih provider dan kredensialnya diuji di
-development build.
+development build. Riset ulang 20 Oktober 2026 mengusulkan MapLibre + MapTiler Flex
+(lihat [`MAP_PROVIDER_DECISION.md`](MAP_PROVIDER_DECISION.md) bagian 5), tetapi usulan itu belum
+diterima sehingga dependency peta tetap belum ditambahkan.
 
 ## Tujuan
 
@@ -127,9 +131,9 @@ penting, uji perjalanan tetap terdaftar di runner, dan direktori draf lama tidak
 | Sampling & kesegaran lokasi | `src/features/rides/location.ts` | Implemented · unit test |
 | Tracking foreground/background | `src/features/rides/tracking.ts` | Implemented · belum diuji perangkat |
 | Tab daftar perjalanan | `src/app/(tabs)/rides.tsx` | Implemented · component test |
-| Buat/ubah perjalanan | `src/app/ride-new.tsx` | Implemented · belum ada component test |
+| Buat/ubah perjalanan | `src/app/ride-new.tsx` | Implemented · component test (11 test, 20 Oktober 2026) |
 | Detail, undangan, consent, posisi | `src/app/ride.tsx` | Implemented · component test |
-| Peta | — | **Belum**; layar menampilkan daftar + label kesegaran |
+| Peta | — | **Belum** — diblokir keputusan provider (ADR-064); layar menampilkan daftar + label kesegaran, bukan peta tiruan |
 
 Tidak ada tombol demo. Setiap tombol memanggil RPC/service nyata; tombol yang tidak relevan dengan
 peran/status disembunyikan, tetapi otorisasi tetap diputuskan database.

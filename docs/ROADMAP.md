@@ -112,8 +112,9 @@ butuh APK di perangkat tetap **Blocked**.
       ketika file database berubah; run pertama hijau pada 16 Oktober 2026 (`38862870367`, notice
       `UJI RLS PROFIL LULUS`, 120 perintah).
 - [x] Menjalankan rilis APK pertama sampai GitHub Release berisi APK. — `v0.1.0-build9` (15 Oktober
-      2026) terbit; `v0.1.0-build20` (18 Oktober 2026, `fa4397e`) adalah build terbaru yang memuat
-      Milestone 2 (baseline audit: `v0.1.0-build19` dari `749424c`).
+      2026) terbit; `v0.1.0-build23` (18 Oktober 2026, `df75ba1`) adalah build terbaru, dan
+      `v0.1.0-build20` dari `fa4397e` adalah build terakhir yang hanya memuat Milestone 2
+      (baseline audit: `v0.1.0-build19` dari `749424c`).
 - [ ] Uji manual AUTH-01…AUTH-14 dan PROF-01…PROF-07 di perangkat. — **Blocked** (APK tersedia, tetapi
       belum dijalankan di HP fisik; lihat bagian 5 `MILESTONE_2_REPORT.md`).
 
@@ -160,8 +161,9 @@ termasuk Storage foto/logo/avatar, foto profil, dan workflow perjalanan, diverif
 19 Oktober 2026). Pemilik aplikasi melaporkan pengujian di perangkat berjalan tanpa error yang
 teramati; tag APK dan kasus uji per kasus **tidak tersedia sebagai artefak**, jadi klaim ini dicatat
 sebagai laporan pemilik, bukan bukti uji terverifikasi. Basis implementasi: `749424c` (tag
-`v0.1.0-build19`, 105.904.027 byte, SHA-256 `775a3309…b3d9`); build terbaru: `v0.1.0-build20` dari
-`fa4397e` (105.904.031 byte, SHA-256 `a4ae87b4…fe9d`). Implementasi `cf818be`, checklist perangkat
+`v0.1.0-build19`, 105.904.027 byte, SHA-256 `775a3309…b3d9`); build Milestone 2 terakhir:
+`v0.1.0-build20` dari `fa4397e` (105.904.031 byte, SHA-256 `a4ae87b4…fe9d`); build terbaru saat ini:
+`v0.1.0-build23` dari `df75ba1` (106.518.751 byte, SHA-256 `2f2890…9ee7`). Implementasi `cf818be`, checklist perangkat
 `1ef13a8`, perbaikan versi Expo `a9858a9`, perbaikan generator tipe `ca2461c`. CI #26/RLS #4/Release
 #19 hijau pada `749424c`; CI #27/Release #20 hijau pada `fa4397e`. Setelah tag hanya ada commit
 dokumentasi `ee0a0bd`.
@@ -192,12 +194,16 @@ artefak per kasus tidak tersedia — bagian 5 `docs/MILESTONE_2_REPORT.md`).
 Rencana rinci, termasuk yang sengaja **di luar** lingkup, ada di
 [`docs/MILESTONE_3_PLAN.md`](MILESTONE_3_PLAN.md). Status: **Implemented · Passed locally ·
 Passed against dev backend**; uji dua perangkat/background/baterai masih **Blocked**. Gerbang M2
-dilaporkan lulus oleh pemilik aplikasi (owner-reported, tanpa artefak uji per kasus).
+dilaporkan lulus oleh pemilik aplikasi (owner-reported, tanpa artefak uji per kasus). Pemilik juga
+melaporkan build `v0.1.0-build23` dipakai tanpa galat yang teramati (**owner-reported**); laporan itu
+tidak menggantikan uji khusus yang masih Blocked di bawah. Formulir buat/ubah perjalanan kini punya
+component test sendiri (11 test).
 
 Gerbang tambahan sebelum layar peta: **penyedia peta/tile belum dipilih** (ADR-009/ADR-064). Opsi,
 lisensi, kuota, privasi, dan syarat offline ada di
-[`docs/MAP_PROVIDER_DECISION.md`](MAP_PROVIDER_DECISION.md); jangan menambahkan dependency peta
-sebelum keputusan itu dicatat. Sampai itu terjadi, layar perjalanan menampilkan **daftar posisi**
+[`docs/MAP_PROVIDER_DECISION.md`](MAP_PROVIDER_DECISION.md). Riset 20 Oktober 2026 mengusulkan
+MapLibre + MapTiler Flex dan sudah dicatat sebagai **Proposed**; persetujuan pemilik produk belum ada,
+jadi dependency peta tetap **tidak** ditambahkan. Sampai itu terjadi, layar perjalanan menampilkan **daftar posisi**
 dengan label live/basi/belum ada, bukan peta tiruan.
 
 - [x] Create/join/leave ride, undangan, dan pengeluaran peserta lewat RPC.
@@ -216,6 +222,11 @@ tetap bisa ikut; izin ditolak/GPS mati/network drop dijelaskan; status final tid
 aktif; tracking tidak berjalan tanpa ride aktif dan opt-in.
 
 ## Milestone 4 — Hazard reports dan convoy chat
+
+**Status: belum dimulai.** Rencana rinci (kategori, RLS, rate limit, sistem pesan, urutan kerja, dan
+kriteria penerimaan) ada di [`docs/MILESTONE_4_PLAN.md`](MILESTONE_4_PLAN.md). Gerbangnya: keputusan
+provider peta (ADR-064) dan uji perangkat khusus M3 harus selesai atau ditunda eksplisit oleh pemilik
+produk lebih dulu. Tidak ada layar, tombol, atau placeholder M4 di aplikasi saat ini.
 
 - [ ] CRUD report dan expiry rules.
 - [ ] Marker/list/filter laporan.
@@ -267,12 +278,12 @@ aktif; tracking tidak berjalan tanpa ride aktif dan opt-in.
 - [ ] Background playback sesuai konfigurasi yang diizinkan.
 - [ ] Uji transisi voice ↔ music, panggilan sistem dan lock screen.
 
-## Utang produk dan keputusan terbuka (per 19 Oktober 2026)
+## Utang produk dan keputusan terbuka (per 20 Oktober 2026)
 
 | Item | Status | Memblokir Milestone 3? | Pemilik keputusan |
 | --- | --- | --- | --- |
-| Uji perangkat fisik Milestone 2 | **Blocked** — APK `v0.1.0-build20` siap, belum dijalankan | **Ya** — gerbang masuk seluruh M3 | Pemilik aplikasi |
-| Penyedia peta/tile | **Belum diputuskan** (ADR-009, ADR-064) | **Ya**, hanya untuk langkah marker/peta; skema & RPC ride tidak | Pemilik produk + engineering |
+| Uji perangkat fisik Milestone 2 | **Owner-reported lulus** (tanpa artefak per kasus); build `v0.1.0-build23` tersedia | **Tidak lagi** — M3 sudah berjalan | Pemilik aplikasi |
+| Penyedia peta/tile | **Proposed**: MapLibre + MapTiler Flex (riset 20 Oktober 2026); belum disetujui | **Ya**, hanya untuk langkah marker/peta; skema & RPC ride tidak | Pemilik produk + engineering |
 | UI persetujuan follow (daftar permintaan) | Belum ada; aturan database sudah | Tidak — pekerjaan sosial (M6) | Pemilik produk |
 | Rate limit follow + penolakan permintaan dari akun terblokir | Belum ada | Tidak — hardening sosial (M6) | Engineering |
 | Sapuan objek yatim logo klub & avatar | Belum ada; foto kendaraan sudah | Tidak — optimasi kuota | Engineering |

@@ -35,9 +35,9 @@ Istilah status dipakai konsisten di seluruh dokumentasi:
 | Milestone 2: klub (buat, gabung, peran, keluarkan, jejak audit) | Ya | Ya | **Ya** (uji RLS LULUS) | **Ya** (dilaporkan pemilik) |
 | Milestone 2: foto kendaraan & logo klub (Supabase Storage) | Ya — bucket privat, unggah/ganti/hapus, foto diperkecil + dikompres otomatis di perangkat, objek yatim disapu otomatis | Ya (75 unit test) | **Ya** (uji Storage RLS LULUS + uji HTTP LULUS) | **Ya** (dilaporkan pemilik; build19/build20 memuat modul native) |
 | Milestone 2: foto profil (avatar) | Ya — bucket privat owner-only, unggah/ganti/hapus dari tab Profil, foto diperkecil otomatis | Ya (17 unit test) | **Ya** (uji HTTP Storage LULUS) | **Ya** (dilaporkan pemilik) |
-| Milestone 3: perjalanan klub (buat, undang, gabung, keluar, host memulai/menyelesaikan/membatalkan) | Ya — RPC transactional, state machine di database | Ya (27 test fitur + 7 test layar) | **Ya** (uji RLS/RPC 67 perintah) | **Blocked** (dua perangkat) |
+| Milestone 3: perjalanan klub (buat, undang, gabung, keluar, host memulai/menyelesaikan/membatalkan) | Ya — RPC transactional, state machine di database | Ya (27 test fitur + 20 test layar, termasuk 11 test formulir buat/ubah) | **Ya** (uji RLS/RPC 67 perintah) | **Blocked** (dua perangkat) |
 | Milestone 3: berbagi lokasi opt-in (foreground + background) | Ya — consent terpisah dari izin OS, sampling 15 dtk/25 m, basi 60 dtk, lokasi terakhir dihapus saat opt-out/keluar/ride final | Ya | **Ya** (uji allow/deny lokasi) | **Blocked** (izin, GPS mati, force-stop, baterai 30 menit) |
-| Milestone 3: peta konvoi | **Belum** — provider belum dipilih (ADR-064); layar menampilkan daftar posisi + status kesegaran, bukan peta tiruan | — | — | — |
+| Milestone 3: peta konvoi | **Belum** — ADR-064 masih **Proposed** (rekomendasi MapLibre + MapTiler Flex, riset ulang 20 Oktober 2026); layar menampilkan daftar posisi + status kesegaran, bukan peta tiruan | — | — | — |
 | Milestone 4+: chat, hazard, feed, musik | **Belum** | — | — | — |
 
 **Blocked** yang tersisa berarti: alur itu belum dijalankan terhadap backend nyata atau belum diuji di
@@ -76,7 +76,7 @@ karena berkasnya ditulis ulang (perlu dikonfirmasi di perangkat — checklist GA
 (`npm run db:test` bagian 13) dan lewat HTTP API Storage dengan akun uji sementara
 (`npm run storage:test`: unggah, signed URL, penolakan lintas pengguna, lalu pembersihan penuh).
 Modul native yang dipakai (`expo-image-picker`, `expo-file-system`, `expo-image-manipulator`) **sudah
-ada di APK `v0.1.0-build19` dan `v0.1.0-build20`** — diperiksa di `classes*.dex` dan bundel JS kedua
+ada di APK `v0.1.0-build19` dan `v0.1.0-build20`**, dan tetap ada di build berikutnya termasuk `v0.1.0-build23` karena dependency native itu tidak berubah sejak `fa4397e`** — diperiksa di `classes*.dex` dan bundel JS kedua
 berkas rilis itu; yang
 belum terbukti adalah pemakaian nyata di perangkat fisik (izin galeri, hasil kompresi, signed URL
 setelah aplikasi dibuka ulang).
@@ -225,7 +225,7 @@ Hasil nyata pada commit `749424c` (19 Oktober 2026, Node 24.18.1, npm 12.0.2):
 | `npm run lint`         | Exit 0.                                                       |
 | `npm run format:check` | Exit 0.                                                       |
 | `npm run deps:check`   | Exit 0 — versi dependency cocok dengan Expo SDK 57.0.30 (ADR-054). |
-| `npm test`             | **32 suite, 353 test lulus**, exit 0 (dijalankan setelah `npm ci`; termasuk suite perjalanan Milestone 3, 14 test kompresi foto, 18 test pembersihan objek yatim Storage, dan 17 test foto profil: 12 API + 5 komponen layar). Diverifikasi ulang 19 Oktober 2026, termasuk 2 test siklus task lokasi. |
+| `npm test`             | **33 suite, 364 test lulus**, exit 0 (dijalankan setelah `npm ci`; termasuk suite perjalanan Milestone 3, 14 test kompresi foto, 18 test pembersihan objek yatim Storage, dan 17 test foto profil: 12 API + 5 komponen layar). Diverifikasi ulang 20 Oktober 2026 setelah **11 test komponen `ride-new.tsx`** ditambahkan (sebelumnya 32 suite/353 test). |
 | `npm run test:scripts` | **240 test lulus, exit 0** (19 Oktober 2026) — termasuk 4 test penjaga Milestone 3. Sebelumnya 235 test dengan satu kegagalan di checkout Windows: asersi baris pertama `CHANGELOG.md` membandingkan CRLF di disk dengan `HEADER` ber-LF. Kini akhir baris diseragamkan di batas perbandingan (`normalizeLineEndings`, ADR-063) dan ada test regresi untuk LF/CRLF/CR; asersi judul tetap ketat, file Git tidak diubah, dan `core.autocrlf` tidak disentuh. |
 | `npm run doctor`       | **Tidak dapat dipastikan** (19 Oktober 2026): 20 dari 21 pemeriksaan berjalan, pemeriksaan skema config gagal `TypeError: fetch failed` / `EAI_AGAIN exp.host` karena DNS lingkungan ini. Dua percobaan memberi hasil sama; bukan temuan proyek. Jalankan ulang di CI atau jaringan yang menjangkau `exp.host`. |
 | `npm run export:android` | Exit 0, bundel Hermes `entry-*.hbc` 3,8 MB. |
@@ -233,7 +233,7 @@ Hasil nyata pada commit `749424c` (19 Oktober 2026, Node 24.18.1, npm 12.0.2):
 | `npm run db:types:check` | Exit 0 — `database.generated.ts` (653 baris, Supabase CLI 2.121.0) sama dengan skema project development, diverifikasi ulang 18 Oktober 2026 **tanpa link project maupun access token** (target dioper lewat `--db-url`, ADR-061). Skenario CI direproduksi lokal dengan memindahkan `supabase/.temp` (tautan CLI) — sebelumnya exit 1 dengan `Must specify one of --local, --linked, --project-id, or --db-url`. Drift yang disengaja terdeteksi (exit 1) dan menampilkan baris pertama yang berbeda. |
 | `npm run storage:test` | **Exit 0 — `UJI INTEGRASI STORAGE LULUS`** (27 langkah: unggah sebagai pemilik untuk foto kendaraan **dan** foto profil, signed URL + unduhan SHA-256, delapan penolakan lintas pengguna/anon, hapus oleh pemilik, verifikasi nol sisa) terhadap project development, 18 Oktober 2026. Dijalankan tiga kali berturut-turut tanpa sisa (satu di antaranya menyapu objek yatim yang sengaja ditinggalkan run terputus), dan sekali dengan publishable key salah (exit 1, data uji tetap dibersihkan). |
 | `npx supabase ...`     | CLI 2.121.0 (lewat `npx`, tidak masuk `package.json`). `link` + `db push` menerapkan seluruh migration (tiga belas versi; `npx supabase migration list` 19 Oktober 2026 menunjukkan kolom Local dan Remote sama untuk ketiga belasnya). Pada umumnya jangan menaruh connection string di argumen perintah karena npm/npx mencetak ulang baris perintahnya; pengecualian tunggal adalah `npm run db:types` (ADR-061) yang mengoperkannya sebagai `--db-url` karena itulah satu-satunya cara mengarahkan `gen types` tanpa access token mesin — perintah itu menyetel `npm_config_loglevel=error` supaya `npx` tidak mencetak ulang argumennya dan menyunting seluruh keluaran sebelum dicetak, dan keduanya diuji di `scripts/__tests__/db-types.test.mjs`. |
-| `npx expo prebuild` + `./gradlew assembleRelease` | **Berjalan lokal maupun di GitHub Actions**: Release APK run **#20** (18 Oktober 2026, commit `fa4397e`) menerbitkan `v0.1.0-build20`; run **#19** menerbitkan `v0.1.0-build19` dari `749424c`. Keduanya berisi `app-preview.apk` bertanda tangan. `npm run test:scripts` juga menguji `scripts/configure-android-release.mjs`. |
+| `npx expo prebuild` + `./gradlew assembleRelease` | **Berjalan lokal maupun di GitHub Actions**: Release APK run **#23** (18 Oktober 2026, commit `df75ba1`) menerbitkan `v0.1.0-build23`; run **#20** menerbitkan `v0.1.0-build20` dari `fa4397e`, dan run **#19** menerbitkan `v0.1.0-build19` dari `749424c`. Semuanya berisi `app-preview.apk` bertanda tangan. `npm run test:scripts` juga menguji `scripts/configure-android-release.mjs`. |
 
 `npm test` tidak menyentuh jaringan: fungsi api menerima client sebagai argumen sehingga test
 menyuntikkan fake client dari `src/test-support/fakeSupabase.ts`; test navigasi memakai `jest.mock`
@@ -452,10 +452,10 @@ tanpa filter).
   tidak ikut muncul sebagai “perubahan” di catatan rilis maupun entri berikutnya. Rinciannya di
   [`docs/SETUP_GUIDE.md`](docs/SETUP_GUIDE.md) bagian 6.8.
 
-Status per 19 Oktober 2026: pada `749424c`, CI **#26**, Database RLS **#4**, dan Release APK **#19**
-hijau (tag `v0.1.0-build19`). Commit audit `fa4397e` hanya menambah dokumentasi/tooling; CI **#27**
-dan Release APK **#20** hijau, menerbitkan `v0.1.0-build20`. `origin/main` kini `78cc37e`
-(pencatatan build20 di `CHANGELOG.md`). Tidak ada perubahan kode aplikasi setelah `749424c`.
+Status per 20 Oktober 2026: pada `df75ba1` (tag `v0.1.0-build23`), CI **#30** dan Release APK **#23**
+hijau, sebagai run pertama yang menerbitkan tag build23. Database RLS **#5** hijau pada merge `7cce0ef`.
+`origin/main` kini `117bed3` (pencatatan build23 di `CHANGELOG.md`), dan tidak ada perubahan kode
+aplikasi setelah `df75ba1`.
 
 Uji RLS berjalan **di GitHub Actions**, bukan hanya lokal: workflow `database-rls` memverifikasi
 connection string menunjuk project development sebelum menyentuh database, lalu menolak lulus bila
@@ -463,14 +463,15 @@ notice penanda dari server tidak diterima. Run **#3** pada `575b166` sempat **ga
 terakhir (`gen types` tanpa target, ADR-061); perbaikannya ada di `ca2461c` dan run **#4** hijau.
 Workflow `ci.yml` tetap bebas secret Supabase.
 
-Kedua alur rilis **sudah berjalan di GitHub**. APK preview terbaru yang **memuat** Milestone 2 adalah
-[v0.1.0-build20](https://github.com/29nls/rodakawan/releases/tag/v0.1.0-build20) (18 Oktober 2026,
-commit `fa4397e`): `app-preview.apk`, 105.904.031 byte, SHA-256
-`a4ae87b459c8ffffaaeb53406bbb2dd1ec529aa91112a64ea887f0b015d9fe9d`, sertifikat
-`3ea8bb4745b638be8fddf71e15edd9786d45aac65c0384b87be8fa2c32b3b14d`. Baseline audit sebelumnya,
-[v0.1.0-build19](https://github.com/29nls/rodakawan/releases/tag/v0.1.0-build19) dari `749424c`,
-berukuran 105.904.027 byte dengan SHA-256
-`775a3309fce38416fe04222652031282047f0197bb149da8520b13e73d42b3d9`. Kedua berkas sudah diunduh ulang
+Kedua alur rilis **sudah berjalan di GitHub**. APK preview terbaru adalah
+[v0.1.0-build23](https://github.com/29nls/rodakawan/releases/tag/v0.1.0-build23) (18 Oktober 2026,
+commit `df75ba1`): `app-preview.apk`, 106.518.751 byte, SHA-256
+`2f289030950807b6c17026afc435814406b87c61bb7c22441f75f4849679ee75`, sertifikat
+`3ea8bb4745b638be8fddf71e15edd9786d45aac65c0384b87be8fa2c32b3b14d` — nilai itu adalah digest aset
+dan sertifikat yang dicetak workflow rilis, **belum** diverifikasi ulang di mesin ini. Baseline audit sebelumnya,
+[v0.1.0-build20](https://github.com/29nls/rodakawan/releases/tag/v0.1.0-build20) dari `fa4397e`,
+berukuran 105.904.031 byte dengan SHA-256
+`a4ae87b459c8ffffaaeb53406bbb2dd1ec529aa91112a64ea887f0b015d9fe9d`. Kedua berkas build19/build20 sudah diunduh ulang
 dan diverifikasi lokal: SHA-256/ukuran sama dengan metadata rilis, tanda tangan v2 sah, dan
 `classes*.dex` memuat modul `expo.modules.imagepicker`, `expo.modules.imagemanipulator`, serta
 `expo.modules.filesystem`. `v0.1.0-build9` (commit `7639ba9`) dibuat **sebelum** garasi dan klub ada,
@@ -510,9 +511,12 @@ Profil build EAS yang tersisa ada di [`eas.json`](eas.json):
 Nama paket Android `com.rodakawan.app` di [`app.json`](app.json) masih sementara dan wajib diganti
 sebelum rilis Play Store bila identitas final berbeda (ADR-015).
 
-Status: rantai build **sudah terbukti di GitHub Actions** — Release APK run #19 (18 Oktober 2026)
+Status: rantai build **sudah terbukti di GitHub Actions** — Release APK run #23 (18 Oktober 2026)
 menjalankan prebuild, Gradle, verifikasi tanda tangan, uji nyala di emulator, dan penerbitan
-`v0.1.0-build20`. Yang belum terbukti adalah pemasangan dan pemakaian APK itu di HP fisik pemilik.
+`v0.1.0-build23`. Pemilik aplikasi melaporkan build itu dipakai tanpa galat yang teramati; itu
+laporan pemilik (owner-reported), bukan uji perangkat yang terekam. Uji khusus yang masih **Blocked**:
+dua perangkat untuk alur perjalanan, izin/GPS mati/mode pesawat, force-stop dan reboot, serta ukur
+baterai 30 menit (lihat [`docs/QA_TEST_PLAN.md`](docs/QA_TEST_PLAN.md)).
 
 ### Merilis APK lewat workflow
 

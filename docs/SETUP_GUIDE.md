@@ -345,8 +345,10 @@ Realtime publication default. Bila project memakai publication kustom, pastikan 
 dipublikasikan; tanpa itu perubahan baris tidak terkirim, tetapi layar tetap dapat dimuat ulang manual.
 
 **Peta.** Jangan mengisi `EXPO_PUBLIC_MAP_STYLE_URL` dengan URL contoh dan jangan memasang renderer
-peta sebelum ADR-064 final. Build saat ini menampilkan daftar posisi + umur pembaruan, dengan keadaan
-“peta belum tersedia” yang disengaja.
+peta sebelum ADR-064 disetujui. Riset 20 Oktober 2026 mengusulkan MapLibre + MapTiler Flex dan
+mencatatnya sebagai **Proposed** di [`MAP_PROVIDER_DECISION.md`](MAP_PROVIDER_DECISION.md) bagian 5;
+persetujuan pemilik produk belum ada. Build saat ini menampilkan daftar posisi + umur pembaruan,
+dengan keadaan “peta belum tersedia” yang disengaja.
 
 **Uji perangkat yang belum dijalankan.** Dua akun di dua HP: buat ride, undang, terima, mulai, nyalakan
 berbagi, matikan, keluar, selesaikan. Ulangi dengan izin background ditolak, GPS mati, mode pesawat,

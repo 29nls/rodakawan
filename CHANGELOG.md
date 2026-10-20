@@ -8,6 +8,29 @@ sedangkan build preview (`v<versi>-build<N>`) diringkas di dalam blok yang bisa 
 versi adalah tautan ke halaman rilisnya di GitHub, sehingga riwayat ini bisa dinavigasi langsung
 dari berkas.
 
+## Belum dirilis — 2026-10-20
+
+Bagian ini ditulis manual dan **bukan** rilis; build berikutnya akan disisipkan di atasnya oleh
+workflow rilis.
+
+### Pengujian
+
+- Tambah 11 test komponen formulir buat/ubah perjalanan (`src/__tests__/ride-new.test.tsx`):
+  render + label aksesibilitas, validasi judul/jadwal, payload `createRide`/`updateRide`, mode ubah
+  yang hanya untuk host dan hanya saat `planned`, pesan galat service, retry tanpa duplikasi, dan
+  pencegahan kiriman ganda. `npm test` kini **33 suite / 364 test**.
+
+### Dokumentasi
+
+- ADR-064 naik dari "belum final" ke **Proposed**: rekomendasi MapLibre + MapTiler Flex dengan angka,
+  kuota, lisensi, dan atribusi yang diverifikasi ulang 20 Oktober 2026, plus koreksi bahwa pembatasan
+  kunci per `package name` + SHA-1 hanya tersedia di Google Cloud, bukan di MapTiler/Stadia.
+- Rencana Milestone 4 (laporan bahaya + chat konvoi) ditambahkan di `docs/MILESTONE_4_PLAN.md`.
+  Belum ada kode, layar, atau tombol M4.
+- README, ROADMAP, rencana M3, QA plan, dan SETUP_GUIDE diselaraskan: `v0.1.0-build23` adalah rilis
+  terbaru, laporan pemilik dicatat sebagai **owner-reported**, dan status uji perangkat khusus
+  (dua perangkat, GPS mati/mode pesawat, force-stop/reboot, baterai 30 menit) tetap **Blocked**.
+
 ## [v0.1.0-build23](https://github.com/29nls/rodakawan/releases/tag/v0.1.0-build23) — 2026-10-18 · pratinjau
 
 <details>

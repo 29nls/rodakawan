@@ -175,11 +175,12 @@ Yang **sudah otomatis** (`npm test`, jaringan dimatikan; client Supabase diganti
 | `src/features/rides/__tests__/*.test.ts` | Validasi perjalanan/jadwal, kebijakan sampling & kesegaran lokasi, API perjalanan (RPC, konsent, Postgres Changes tanpa `user_id` klien). |
 | `src/__tests__/rides-list.test.tsx` | Tab Perjalanan: daftar nyata, status, keadaan kosong, dan aksi buat. |
 | `src/__tests__/ride-detail.test.tsx` | Detail perjalanan: consent lokasi, penolakan izin, undangan, dan pembatasan non-anggota. |
+| `src/__tests__/ride-new.test.tsx` | Formulir buat/ubah perjalanan: render & label aksesibilitas, validasi judul/klub/jadwal, payload `createRide`/`updateRide`, mode ubah (hanya host, hanya `planned`), pesan galat, retry, dan pencegahan kiriman ganda. |
 | `src/components/ui/__tests__/*` | Perilaku dasar komponen yang dipakai form (tombol, field). |
 
 Hasil terakhir dijalankan (19 Oktober 2026, Node 24.18.1, npm 12.0.2, setelah `npm ci` dari
 `package-lock.json`):
-`npm test -- --ci` → **32 suite, 353 test lulus** (termasuk suite perjalanan Milestone 3 dan 2 test siklus task lokasi, 14 test kompresi foto, 18 test
+`npm test -- --ci` → **33 suite, 364 test lulus** (20 Oktober 2026; termasuk suite perjalanan Milestone 3, 11 test komponen formulir perjalanan, dan 2 test siklus task lokasi, 14 test kompresi foto, 18 test
 pembersihan objek yatim, dan 17 test foto profil: 12 API + 5 komponen layar); `npm run test:scripts`
 → **240 test lulus, exit 0** (termasuk 4 test penjaga Milestone 3);
 `npm run deps:check`, `npm run typecheck`, `npm run lint`, `npm run format:check`, dan
@@ -301,11 +302,17 @@ Yang **masih Blocked** (butuh perangkat / alur aplikasi / akun):
 - PROF-07 — butuh sesi nyata yang kedaluwarsa.
 - Alur follow dari **aplikasi** (kirim permintaan, terima permintaan) belum ada; yang terbukti baru
   aturan dan fungsi di database.
+- **RIDE-01…RIDE-08 dan LOC-01…LOC-08 — bukti per langkah di perangkat** masih Blocked untuk
+  alur dua perangkat. Pemilik aplikasi melaporkan `v0.1.0-build23` dipakai tanpa galat yang teramati
+  (**owner-reported**, tanpa rekaman per kasus); laporan itu tidak membuktikan alur dua akun, izin
+  yang dicabut di tengah perjalanan, GPS mati/mode pesawat, force-stop/reboot, atau angka baterai.
+  Yang sudah lulus otomatis: seluruh aturan RLS/RPC (`npm run db:test`, berkas
+  `rls_rides_test.sql`) dan 47 test Jest fitur/layar perjalanan.
 - **GAR-01…GAR-04 dan CLUB-01…CLUB-10 — bukti per langkah** masih Blocked, meskipun pemilik
   aplikasi melaporkan build sudah dicoba di HP tanpa error yang teramati (owner-reported, tanpa tag
   rilis/kasus uji per kasus). APK yang dimaksud: `fa4397e`, rilis `v0.1.0-build20`; baseline
-  `749424c`/build19. Aturan di database sudah lulus; yang belum terdokumentasi adalah bukti alur
-  layarnya (bagian 5 `docs/MILESTONE_2_REPORT.md` memuat checklist-nya).
+  `749424c`/build19; APK terbaru sekarang `df75ba1`/`v0.1.0-build23`. Aturan di database sudah lulus;
+  yang belum terdokumentasi adalah bukti alur layarnya (bagian 5 `docs/MILESTONE_2_REPORT.md` memuat checklist-nya).
   Bukti tiap langkah direkam otomatis oleh `node scripts/device-checklist.mjs` (tangkapan layar,
   hierarki UI, logcat, identitas perangkat dan APK); penilaian langkah tetap dilakukan manusia.
 - **GAR-05 / CLUB-11 lewat aplikasi di perangkat** — logika unggah/ganti/hapus, kompresi otomatis
@@ -313,7 +320,8 @@ Yang **masih Blocked** (butuh perangkat / alur aplikasi / akun):
   pembersihan objek yatim (18 test unit), policy Storage
   (`npm run db:test` bagian 13), serta jalur HTTP nyata (`npm run storage:test`) sudah lulus, tetapi
   alur galeri → perkecil → unggah → signed URL dari **perangkat fisik** belum dijalankan.
-  `v0.1.0-build20` **sudah memuat** modul native itu (diperiksa di `classes*.dex` dan bundel JS),
+  `v0.1.0-build20` (dan build sesudahnya, termasuk `v0.1.0-build23`) **sudah memuat** modul native itu
+  (build20 diperiksa langsung di `classes*.dex` dan bundel JS; dependency-nya tidak berubah sejak itu),
   jadi tidak perlu build baru hanya untuk mendapatkannya. Yang harus dibuktikan manual: izin galeri muncul hanya saat tombol ditekan, foto HEIC
   iPhone terkonversi/diterima, foto 12 MP benar-benar turun ukurannya sebelum diunggah (kuota
   Storage hemat) dan hasilnya tetap tajam — termasuk foto potret yang tinggi, foto PNG berlogo

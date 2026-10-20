@@ -78,3 +78,68 @@ Sumber:
 
 Pilihan final harus dicatat sebagai ADR (menggantikan status "Belum final" ADR-009) sebelum
 `@maplibre/maplibre-react-native` atau `@rnmapbox/maps` ditambahkan ke `package.json`.
+
+## 5. Pembaruan riset 20 Oktober 2026 dan usulan keputusan
+
+Status ADR-064 kini **Proposed**, bukan final: rekomendasi teknis sudah diperbarui, tetapi pemilik
+produk belum menyetujuinya. Dependency peta tetap belum ditambahkan, dan layar perjalanan tetap
+menampilkan daftar posisi + label kesegaran (tanpa peta, tile publik, atau koordinat contoh).
+
+Angka di bawah diverifikasi ulang dari halaman resmi pada 20 Oktober 2026. Yang berubah dari bagian 2:
+
+| Opsi | Angka/ketentuan terverifikasi | Sumber |
+| --- | --- | --- |
+| **MapTiler Cloud** | Gratis **5.000 sesi + 100.000 request/bulan**, non-komersial, berhenti saat kuota habis. **Flex US$30/bulan**: 25.000 sesi + 500.000 request; kelebihan **US$2,50/1.000 sesi** atau **US$0,15/1.000 request** menurut model penagihan yang berlaku. Atribusi `© MapTiler © OpenStreetMap contributors`; paket gratis juga mewajibkan logo MapTiler bertaut. Cache sementara di perangkat diizinkan, **ekspor/unduh massal dilarang** tanpa perjanjian tertulis. Menyatakan peta tidak memuat kode pelacak dan tidak melacak aktivitas peta pengguna. | <https://www.maptiler.com/cloud/pricing/>, <https://www.maptiler.com/terms/cloud/>, <https://docs.maptiler.com/guides/map-design/attribution/add-attribution/> |
+| **Stadia Maps** | Gratis **200.000 kredit/bulan**, **non-komersial**. **Starter US$20/bulan** = 1.000.000 kredit; kelebihan **US$0,03/1.000 kredit**; satu tile vektor/raster = satu kredit. Atribusi `© Stadia Maps © OpenMapTiles © OpenStreetMap`. Cache offline seluler maksimum **100 MB per perangkat**; cache biasa mengikuti header HTTP atau 7 hari. Log server/IP **±7–14 hari**. | <https://stadiamaps.com/pricing/>, <https://stadiamaps.com/terms-of-service/>, <https://docs.stadiamaps.com/attribution/> |
+| **Mapbox** | Maps SDK seluler: **25.000 MAU/bulan gratis**, tier berikutnya **US$4/1.000 MAU**. SDK mengirim data lokasi/penggunaan tanpa identitas dan opt-out individual wajib (kontrol atribusi). Ketentuan *vehicle usage* menuntut lisensi terpisah untuk penggunaan produksi terkait kendaraan. | <https://www.mapbox.com/pricing>, <https://docs.mapbox.com/android/maps/guides/>, <https://www.mapbox.com/legal/tos> |
+| **Google Maps Platform** | SKU **Maps SDK for Android** kini tercatat dengan batas gratis **"Unlimited"**, berbeda dari SKU **Dynamic Maps** (10.000 event/bulan gratis lalu US$7/1.000). Billing dan API key tetap wajib. **Map Tiles API**: 100.000 tile 2D/bulan gratis. Map Tiles API melarang prefetch/penyimpanan. | <https://developers.google.com/maps/billing-and-pricing/pricing>, <https://developers.google.com/maps/documentation/tile/usage-and-billing> |
+| **OpenStreetMap raster publik** | Tetap bukan opsi produksi: layanan komunitas tanpa SLA, offline/prefetch dilarang, dan pemakaian berat dapat diblokir. | <https://operations.osmfoundation.org/policies/tiles/> |
+| **`@maplibre/maplibre-react-native`** | Rilis terbaru **11.5.0** (4 Oktober 2026). Peer dependency menyatakan `expo >=54` dan `react-native >=0.80`, jadi SDK 57 / RN 0.86 berada di dalam rentang yang dideklarasikan — **tidak ada pernyataan resmi** bahwa SDK 57 diuji khusus. Versi 11 hanya untuk arsitektur baru. Butuh **config plugin + prebuild** dan **tidak jalan di Expo Go**. Default Android: minSdk 24, Kotlin 2.0.21, compileSdk 35, NDK 27.1.12297006. | <https://github.com/maplibre/maplibre-react-native/releases>, <https://maplibre.org/maplibre-react-native/docs/setup/expo/> |
+
+### Koreksi penting: pembatasan kunci API
+
+Bagian 3 pertanyaan 5 menyebut "kunci yang dibatasi per aplikasi (package name + SHA-1)". Setelah
+diperiksa, pembatasan itu adalah fitur **Google Cloud**; tidak semua provider menyediakannya:
+
+- **Google Maps**: kunci dapat dibatasi ke **Android apps** dengan package name + SHA-1 (ada di
+  Google Cloud Console).
+- **MapTiler**: panduan aplikasi native menyebut pengamanan kunci lewat **"Allowed User-Agent"**
+  (substring), bukan package name + SHA-1.
+- **Stadia Maps**: menyarankan API key + penyimpanan aman (mis. Android Keystore) dan pembatasan
+  pemakaian; pengikatan kunci ke package name + SHA-1 **tidak terverifikasi** ada.
+
+Artinya untuk MapLibre + MapTiler, "kunci yang dibatasi per aplikasi" **tidak bisa** dijanjikan
+seperti pada Google. Pengamannya: kunci hanya di env build (bukan repo), batas kuota + alert di
+dashboard MapTiler, rotasi kunci bila bocor, dan kesadaran bahwa kunci di aplikasi klien selalu bisa
+diekstrak. Ini risiko yang harus disetujui pemilik produk, bukan sesuatu yang bisa dihilangkan
+dengan konfigurasi.
+
+### Rekomendasi (status: Proposed)
+
+**MapLibre + MapTiler Flex** untuk renderer dan tile.
+
+- Renderer open-source, tanpa tagihan per MAU, dan tetap bisa diganti provider tile lain bila harga
+  MapTiler berubah — berbeda dari `@rnmapbox/maps` yang mengunci ke Mapbox.
+- Flex US$30/bulan memberi 25.000 sesi + 500.000 request; untuk pilot dengan puluhan pengendara,
+  pemakaian tile jauh di bawah kuota, dan batasnya terlihat serta berhenti (bukan tagihan kejutan).
+- Tidak ada telemetri SDK lokasi pengendara; yang terlihat provider hanya area tile + IP.
+- Perlu disetujui: (a) paket berbayar sejak awal bila RodaKawan dipakai komersial, (b) tidak ada
+  peta offline penuh (hanya cache sementara), (c) pengamanan kunci memakai User-Agent + kuota, bukan
+  package + SHA-1.
+
+Alternatif bila ingin menghindari biaya bulanan pada pilot non-komersial: **MapLibre + Stadia Maps
+Starter** (US$20/bulan, 1 juta kredit, cache offline 100 MB). Alternatif bila prioritasnya kemudahan
+Android dan siap menerima telemetri serta lisensi kendaraan: **Google Maps SDK**.
+
+### Yang harus terjadi sebelum implementasi
+
+1. Pemilik produk menerima salah satu opsi dan status ADR-064 diubah dari **Proposed** menjadi
+   **Disetujui** di [`PROJECT_DECISIONS.md`](PROJECT_DECISIONS.md).
+2. Akun provider + paket yang sesuai dibuat, lalu kunci/URL gaya peta disimpan sebagai
+   `EXPO_PUBLIC_MAP_STYLE_URL` (variabel publik yang **sudah** dibaca `src/lib/env.ts`; nilainya
+   bukan rahasia, tetapi tetap tidak boleh di-commit).
+3. `@maplibre/maplibre-react-native` ditambahkan, config plugin dipasang, dan **development build**
+   dibangun — bukan Expo Go.
+4. Renderer dibungkus lapisan provider tunggal, atribusi MapTiler + OSM ditampilkan, dan keadaan
+   "peta belum dikonfigurasi"/galat tetap eksplisit.
+5. Baru setelah itu marker posisi peserta (hanya anggota aktif, lewat RLS yang sudah ada) dikerjakan.
