@@ -8,6 +8,21 @@ sedangkan build preview (`v<versi>-build<N>`) diringkas di dalam blok yang bisa 
 versi adalah tautan ke halaman rilisnya di GitHub, sehingga riwayat ini bisa dinavigasi langsung
 dari berkas.
 
+## [v0.1.0-build31](https://github.com/29nls/rodakawan/releases/tag/v0.1.0-build31) — 2026-10-20 · pratinjau
+
+<details>
+<summary>Catatan rilis pratinjau</summary>
+
+### Perubahan lain
+
+- Menambahkan dashboard moderasi berbasis konteks perjalanan dan memindahkan penyaringan pesan terblokir ke sisi server untuk memperkuat privasi dan kepatuhan RLS. (`55cee4d`)
+- Selesaikan Milestone 4 dan pulihkan gerbang kualitas yang merah (`e3a1653`)
+- streamline code formatting and improve error handling in hazards and chat features (`2b84ec4`)
+- Implement Milestone 4 hazard reports and convoy chat (`ed603e4`)
+- Add RLS and RPC tests for chat and hazard reporting features in Milestone 4 (`b6b6e7f`)
+
+</details>
+
 ## Belum dirilis — Milestone 4 (21 Oktober 2026)
 
 Catatan manual; belum ada tag rilis yang memuat perubahan ini. Rilis berikutnya akan disisipkan di atas
