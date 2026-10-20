@@ -8,6 +8,22 @@ sedangkan build preview (`v<versi>-build<N>`) diringkas di dalam blok yang bisa 
 versi adalah tautan ke halaman rilisnya di GitHub, sehingga riwayat ini bisa dinavigasi langsung
 dari berkas.
 
+## [v0.1.0-build26](https://github.com/29nls/rodakawan/releases/tag/v0.1.0-build26) — 2026-10-20 · pratinjau
+
+<details>
+<summary>Catatan rilis pratinjau</summary>
+
+### Fitur
+
+- siapkan lapisan provider peta tanpa dependency (`b0c8361`)
+
+### Perubahan lain
+
+- rapikan status rilis dan tautan peta di README/ROADMAP (`6a3340e`)
+- tutup celah uji formulir perjalanan dan catat usulan peta (`dde55d1`)
+
+</details>
+
 ## Belum dirilis — 2026-10-20
 
 Bagian ini ditulis manual dan **bukan** rilis; build berikutnya akan disisipkan di atasnya oleh
