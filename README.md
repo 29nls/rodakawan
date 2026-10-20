@@ -234,7 +234,7 @@ Hasil nyata pada commit `749424c` (19 Oktober 2026, Node 24.18.1, npm 12.0.2):
 | `npm run db:types:check` | Exit 0 — `database.generated.ts` (653 baris, Supabase CLI 2.121.0) sama dengan skema project development, diverifikasi ulang 18 Oktober 2026 **tanpa link project maupun access token** (target dioper lewat `--db-url`, ADR-061). Skenario CI direproduksi lokal dengan memindahkan `supabase/.temp` (tautan CLI) — sebelumnya exit 1 dengan `Must specify one of --local, --linked, --project-id, or --db-url`. Drift yang disengaja terdeteksi (exit 1) dan menampilkan baris pertama yang berbeda. |
 | `npm run storage:test` | **Exit 0 — `UJI INTEGRASI STORAGE LULUS`** (27 langkah: unggah sebagai pemilik untuk foto kendaraan **dan** foto profil, signed URL + unduhan SHA-256, delapan penolakan lintas pengguna/anon, hapus oleh pemilik, verifikasi nol sisa) terhadap project development, 18 Oktober 2026. Dijalankan tiga kali berturut-turut tanpa sisa (satu di antaranya menyapu objek yatim yang sengaja ditinggalkan run terputus), dan sekali dengan publishable key salah (exit 1, data uji tetap dibersihkan). |
 | `npx supabase ...`     | CLI 2.121.0 (lewat `npx`, tidak masuk `package.json`). `link` + `db push` menerapkan seluruh migration (tiga belas versi; `npx supabase migration list` 19 Oktober 2026 menunjukkan kolom Local dan Remote sama untuk ketiga belasnya). Pada umumnya jangan menaruh connection string di argumen perintah karena npm/npx mencetak ulang baris perintahnya; pengecualian tunggal adalah `npm run db:types` (ADR-061) yang mengoperkannya sebagai `--db-url` karena itulah satu-satunya cara mengarahkan `gen types` tanpa access token mesin — perintah itu menyetel `npm_config_loglevel=error` supaya `npx` tidak mencetak ulang argumennya dan menyunting seluruh keluaran sebelum dicetak, dan keduanya diuji di `scripts/__tests__/db-types.test.mjs`. |
-| `npx expo prebuild` + `./gradlew assembleRelease` | **Berjalan lokal maupun di GitHub Actions**: Release APK run **#23** (18 Oktober 2026, commit `df75ba1`) menerbitkan `v0.1.0-build23`; run **#20** menerbitkan `v0.1.0-build20` dari `fa4397e`, dan run **#19** menerbitkan `v0.1.0-build19` dari `749424c`. Semuanya berisi `app-preview.apk` bertanda tangan. `npm run test:scripts` juga menguji `scripts/configure-android-release.mjs`. |
+| `npx expo prebuild` + `./gradlew assembleRelease` | **Berjalan lokal maupun di GitHub Actions**: Release APK run **#26** (20 Oktober 2026, commit `b0c8361`) menerbitkan `v0.1.0-build26`; run **#23** menerbitkan `v0.1.0-build23` dari `df75ba1`; run **#20** menerbitkan `v0.1.0-build20` dari `fa4397e`, dan run **#19** menerbitkan `v0.1.0-build19` dari `749424c`. Semuanya berisi `app-preview.apk` bertanda tangan. `npm run test:scripts` juga menguji `scripts/configure-android-release.mjs`. |
 
 `npm test` tidak menyentuh jaringan: fungsi api menerima client sebagai argumen sehingga test
 menyuntikkan fake client dari `src/test-support/fakeSupabase.ts`; test navigasi memakai `jest.mock`
@@ -453,11 +453,10 @@ tanpa filter).
   tidak ikut muncul sebagai “perubahan” di catatan rilis maupun entri berikutnya. Rinciannya di
   [`docs/SETUP_GUIDE.md`](docs/SETUP_GUIDE.md) bagian 6.8.
 
-Status per 20 Oktober 2026: pada `df75ba1` (tag `v0.1.0-build23`), CI **#30** dan Release APK **#23**
-hijau, sebagai run pertama yang menerbitkan tag build23. Database RLS **#5** hijau pada merge `7cce0ef`.
-Commit kode terakhir tetap `df75ba1`; setelah itu hanya ada commit dokumentasi (`117bed3`) dan commit
-dokumentasi + komponen test (`dde55d1`, 20 Oktober 2026) — keduanya tidak mengubah isi aplikasi,
-sehingga workflow rilis melewatkan build APK.
+Status per 20 Oktober 2026: pada `b0c8361` (lapisan provider peta), CI **39399665027** dan Release APK
+**#26** hijau, menerbitkan tag `v0.1.0-build26`; `origin/main` kini `001774a` (pencatatan rilis itu di
+`CHANGELOG.md`). Sebelumnya, pada `df75ba1`, CI **#30** dan Release APK **#23** hijau (tag
+`v0.1.0-build23`), dan Database RLS **#5** hijau pada merge `7cce0ef`.
 
 Uji RLS berjalan **di GitHub Actions**, bukan hanya lokal: workflow `database-rls` memverifikasi
 connection string menunjuk project development sebelum menyentuh database, lalu menolak lulus bila
@@ -466,11 +465,12 @@ terakhir (`gen types` tanpa target, ADR-061); perbaikannya ada di `ca2461c` dan 
 Workflow `ci.yml` tetap bebas secret Supabase.
 
 Kedua alur rilis **sudah berjalan di GitHub**. APK preview terbaru adalah
-[v0.1.0-build23](https://github.com/29nls/rodakawan/releases/tag/v0.1.0-build23) (18 Oktober 2026,
-commit `df75ba1`): `app-preview.apk`, 106.518.751 byte, SHA-256
-`2f289030950807b6c17026afc435814406b87c61bb7c22441f75f4849679ee75`, sertifikat
+[v0.1.0-build26](https://github.com/29nls/rodakawan/releases/tag/v0.1.0-build26) (20 Oktober 2026,
+commit `b0c8361`): `app-preview.apk`, 106.524.231 byte, SHA-256
+`97e702628109fed3c4d38e93c103c33cde713f423ceff9fc35f642348b6c2432`, sertifikat
 `3ea8bb4745b638be8fddf71e15edd9786d45aac65c0384b87be8fa2c32b3b14d` — nilai itu adalah digest aset
-dan sertifikat yang dicetak workflow rilis, **belum** diverifikasi ulang di mesin ini. Baseline audit sebelumnya,
+dan sertifikat yang dicetak workflow rilis; uji nyala di emulator ikut lulus, tetapi berkasnya **belum**
+diunduh ulang di mesin ini. APK Milestone 2 terakhir,
 [v0.1.0-build20](https://github.com/29nls/rodakawan/releases/tag/v0.1.0-build20) dari `fa4397e`,
 berukuran 105.904.031 byte dengan SHA-256
 `a4ae87b459c8ffffaaeb53406bbb2dd1ec529aa91112a64ea887f0b015d9fe9d`. Kedua berkas build19/build20 sudah diunduh ulang

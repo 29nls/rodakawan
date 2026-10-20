@@ -24,37 +24,6 @@ dari berkas.
 
 </details>
 
-## Belum dirilis — 2026-10-20
-
-Bagian ini ditulis manual dan **bukan** rilis; build berikutnya akan disisipkan di atasnya oleh
-workflow rilis.
-
-### Pengujian
-
-- Tambah 11 test komponen formulir buat/ubah perjalanan (`src/__tests__/ride-new.test.tsx`):
-  render + label aksesibilitas, validasi judul/jadwal, payload `createRide`/`updateRide`, mode ubah
-  yang hanya untuk host dan hanya saat `planned`, pesan galat service, retry tanpa duplikasi, dan
-  pencegahan kiriman ganda. `npm test` kini **35 suite / 386 test** (termasuk 22 test lapisan peta).
-
-### Peta
-
-- Lapisan provider peta disiapkan tanpa dependency: `src/features/map/` memisahkan kontrak
-  renderer, atribusi wajib per provider, marker dari lokasi terakhir peserta, dan keadaan
-  "belum dikonfigurasi/renderer belum ada/siap". Layar perjalanan memakai slot itu, sehingga
-  pemasangan MapLibre nanti hanya butuh satu adapter. URL non-https, host tak dikenal, dan nilai
-  contoh `.env.example` berhenti sebagai keadaan eksplisit — bukan peta tanpa atribusi.
-
-### Dokumentasi
-
-- ADR-064 naik dari "belum final" ke **Proposed**: rekomendasi MapLibre + MapTiler Flex dengan angka,
-  kuota, lisensi, dan atribusi yang diverifikasi ulang 20 Oktober 2026, plus koreksi bahwa pembatasan
-  kunci per `package name` + SHA-1 hanya tersedia di Google Cloud, bukan di MapTiler/Stadia.
-- Rencana Milestone 4 (laporan bahaya + chat konvoi) ditambahkan di `docs/MILESTONE_4_PLAN.md`.
-  Belum ada kode, layar, atau tombol M4.
-- README, ROADMAP, rencana M3, QA plan, dan SETUP_GUIDE diselaraskan: `v0.1.0-build23` adalah rilis
-  terbaru, laporan pemilik dicatat sebagai **owner-reported**, dan status uji perangkat khusus
-  (dua perangkat, GPS mati/mode pesawat, force-stop/reboot, baterai 30 menit) tetap **Blocked**.
-
 ## [v0.1.0-build23](https://github.com/29nls/rodakawan/releases/tag/v0.1.0-build23) — 2026-10-18 · pratinjau
 
 <details>
@@ -89,7 +58,11 @@ workflow rilis.
 
 </details>
 
-## Belum dirilis — Milestone 3
+## Catatan rinci Milestone 3 (dirilis bertahap di build21–build23)
+
+Bagian ini ditulis manual dan bukan entri rilis tersendiri; entri rilis di atas tetap otoritatif
+untuk tanggal, tag, dan APK. Rincian di bawah menjelaskan isi Milestone 3 yang masuk lewat beberapa
+build preview.
 
 - Perjalanan klub: buat/ubah, undang, terima undangan, gabung, keluar, keluarkan peserta, dan
   kontrol host untuk memulai/menyelesaikan/membatalkan. Seluruh mutasi lewat RPC transactional dengan
