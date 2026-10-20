@@ -51,11 +51,7 @@ import {
   startRideLocationTracking,
   stopRideLocationTracking,
 } from '@/features/rides/tracking';
-import {
-  getChatHistory,
-  sendChatMessage,
-  type ChatMessageRow,
-} from '@/features/chat/api';
+import { getChatHistory, sendChatMessage, type ChatMessageRow } from '@/features/chat/api';
 import { formatRideSchedule } from '@/features/rides/validation';
 import { readPublicEnv } from '@/lib/env';
 import type {
@@ -781,7 +777,9 @@ export default function RideScreen() {
             title="Chat Konvoi"
           />
           <View style={styles.chatContainer}>
-            <AppText tone="secondary">Chat konvoi tersedia. Fitur lengkap sedang dikembangkan.</AppText>
+            <AppText tone="secondary">
+              Chat konvoi tersedia. Fitur lengkap sedang dikembangkan.
+            </AppText>
           </View>
           <View style={styles.chatInputRow}>
             <TextInput

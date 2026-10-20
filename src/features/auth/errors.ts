@@ -203,8 +203,7 @@ export function mapProfileError(error: unknown): AppError {
     case '23505':
       return {
         code: 'username_taken',
-        message:
-          'Username sudah dipakai akun lain. Coba username lain, misalnya dengan angka.',
+        message: 'Username sudah dipakai akun lain. Coba username lain, misalnya dengan angka.',
         retryable: false,
       };
     case '23514':

@@ -242,10 +242,7 @@ export default function HazardsScreen() {
                 <Pressable
                   key={cat.value}
                   onPress={() => setForm((prev) => ({ ...prev, category: cat.value }))}
-                  style={[
-                    styles.pill,
-                    form.category === cat.value && styles.pillActive,
-                  ]}
+                  style={[styles.pill, form.category === cat.value && styles.pillActive]}
                 >
                   <AppText tone={form.category === cat.value ? 'primary' : 'secondary'}>
                     {cat.label}
@@ -262,10 +259,7 @@ export default function HazardsScreen() {
                 <Pressable
                   key={sev.value}
                   onPress={() => setForm((prev) => ({ ...prev, severity: sev.value }))}
-                  style={[
-                    styles.pill,
-                    form.severity === sev.value && styles.pillActive,
-                  ]}
+                  style={[styles.pill, form.severity === sev.value && styles.pillActive]}
                 >
                   <AppText tone={form.severity === sev.value ? 'primary' : 'secondary'}>
                     {sev.label}
@@ -318,7 +312,9 @@ export default function HazardsScreen() {
           />
 
           {formError ? <Banner title="Kesalahan" message={formError} tone="danger" /> : null}
-          {actionError ? <Banner title="Aksi tidak selesai" message={actionError.message} tone="danger" /> : null}
+          {actionError ? (
+            <Banner title="Aksi tidak selesai" message={actionError.message} tone="danger" />
+          ) : null}
 
           <Button
             disabled={submitting}

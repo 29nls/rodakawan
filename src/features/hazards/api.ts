@@ -78,16 +78,28 @@ export async function createHazard(
   input: HazardCreateInput,
 ): Promise<ApiResult<HazardRow>> {
   const validCategories = [
-    'pothole', 'crash', 'traffic', 'weather', 'flood', 'road_block',
-    'traffic_enforcement', 'other'
+    'pothole',
+    'crash',
+    'traffic',
+    'weather',
+    'flood',
+    'road_block',
+    'traffic_enforcement',
+    'other',
   ];
   if (!validCategories.includes(input.category)) {
-    return { ok: false, error: hazardInvalidCategory('Kategori laporan tidak dikenal: ' + input.category) };
+    return {
+      ok: false,
+      error: hazardInvalidCategory('Kategori laporan tidak dikenal: ' + input.category),
+    };
   }
 
   const validSeverities = ['info', 'moderate', 'high', 'critical'];
   if (!validSeverities.includes(input.severity)) {
-    return { ok: false, error: hazardInvalidSeverity('Tingkat keparahan tidak dikenal: ' + input.severity) };
+    return {
+      ok: false,
+      error: hazardInvalidSeverity('Tingkat keparahan tidak dikenal: ' + input.severity),
+    };
   }
 
   if (input.latitude < -90 || input.latitude > 90) {
@@ -98,7 +110,10 @@ export async function createHazard(
   }
 
   if (input.description && input.description.length > 1000) {
-    return { ok: false, error: hazardInvalidDescription('Deskripsi laporan maksimal 1000 karakter') };
+    return {
+      ok: false,
+      error: hazardInvalidDescription('Deskripsi laporan maksimal 1000 karakter'),
+    };
   }
 
   if (input.rideId) {
@@ -110,12 +125,26 @@ export async function createHazard(
 
     if (error) return { ok: false, error: mapTableError(error) };
     if (!data) {
-      return { ok: false, error: { code: 'not_found', message: 'Perjalanan untuk laporan ini tidak ditemukan', retryable: false } };
+      return {
+        ok: false,
+        error: {
+          code: 'not_found',
+          message: 'Perjalanan untuk laporan ini tidak ditemukan',
+          retryable: false,
+        },
+      };
     }
 
     const { data: userData } = await client.auth.getUser();
     if (!userData?.user?.id) {
-      return { ok: false, error: { code: 'chat_unauthenticated', message: 'Mengirim laporan membutuhkan sesi', retryable: false } };
+      return {
+        ok: false,
+        error: {
+          code: 'chat_unauthenticated',
+          message: 'Mengirim laporan membutuhkan sesi',
+          retryable: false,
+        },
+      };
     }
 
     const { data: member, error: memberError } = await client
@@ -127,7 +156,14 @@ export async function createHazard(
 
     if (memberError) return { ok: false, error: mapTableError(memberError) };
     if (!member || ((member as any).role !== 'host' && (member as any).status !== 'joined')) {
-      return { ok: false, error: { code: 'not_authorized', message: 'Hanya peserta perjalanan yang dapat menautkan laporan ke perjalanan itu', retryable: false } };
+      return {
+        ok: false,
+        error: {
+          code: 'not_authorized',
+          message: 'Hanya peserta perjalanan yang dapat menautkan laporan ke perjalanan itu',
+          retryable: false,
+        },
+      };
     }
   }
 
@@ -144,10 +180,16 @@ export async function createHazard(
   if (error) {
     const detail = (error as any).details || (error as any).detail || '';
     if (typeof detail === 'string' && detail.includes('hazard_rate_limit')) {
-      return { ok: false, error: { code: 'rate_limited', message: hazardRateLimitMessage(), retryable: true } };
+      return {
+        ok: false,
+        error: { code: 'rate_limited', message: hazardRateLimitMessage(), retryable: true },
+      };
     }
     if (typeof detail === 'string' && detail.includes('hazard_duplicate_nearby')) {
-      return { ok: false, error: { code: 'duplicate', message: hazardDuplicateNearbyMessage(), retryable: false } };
+      return {
+        ok: false,
+        error: { code: 'duplicate', message: hazardDuplicateNearbyMessage(), retryable: false },
+      };
     }
     return { ok: false, error: mapRpcError(error) };
   }
