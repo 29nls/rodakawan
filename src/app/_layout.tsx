@@ -58,6 +58,8 @@ function RootNavigator() {
         {/* Milestone 3: perjalanan dan berbagi lokasi opt-in. */}
         <Stack.Screen name="ride-new" />
         <Stack.Screen name="ride" />
+        {/* Milestone 4: moderasi laporan penyalahgunaan (host/admin klub). */}
+        <Stack.Screen name="moderation" />
       </Stack.Protected>
 
       <Stack.Protected guard={resolved && session === null}>

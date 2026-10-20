@@ -239,21 +239,27 @@ M3 sudah lulus.
 - [x] Report abuse/confirm report — `report_content` (tabel `content_reports` lama), satu konfirmasi
       per pengguna per laporan.
 - [x] Chat persisted + realtime events — `chat_messages` + Postgres Changes, keyset pagination,
-      idempotensi `client_message_id`, panel chat di detail perjalanan.
+      idempotensi `client_message_id`, panel chat di detail perjalanan. Pesan teks dari pengguna yang
+      diblokir disaring **di server** (policy SELECT, ADR-068), bukan disembunyikan di UI.
 - [x] System messages untuk start/end/member changes — trigger `rides_system_message` dan
       `ride_members_system_message`, transaksional dengan mutasinya.
 - [x] Rate limits dan error states — 5 laporan/10 menit, duplikat 50 m/10 menit, 10 konfirmasi/jam,
       20 pesan/60 detik; semuanya di database, bukan UI.
+- [x] Dashboard moderasi laporan penyalahgunaan — antrean laporan atas hazard dan chat untuk host
+      perjalanan/admin klub, tiga tindakan (hapus konten, abaikan, tandai ditinjau), dan jejak audit
+      `moderation_actions` yang hanya bisa dibaca lewat RPC (ADR-067).
 
-**Belum (blocked):** migration `20261020090000_hazard_reports_m4.sql` dan
-`20261020100000_convoy_chat_m4.sql` belum diterapkan ke project development, jadi uji RLS/RPC M4
-(`supabase/tests/rls_hazards_test.sql`, `supabase/tests/rls_chat_test.sql`) belum pernah dijalankan
-dan realtime lintas perangkat belum dibuktikan. CI untuk `2b84ec4` juga gagal di Lint; perbaikannya
-sudah diverifikasi lokal tetapi belum di-push.
+**Belum (blocked):** migration `20261020090000_hazard_reports_m4.sql`,
+`20261020100000_convoy_chat_m4.sql`, dan `20261021120000_moderation_dashboard.sql` belum diterapkan ke
+project development, jadi uji RLS/RPC M4 (`supabase/tests/rls_hazards_test.sql`,
+`rls_chat_test.sql`, `rls_moderation_m4_test.sql`) belum pernah dijalankan dan realtime lintas
+perangkat belum dibuktikan. CI untuk `2b84ec4` juga gagal di Lint; perbaikannya sudah diverifikasi
+lokal tetapi belum di-push.
 
 **Exit criteria:** report kedaluwarsa tidak aktif; chat tidak dapat dibaca non-member; retry tidak
-membuat duplicate message. Ketiganya **dirancang dan diuji di database**, tetapi baru terbukti setelah
-migration diterapkan dan `npm run db:test -- --file …` hijau.
+membuat duplicate message; hanya host/admin klub yang dapat menghapus konten dan setiap penghapusan
+tercatat. Keempatnya **dirancang dan diuji di database**, tetapi baru terbukti setelah migration
+diterapkan dan `npm run db:test -- --file …` hijau.
 
 ## Milestone 5 — Push, polish dan beta
 

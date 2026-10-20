@@ -2,7 +2,7 @@
  * Client Supabase palsu untuk pengujian chat konvoi dan laporan bahaya.
  *
  * Yang dibutuhkan test fitur ini lebih dari `createQueryClient`: pemanggilan
- * `rpc`, rantai filter keyset (`or`), tabel `user_blocks`, dan channel realtime.
+ * `rpc`, rantai filter keyset (`or`), dan channel realtime.
  * Semua pemanggilan dicatat supaya test dapat membuktikan bentuk query yang
  * dikirim (mis. retry memakai `clientMessageId` yang sama) tanpa menyentuh
  * jaringan maupun modul native.
@@ -40,7 +40,7 @@ export type FakeChatClient = {
 };
 
 export type FakeChatClientOptions = {
-  /** Baris per tabel; dipakai untuk riwayat chat (`chat_messages`) dan blokir. */
+  /** Baris per tabel; dipakai untuk riwayat chat (`chat_messages`). */
   rows?: Record<string, unknown[]>;
   rpc?: (
     call: RpcCall,

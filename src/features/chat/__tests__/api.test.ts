@@ -4,9 +4,7 @@ import {
   CHAT_EDIT_WINDOW_MS,
   deleteChatMessage,
   editChatMessage,
-  getBlockedUserIds,
   getChatMessages,
-  hiddenByBlock,
   MAX_CHAT_CONTENT_LENGTH,
   mergeChatMessages,
   reportChatMessage,
@@ -22,8 +20,10 @@ import { createFakeChatClient } from '@/test-support/fakeChatClient';
  *
  * Yang dibuktikan: validasi trim sebelum memanggil backend, kontrak argumen RPC,
  * idempotensi retry (`clientMessageId` sama), keyset pagination, dedupe realtime,
- * kebijakan edit/hapus, penyembunyian pesan dari pengguna yang diblokir, dan
- * pelaporan penyalahgunaan lewat `report_content` — bukan INSERT langsung.
+ * kebijakan edit/hapus, dan pelaporan penyalahgunaan lewat `report_content` —
+ * bukan INSERT langsung. Penyaringan pengguna yang diblokir **tidak** diuji di
+ * sini: itu tanggung jawab policy `chat_select_ride_member` (ADR-068) dan diuji
+ * di `supabase/tests/rls_blocked_chat_test.sql`.
  */
 
 const RIDE_ID = 'ride-1';
@@ -392,18 +392,6 @@ describe('realtime', () => {
     channels[0].emit({ new: buildRow({ ride_id: 'ride-lain' }) }, 'INSERT');
 
     expect(onInsert).not.toHaveBeenCalled();
-  });
-
-  it('menyembunyikan pesan dari pengguna yang diblokir tanpa mengubah urutan', async () => {
-    const { client } = createFakeChatClient({
-      rows: { user_blocks: [{ blocked_id: 'user-2' }] },
-    });
-
-    const blocked = await getBlockedUserIds(client);
-
-    expect(blocked).toEqual(['user-2']);
-    expect(hiddenByBlock({ sender_id: 'user-2' }, blocked)).toBe(true);
-    expect(hiddenByBlock({ sender_id: USER_ID }, blocked)).toBe(false);
   });
 });
 

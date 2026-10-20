@@ -11,7 +11,10 @@
  *   halaman dan tidak membuat baris terlewat;
  * - pesan sistem tidak punya jalur tulis klien: pembuatnya trigger database
  *   (`insert_ride_system_message` dicabut dari `authenticated`);
- * - isi pesan yang sudah dihapus tidak pernah dikirim ke UI (`redactChatMessage`).
+ * - isi pesan yang sudah dihapus tidak pernah dikirim ke UI (`toChatMessage`);
+ * - pesan dari pengguna yang diblokir **tidak pernah diterima klien**: policy
+ *   `chat_select_ride_member` menyaringnya di server (ADR-068), termasuk untuk
+ *   Postgres Changes. Tidak ada daftar blokir di sisi klien.
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js';
@@ -315,34 +318,6 @@ export function subscribeChatMessages(
       void client.removeChannel(channel);
     },
   };
-}
-
-/**
- * Daftar pengguna yang diblokir oleh sesi ini.
- *
- * `user_blocks` hanya punya policy SELECT untuk `blocker_id = auth.uid()`, jadi
- * hubungan blokir tidak pernah terbaca dari sisi lain. Bila tabel belum ada di
- * backend, hasilnya daftar kosong — chat tetap bisa dipakai.
- */
-export async function getBlockedUserIds(client: ChatClient): Promise<string[]> {
-  try {
-    const { data, error } = await client.from('user_blocks').select('blocked_id');
-    if (error || !data) return [];
-    return (data as { blocked_id: string }[]).map((row) => row.blocked_id);
-  } catch {
-    return [];
-  }
-}
-
-/**
- * Tandai pesan dari pengguna yang diblokir. Isi pesan tidak ditampilkan, tetapi
- * barisnya tetap ada supaya urutan dan konteks percakapan tidak berubah.
- */
-export function hiddenByBlock(
-  message: Pick<ChatMessage, 'sender_id'>,
-  blockedUserIds: readonly string[],
-): boolean {
-  return blockedUserIds.includes(message.sender_id);
 }
 
 /** Laporkan pesan chat melalui RPC moderasi yang sama dengan laporan bahaya. */

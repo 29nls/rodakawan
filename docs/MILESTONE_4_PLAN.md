@@ -148,6 +148,9 @@ kedaluwarsa tidak pernah tampil sebagai aktif walaupun sapuan belum berjalan.
   jumlah laporan (mencegah penyalahgunaan).
 - Pesan pengguna yang diblokir: usulan menyembunyikan di klien, bukan lewat RLS, karena RLS per
   baris akan membocorkan keberadaan blokir dan memperumit paginasi. Butuh keputusan produk.
+  **Diputuskan 21 Oktober 2026 (ADR-068):** penyaringan dipindahkan ke policy `chat_select_ride_member`
+  di server, karena penyembunyian di klien berarti isi pesan tetap terkirim lewat REST dan realtime.
+  Pesan sistem tetap terlihat, dan paginasi tetap benar karena RLS diterapkan sebelum `LIMIT`.
 
 ## 4. Uji yang wajib ada (allow **dan** deny)
 

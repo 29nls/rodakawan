@@ -160,19 +160,56 @@ Ditambahkan 21 Oktober 2026. Status yang dipakai sama dengan bagian 9, ditambah 
 | --- | --- | --- | --- | --- |
 | Hazard: RPC + expiry server + idempotensi + rate limit + duplikat | Ya | Ya (29 test) | **Blocked** (migration belum diterapkan) | — |
 | Hazard: tab Peringatan (filter, form, ubah/lepas, konfirmasi, lapor) | Ya | Ya (6 test layar) | **Blocked** | **Blocked** |
-| Chat: RPC + keyset pagination + pesan sistem + realtime + blokir | Ya | Ya (25 test API + 9 test panel) | **Blocked** | **Blocked** |
-| Uji RLS/RPC SQL M4 | Ya (berkas siap) | — | **Blocked** (`npm run db:test` gagal `ECONNREFUSED`; `.env.db` menunjuk localhost) | — |
+| Chat: RPC + keyset pagination + pesan sistem + realtime | Ya | Ya (24 test API + 9 test panel) | **Blocked** | **Blocked** |
+| Chat: pesan teks dari pengguna yang diblokir disaring di server (REST + realtime) | Ya (policy `chat_select_ride_member` + `is_blocked_by_me`) | Ya (tidak ada daftar blokir di klien) | **Blocked** | **Blocked** |
+| Moderasi: layanan antrean/aksi/audit + layar dashboard | Ya (16 test layanan + 8 test layar) | Ya | **Blocked** | **Blocked** |
+| Uji RLS/RPC SQL M4 (hazard, chat, moderasi, filter blokir) | Ya (berkas siap) | — | **Blocked** (`npm run db:test` gagal `ECONNREFUSED`; `.env.db` menunjuk localhost) | — |
 | Peta/marker hazard | **Deferred by owner** — ADR-064 masih Proposed | — | — | — |
 | Uji M3 dua perangkat, izin dicabut, GPS mati, force-stop/reboot, baterai 30 menit | **Deferred by owner** — bukan lulus | — | — | **Blocked** |
 
 Perintah yang benar-benar dijalankan pada 21 Oktober 2026: `npm run typecheck` (0), `npm run lint`
-(0 setelah 430 galat CRLF diperbaiki), `npm run format:check` (0), `npm test -- --ci` (**41 suite /
-460 test lulus**), `npm run test:scripts` (**240 lulus**), `npm run export:android` (0), `npm run doctor`
-(gagal karena DNS `exp.host`), `npm run db:test` (exit 1, `ECONNREFUSED`).
+(0 setelah 430 galat CRLF diperbaiki), `npm run format:check` (0), `npm test -- --ci` (**43 suite /
+483 test lulus**, termasuk 16 test layanan dan 8 test layar moderasi), `npm run test:scripts`
+(**240 lulus**), `npm run export:android` (0), `npm run doctor` (gagal karena DNS `exp.host`),
+`npm run db:test` (exit 1, `ECONNREFUSED`).
 
 Uji manual yang **belum** dilakukan dan tidak boleh dianggap lulus: dua perangkat pada chat yang sama,
 realtime saat koneksi putus/nyambung ulang, izin lokasi ditolak saat melapor, GPS mati, laporan
-duplikat nyata dalam radius 50 m, dan moderasi laporan penyalahgunaan oleh peninjau.
+duplikat nyata dalam radius 50 m, dan alur moderasi dengan dua akun nyata.
+
+### 8b. Uji manual dashboard moderasi (ADR-067)
+
+Dengan tiga akun: **A** host perjalanan, **B** peserta yang melapor, **C** anggota biasa klub.
+
+1. B mengirim pesan chat kasar di perjalanan A, lalu melaporkannya; B juga melaporkan satu laporan
+   bahaya yang tertaut perjalanan A. Buka `Profil → Moderasi konten` sebagai A: kedua laporan tampil,
+   lengkap dengan isi konten, alasan, dan nama pelapor.
+2. Sebagai C, buka layar yang sama: **tidak ada** laporan yang tampil. Panggil RPC moderasi langsung
+   dari REST/psql sebagai C: ditolak dengan `moderation_not_allowed`.
+3. Sebagai A, tekan **Hapus konten** pada laporan chat → dialog konfirmasi dulu → setelah konfirmasi,
+   pesan hilang dari chat (placeholder “Pesan dihapus”) dan laporan hilang dari antrean.
+4. Periksa **Jejak aksi terakhir**: tercatat “Konten dihapus”, jenis konten, alasan laporan, waktu,
+   dan catatan (bila diisi). Baris audit yang sama tidak bertambah saat aksi diulang.
+5. Sebagai A, tekan **Abaikan laporan** pada laporan hazard → hazard tetap tampil di tab Peringatan,
+   laporan hilang dari antrean, dan audit mencatat “Laporan diabaikan”.
+6. Sebagai admin klub yang **bukan** peserta perjalanan, buka antrean: laporan chat tetap bisa dibaca
+   isinya lewat `get_moderation_subject`, tetapi riwayat chat lengkap tidak terbuka di detail perjalanan.
+7. Putuskan jaringan saat menekan **Hapus konten**: layar menampilkan galat, status laporan tidak
+   berubah, dan setelah jaringan kembali antrean bisa dimuat ulang tanpa data ganda.
+8. Sebagai anon (tanpa sesi), panggil setiap RPC moderasi dan `list_moderation_actions`: ditolak.
+
+### 8c. Uji manual filter blokir di server (ADR-068)
+
+Dengan akun **A** (host), **B**, dan **C** di perjalanan yang sama, dan pesan teks dari B yang sudah ada:
+
+1. Sebagai A, masukkan blokir ke B (`user_blocks`) lewat jalur admin/psql, lalu muat ulang chat: pesan
+teks B **tidak muncul** dan tidak ada baris placeholder.
+2. Inspeksi trafik (mis. proxy/dev tools): isi pesan B tidak ada di respons REST **maupun** payload
+realtime. Ini inti perubahannya — sebelumnya isinya tetap terkirim.
+3. Pesan sistem dari B (mis. “B bergabung”) tetap tampil untuk A.
+4. Sebagai C, chat tetap menampilkan pesan teks B.
+5. Sebagai B, pesan sendiri tetap terlihat (blokir tidak menyembunyikan pesan dari penulisnya).
+6. Hapus blokir A, muat ulang chat: pesan B muncul kembali tanpa ada data yang ditulis ulang.
 
 ## 9. Status otomatisasi dan verifikasi (Milestone 1–3)
 

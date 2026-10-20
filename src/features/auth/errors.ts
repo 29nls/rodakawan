@@ -34,7 +34,10 @@ export type AppErrorCode =
   | 'chat_not_member'
   | 'chat_message_not_found'
   | 'chat_not_sender'
-  | 'chat_system_message';
+  | 'chat_system_message'
+  /** Moderasi: isi konten tak terbaca lagi, atau langkah kedua gagal setelah yang pertama. */
+  | 'content_unavailable'
+  | 'partial';
 
 export type AppError = {
   code: AppErrorCode;

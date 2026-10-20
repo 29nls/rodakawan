@@ -11,15 +11,19 @@ export type CardProps = {
   /** Padding dari skala spacing, bukan angka bebas. */
   padding?: keyof typeof spacing;
   style?: StyleProp<ViewStyle>;
+  testID?: string;
 };
 
 /**
  * Wadah konten. Varian `accent` dipakai untuk informasi keselamatan/penting
  * agar tidak perlu menambahkan warna di luar token.
  */
-export function Card({ children, variant = 'surface', padding = 'lg', style }: CardProps) {
+export function Card({ children, variant = 'surface', padding = 'lg', style, testID }: CardProps) {
   return (
-    <View style={[styles.base, variantStyles[variant], { padding: spacing[padding] }, style]}>
+    <View
+      style={[styles.base, variantStyles[variant], { padding: spacing[padding] }, style]}
+      testID={testID}
+    >
       {children}
     </View>
   );

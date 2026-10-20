@@ -39,8 +39,8 @@ Istilah status dipakai konsisten di seluruh dokumentasi:
 | Milestone 3: berbagi lokasi opt-in (foreground + background) | Ya — consent terpisah dari izin OS, sampling 15 dtk/25 m, basi 60 dtk, lokasi terakhir dihapus saat opt-out/keluar/ride final | Ya | **Ya** (uji allow/deny lokasi) | **Blocked** (izin, GPS mati, force-stop, baterai 30 menit) |
 | Milestone 3: peta konvoi | **Belum** — ADR-064 masih **Proposed** (rekomendasi MapLibre + MapTiler Flex, riset ulang 20 Oktober 2026); layar menampilkan daftar posisi + status kesegaran, bukan peta tiruan | — | — | — |
 | Milestone 4: laporan bahaya jalan (buat, filter, ubah/lepas, konfirmasi, laporkan) | Ya — RPC transaksional, expiry dihitung server, idempotensi + rate limit + deteksi duplikat di database; tanpa peta, daftar memakai label area perkiraan | Ya (29 test fitur + 6 test layar) | **Blocked** — migration M4 belum diterapkan ke project development | **Blocked** (belum ada build perangkat) |
-| Milestone 4: chat konvoi (teks, ubah/hapus 15 menit, pesan sistem, realtime, laporkan, blokir) | Ya — Postgres Changes pada `chat_messages`, keyset pagination, idempotensi `client_message_id`, panel chat di detail perjalanan | Ya (25 test API + 9 test panel) | **Blocked** — migration M4 belum diterapkan | **Blocked** |
-| Milestone 4: moderasi (`content_reports`, `user_blocks`) | Ya — RPC `report_content`, pesan dari pengguna yang diblokir disembunyikan di UI; tidak ada peran moderator global baru | Ya | **Blocked** | — |
+| Milestone 4: chat konvoi (teks, ubah/hapus 15 menit, pesan sistem, realtime, laporkan, blokir) | Ya — Postgres Changes pada `chat_messages`, keyset pagination, idempotensi `client_message_id`, panel chat di detail perjalanan; pesan teks dari pengguna yang diblokir disaring **di server** (policy, ADR-068), bukan di UI | Ya (24 test API + 9 test panel) | **Blocked** — migration M4 belum diterapkan | **Blocked** |
+| Milestone 4: moderasi (`content_reports`, `moderation_actions`, `user_blocks`) | Ya — pelaporan lewat RPC `report_content`, dashboard `/moderation` untuk host perjalanan/admin klub dengan aksi hapus konten (soft delete), abaikan, dan tandai ditinjau, jejak audit yang hanya bisa dibaca lewat RPC; **tanpa** peran moderator global (ADR-067) | Ya (16 test layanan + 8 test layar) | **Blocked** — migration moderasi belum diterapkan | — |
 | Milestone 5+: feed, musik, voice PTT | **Belum** | — | — | — |
 
 **Blocked** yang tersisa berarti: alur itu belum dijalankan terhadap backend nyata atau belum diuji di
@@ -49,10 +49,11 @@ HP fisik. Status **Ya** pada kolom perangkat Milestone 2 berasal dari laporan pe
 atau tag rilis per kasus yang disertakan. Project Supabase development **sudah ada**
 sejak 13 Oktober 2026, **tiga belas** migration (sampai `20261019120000_ride_workflow.sql`) sudah
 diterapkan, uji RLS sudah lulus (ADR-035), dan lubang privasi follow serta integritas detail privat
-kendaraan sudah diperbaiki dengan uji allow/deny (ADR-039, ADR-040). Dua migration Milestone 4 —
-`20261020090000_hazard_reports_m4.sql` dan `20261020100000_convoy_chat_m4.sql` — **belum diterapkan**
-ke project development mana pun; karena itu seluruh status “Dev backend” untuk hazard dan chat tetap
-**Blocked**, bukan lulus. Langkah penerapannya ada di
+kendaraan sudah diperbaiki dengan uji allow/deny (ADR-039, ADR-040). Tiga migration Milestone 4 —
+`20261020090000_hazard_reports_m4.sql`, `20261020100000_convoy_chat_m4.sql`, dan
+`20261021120000_moderation_dashboard.sql` — **belum diterapkan** ke project development mana pun;
+karena itu seluruh status “Dev backend” untuk hazard, chat, dan moderasi tetap **Blocked**, bukan
+lulus. Langkah penerapannya ada di
 [`docs/SETUP_GUIDE.md`](docs/SETUP_GUIDE.md#4-menerapkan-migration). Semua langkah yang dapat
 dijalankan tanpa backend sudah dijalankan — lihat [Perintah pengujian](#perintah-pengujian).
 
@@ -68,6 +69,9 @@ memuat daftar laporan aktif dengan filter kategori/keparahan, formulir lapor (iz
 diminta saat tombol “Gunakan lokasi saat ini” ditekan), ubah/lepas oleh pelapor dalam 15 menit,
 konfirmasi “masih ada”, dan lapor penyalahgunaan; detail perjalanan memuat **chat konvoi** dengan
 riwayat 50 pesan, “muat pesan lama”, ubah/hapus 15 menit, pesan sistem, dan pembaruan realtime.
+Laporan penyalahgunaan ditinjau di **`/moderation`** (dibuka dari tab Profil): host perjalanan dan
+admin klub melihat antrean laporan atas konten yang mereka awasi, menghapus konten (soft delete),
+atau menutup laporan sebagai diabaikan/ditinjau — setiap tindakan tercatat di jejak audit.
 Karena ADR-064 belum disetujui, laporan bahaya **tidak** digambar di peta: setiap laporan menampilkan
 label area perkiraan (±1 km) dari koordinatnya, tanpa tile, marker, atau koordinat contoh.
 
@@ -239,7 +243,7 @@ Hasil nyata pada **21 Oktober 2026** (Windows, Node 24.x, npm 12.x) setelah peke
 | `npm run typecheck` | Exit 0. |
 | `npm run lint` | Exit 0 setelah memperbaiki 430 galat `prettier/prettier` (akhiran baris CRLF pada lima berkas) dan dua pelanggaran `react-hooks` di `ChatPanel.tsx`. |
 | `npm run format:check` | Exit 0. |
-| `npm test -- --ci` | **41 suite, 460 test lulus**, exit 0 — termasuk 25 test API chat, 9 test panel chat, 29 test hazard (API + label area), dan 6 test layar Peringatan. |
+| `npm test -- --ci` | **43 suite, 483 test lulus**, exit 0 — termasuk 24 test API chat, 9 test panel chat, 29 test hazard (API + label area), 6 test layar Peringatan, serta 16 test layanan + 8 test layar moderasi. |
 | `npm run test:scripts` | **240 test lulus**, exit 0. |
 | `npm run doctor` | **Tidak dapat dipastikan**: pemeriksaan skema config gagal `TypeError: fetch failed` / `EAI_AGAIN exp.host` (DNS lingkungan ini), 1 dari 21 pemeriksaan gagal. Bukan temuan proyek. |
 | `npm run export:android` | Exit 0, bundel Hermes `entry-*.hbc` 4 MB. |

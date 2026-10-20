@@ -9,8 +9,9 @@
  *   Label "Terkirim" hanya diberikan pada pesan yang sudah dikonfirmasi server;
  * - pengiriman ulang memakai `clientMessageId` yang sama, jadi tombol "Kirim
  *   ulang" tidak pernah menggandakan pesan;
- * - pesan dari pengguna yang diblokir disembunyikan isinya, bukan dihapus dari
- *   urutan, dan hubungan blokir tidak dikirim ke mana pun.
+ * - pesan dari pengguna yang diblokir tidak pernah sampai ke panel ini: policy
+ *   `chat_select_ride_member` menyaringnya di server (ADR-068), jadi tidak ada
+ *   daftar blokir maupun penyembunyian isi di klien.
  */
 
 import * as Crypto from 'expo-crypto';
@@ -32,9 +33,7 @@ import {
   chatAcceptsNewMessages,
   deleteChatMessage,
   editChatMessage,
-  getBlockedUserIds,
   getChatMessages,
-  hiddenByBlock,
   MAX_CHAT_CONTENT_LENGTH,
   mergeChatMessages,
   reportChatMessage,
@@ -99,7 +98,6 @@ export function ChatPanel({
   const [sending, setSending] = useState(false);
   const [pending, setPending] = useState<PendingMessage[]>([]);
   const [connection, setConnection] = useState<ConnectionState>('connecting');
-  const [blocked, setBlocked] = useState<string[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
   const [actionError, setActionError] = useState<AppError | null>(null);
   const [editing, setEditing] = useState<{ id: string; draft: string } | null>(null);
@@ -157,11 +155,6 @@ export function ChatPanel({
       setMessages((previous) => mergeChatMessages(previous, result.data.messages));
       setHasMore(result.data.hasMore);
       setStatus('ready');
-    })();
-
-    void (async () => {
-      const ids = await getBlockedUserIds(client);
-      if (active) setBlocked(ids);
     })();
 
     return () => {
@@ -449,7 +442,6 @@ export function ChatPanel({
         }
 
         const mine = message.sender_id === userId;
-        const hidden = hiddenByBlock(message, blocked);
         const editable = canEditChatMessage(message, userId, now());
         const name = mine ? 'Anda' : (senderNames[message.sender_id] ?? 'Peserta');
 
@@ -461,11 +453,7 @@ export function ChatPanel({
               {mine && !message.deleted ? ' · terkirim' : ''}
             </AppText>
 
-            {hidden ? (
-              <AppText tone="muted" variant="callout">
-                Pesan disembunyikan karena Anda memblokir pengirim ini.
-              </AppText>
-            ) : message.deleted ? (
+            {message.deleted ? (
               <AppText tone="muted" variant="callout">
                 Pesan ini dihapus oleh pengirim.
               </AppText>
@@ -486,7 +474,7 @@ export function ChatPanel({
               <AppText variant="body">{message.content}</AppText>
             )}
 
-            {editing?.id === message.id || hidden ? null : (
+            {editing?.id === message.id ? null : (
               <View style={styles.inlineActions}>
                 {editable ? (
                   <>

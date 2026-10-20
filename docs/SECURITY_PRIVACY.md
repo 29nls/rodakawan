@@ -126,10 +126,14 @@ Jangan mengadopsi retensi tabel ini secara otomatis; tetapkan dasar, kebutuhan, 
 | Baca plat privat | Pemilik saja | Tidak, kecuali pemilik | Tidak | Tidak |
 | Baca lokasi ride aktif | Host sesuai membership | Ya | Tidak | Tidak |
 | Tulis lokasi | Hanya RPC `publish_ride_location` untuk diri sendiri, member aktif + consent | Sama | Tidak | Tidak |
-| Baca chat ride | Sesuai membership | Ya | Tidak | Tidak |
+| Baca chat ride | Sesuai membership; pesan teks dari pengguna yang ia blokir tidak dikirim | Ya, dengan aturan blokir yang sama per pengguna | Tidak | Tidak |
 | Baca perjalanan klub (`club_id` terisi) | `visibility='club'`: anggota aktif klub. `invite_only`: anggota aktif klub **dan** (pembuat atau peserta `joined`) | Peserta `joined`, tetapi hanya selama masih anggota aktif klub itu | Tidak, kecuali `visibility='public'` | Tidak |
 | Baca perjalanan pribadi (`club_id` kosong) | Pembuat atau peserta `joined` | Pembuat atau peserta `joined` | Tidak, kecuali `visibility='public'` | Tidak |
 | Kirim chat | Member aktif sendiri | Member aktif sendiri | Tidak | Tidak |
+| Baca laporan penyalahgunaan | Host perjalanan atau owner/admin klub pemilik perjalanan; pelapor tetap melihat laporannya sendiri | Tidak, kecuali moderator atas konten itu | Tidak | Tidak |
+| Baca isi konten yang dilaporkan | Sama dengan baris di atas; `get_moderation_subject` hanya mengembalikan baris yang dilaporkan | Hanya lewat policy anggota biasa | Tidak | Tidak |
+| Hapus konten / tutup laporan (moderasi) | Hanya RPC `moderate_hazard`/`moderate_chat_message`/`review_content_report` untuk host/admin klub pemilik perjalanan | Tidak | Tidak | Tidak |
+| Baca jejak audit moderasi | Pelaku sendiri, atau host/admin atas target yang ia awasi (RPC `list_moderation_actions`) | Tidak | Tidak | Tidak |
 | Kelola anggota klub | Owner/admin | Tidak | Tidak | Tidak |
 | Buat hazard | User terautentikasi sesuai policy | Ya | Tidak | Tidak |
 | Buat voice token | Member sah dan ride aktif | Sesuai policy | Tidak | Tidak |
@@ -171,19 +175,81 @@ Perubahan yang **sudah ditulis** di migration (belum diterapkan ke project devel
 - Moderasi memakai `content_reports` lama lewat RPC `report_content`. Pelapor dari `auth.uid()`;
   target pesan chat hanya bisa dilaporkan bila pelapor melihat pesan itu (anggota ride), sehingga
   fungsi ini tidak menjadi oracle keberadaan pesan ride lain. Laporan **tidak** menghapus konten.
-- Pemblokiran: `user_blocks` tetap hanya dapat dibaca `blocker_id = auth.uid()`. Aplikasi menyembunyikan
-  isi pesan dari pengguna yang diblokir di klien; tidak ada policy baru, dan hubungan blokir tidak
-  dikirim ke pengguna lain.
+- Pemblokiran: `user_blocks` tetap hanya dapat dibaca `blocker_id = auth.uid()`, dan hubungan blokir
+  tidak dikirim ke pengguna lain. **Sejak ADR-068** penyaringan pindah ke server (lihat §8.3): klien
+  tidak lagi menerima isi pesan dari pengguna yang diblokir, baik lewat REST maupun realtime.
 - Realtime: `chat_messages` dan `ride_locations` ditambahkan ke publication `supabase_realtime`.
   Setiap baris tetap melewati policy `SELECT` tabelnya sebelum dikirim; tidak ada Broadcast publik.
 
 **Batas yang harus disebut terbuka:** (1) policy baca hazard adalah data komunitas — pelapor melihat
 laporannya sendiri walau sudah kedaluwarsa, dan pengguna terautentikasi mana pun melihat laporan aktif;
-(2) belum ada peran moderator global, jadi `status = 'removed'` oleh selain pelapor hanya lewat
-dashboard tepercaya; (3) uji allow/deny M4 (`supabase/tests/rls_hazards_test.sql`,
-`rls_chat_test.sql`) belum pernah dieksekusi, sehingga jaminan di atas masih **klaim desain**, bukan
-hasil pengujian; (4) penyembunyian pesan terblokir terjadi di klien, jadi isi pesan tetap terkirim ke
-perangkat pengguna yang memblokir (bukan kebocoran ke pihak lain, tetapi bukan penyaringan server).
+(2) tidak ada peran moderator global; moderasi hanya lewat wewenang atas konteks perjalanan (ADR-067),
+sehingga laporan bahaya tanpa `ride_id` tetap hanya bisa ditutup lewat dashboard tepercaya;
+(3) uji allow/deny M4 (`supabase/tests/rls_hazards_test.sql`, `rls_chat_test.sql`,
+`rls_moderation_m4_test.sql`) belum pernah dieksekusi, sehingga jaminan di atas masih **klaim desain**,
+bukan hasil pengujian; (4) penyembunyian pesan terblokir awalnya dilakukan di klien dan **sudah
+digantikan** penyaringan server oleh ADR-068/§8.3, sehingga isi pesan itu tidak lagi dikirim ke
+perangkat pemblokir.
+
+### 8.2 Dashboard moderasi — wewenang atas konteks, bukan peran global (21 Oktober 2026)
+
+Migration `20261021120000_moderation_dashboard.sql` menambahkan jalur tinjauan tanpa membuat peran
+baru (ADR-067). Yang berwenang adalah pihak yang sudah memegang konteks kontennya:
+
+- `can_moderate_ride(ride_id)` = `is_ride_host` **atau** `is_club_admin` atas klub pemilik perjalanan;
+- `can_moderate_hazard`/`can_moderate_chat_message` = wewenang atas perjalanan tempat konten itu
+  berada; `can_moderate_content_report` meneruskan wewenang itu ke laporan;
+- laporan bahaya tanpa `ride_id` **tidak** dapat dimoderasi dari aplikasi.
+
+Jalur baca dan tulis:
+
+- `content_reports_select_moderator` menambah policy baca untuk moderator; policy pelapor
+  (`content_reports_select_reporter`) tidak diubah. Tidak ada policy tulis: status laporan hanya
+  berubah lewat `review_content_report`.
+- `get_moderation_subject(p_target_type, p_target_id)` mengembalikan **satu baris yang dilaporkan**
+  bila moderator tidak bisa membacanya lewat policy biasa (admin klub bukan peserta chat; hazard yang
+  sudah kedaluwarsa), setelah otorisasi yang sama. Ia tidak membuka riwayat chat.
+- `public.moderation_actions` mencatat pelaku, jenis/ID target, tindakan, alasan, catatan, dan waktu.
+  RLS aktif **tanpa policy**, dan `INSERT/UPDATE/DELETE/SELECT` dicabut dari `authenticated`/`anon`;
+  satu-satunya jalur baca adalah `list_moderation_actions`, yang menyaring baris dengan fungsi
+  otorisasi di atas. Baris audit ditulis RPC dalam transaksi yang sama dengan perubahan konten, jadi
+  tidak ada penghapusan tanpa jejak.
+- Tindakan: `moderate_hazard` (`remove`/`dismiss`, hanya laporan belum final),
+  `moderate_chat_message` (soft delete `deleted_at`, idempoten), `review_content_report`
+  (`reviewed`/`removed`/`dismissed`, hanya laporan `open`). Meninjau laporan **tidak** menghapus konten:
+  penghapusan adalah aksi terpisah dengan baris audit sendiri. Alasan yang dicatat adalah alasan
+  laporan, bukan pilihan moderator.
+- Semua RPC `security definer`, `set search_path = ''`, grant hanya `authenticated`. Identitas pelaku
+  selalu `auth.uid()`.
+
+**Batas:** dashboard menampilkan 50 laporan terbuka tertua tanpa paginasi; penghapusan bersifat soft
+delete sehingga isi tetap ada di database untuk peninjauan; pelapor tidak menerima notifikasi hasil
+tinjauan; dan uji SQL-nya belum dieksekusi terhadap project development.
+
+### 8.3 Pesan dari pengguna yang diblokir disaring di server (21 Oktober 2026)
+
+Migration `20261021130000_blocked_chat_server_filter.sql` memindahkan penyaringan dari UI ke policy
+baca (ADR-068):
+
+- `public.is_blocked_by_me(p_user_id)` — `security definer`, `search_path = ''`, hanya memeriksa
+  `user_blocks` dengan `blocker_id = auth.uid()`. Tidak ada parameter identitas pemblokir, jadi fungsi
+  ini tidak bisa dipakai memeriksa blokir orang lain.
+- `chat_select_ride_member` diganti bentuknya menjadi: anggota ride **dan** bukan pesan teks dari
+  pengguna yang memblokir saya. Penjaga keanggotaan tetap ada (syarat ADR-060).
+- Efeknya berlaku untuk **dua** jalur baca sekaligus: REST/PostgREST dan Postgres Changes (realtime
+  memakai policy SELECT yang sama). Sebelumnya baris dikirim lebih dulu lalu isinya diganti teks di
+  klien — isi pesan sudah sampai ke perangkat.
+- Pesan sistem (`message_type = 'system'`) tidak disaring: isinya bukan pesan pribadi, dan
+  menyembunyikan “Perjalanan dimulai” karena host diblokir akan menghilangkan informasi keselamatan.
+- Tidak ada data yang dihapus: membuka blokir memunculkan kembali riwayat (perlu muat ulang/reconnect
+  karena baris lama tidak didorong ulang), dan pengirim tetap membaca pesannya sendiri.
+- Moderasi tidak terpengaruh: `get_moderation_subject` adalah `security definer`, sehingga moderator
+  yang memblokir penulis tetap bisa membaca konten yang dilaporkan.
+
+**Batas:** blokir tetap satu arah — pengguna yang diblokir masih melihat pesan pemblokir dan tidak
+diberi tahu tentang blokir; tidak ada rate limit atau penolakan follow berbasis blokir (masih dicatat
+sebagai hardening M6 di ROADMAP); dan uji `rls_blocked_chat_test.sql` belum dieksekusi terhadap
+project development.
 
 ## 9. Security release checklist
 

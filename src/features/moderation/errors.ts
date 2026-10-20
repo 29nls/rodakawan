@@ -1,5 +1,10 @@
 /**
- * Pemetaan galat RPC `public.report_content` (20261020100000_convoy_chat_m4.sql).
+ * Pemetaan galat RPC moderasi.
+ *
+ * Dua sumber tag:
+ * - `public.report_content` (20261020100000_convoy_chat_m4.sql) untuk pelaporan;
+ * - `moderate_hazard`/`moderate_chat_message`/`review_content_report`
+ *   (20261021120000_moderation_dashboard.sql) untuk dashboard moderasi.
  *
  * Kontraknya sama dengan modul lain: `detail` berisi tag mesin, dan pesan yang
  * dilihat pengguna berasal dari tabel di bawah — bukan teks `raise exception`
@@ -39,6 +44,49 @@ export const MODERATION_ERROR_TAGS: Record<string, AppError> = {
   report_target_not_found: {
     code: 'not_found',
     message: 'Konten yang ingin Anda laporkan sudah tidak ditemukan. Muat ulang lalu coba lagi.',
+    retryable: false,
+  },
+  moderation_unauthenticated: {
+    code: 'not_authorized',
+    message: 'Masuk dulu untuk meninjau laporan penyalahgunaan.',
+    retryable: false,
+  },
+  moderation_invalid_action: {
+    code: 'invalid_data',
+    message: 'Tindakan moderasi tidak dikenal. Muat ulang antrean lalu pilih tindakan lagi.',
+    retryable: false,
+  },
+  moderation_invalid_reason: {
+    code: 'invalid_data',
+    message: 'Alasan moderasi tidak dikenal. Muat ulang antrean lalu coba lagi.',
+    retryable: false,
+  },
+  moderation_invalid_note: {
+    code: 'invalid_data',
+    message: 'Catatan moderasi maksimal 1000 karakter. Pendekkan dulu, lalu simpan.',
+    retryable: false,
+  },
+  moderation_target_not_found: {
+    code: 'not_found',
+    message: 'Konten atau laporan ini sudah tidak ditemukan. Muat ulang antrean.',
+    retryable: false,
+  },
+  moderation_target_final: {
+    code: 'conflict',
+    message:
+      'Konten ini sudah final (dilepas, diabaikan, atau kedaluwarsa), jadi tidak bisa dimoderasi lagi.',
+    retryable: false,
+  },
+  moderation_report_closed: {
+    code: 'conflict',
+    message:
+      'Laporan ini sudah ditinjau sebelumnya. Muat ulang antrean untuk melihat status terbaru.',
+    retryable: false,
+  },
+  moderation_not_allowed: {
+    code: 'not_authorized',
+    message:
+      'Hanya host perjalanan atau admin klub pemilik perjalanan yang dapat memoderasi konten ini.',
     retryable: false,
   },
 };

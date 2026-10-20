@@ -200,18 +200,17 @@ describe('ChatPanel', () => {
     expect(screen.queryByText('isi yang harus hilang')).toBeNull();
   });
 
-  it('menyembunyikan isi pesan dari pengguna yang diblokir', async () => {
-    await renderPanel({
-      rows: {
-        chat_messages: [buildRow({ content: 'pesan dari orang yang diblokir' })],
-        user_blocks: [{ blocked_id: OTHER }],
-      },
-    });
+  it('tidak memuat daftar blokir di klien; pesan terblokir tidak pernah datang dari server', async () => {
+    const fake = await renderPanel({ rows: { chat_messages: [buildRow()] } });
 
-    expect(
-      await screen.findByText('Pesan disembunyikan karena Anda memblokir pengirim ini.'),
-    ).toBeTruthy();
-    expect(screen.queryByText('pesan dari orang yang diblokir')).toBeNull();
+    expect(await screen.findByText('Halo dari peserta lain')).toBeTruthy();
+
+    // Filter blokir milik policy `chat_select_ride_member` (ADR-068): panel tidak
+    // boleh menanyakan `user_blocks` atau memutuskan sendiri pesan mana yang
+    // disembunyikan, karena isinya sudah tidak dikirim server.
+    expect(fake.queryCalls.some((call) => call.table === 'user_blocks')).toBe(false);
+    expect(fake.queryCalls.every((call) => call.table === 'chat_messages')).toBe(true);
+    expect(screen.queryByText(/Pesan disembunyikan/)).toBeNull();
   });
 
   it('menampilkan keadaan kosong yang menjelaskan langkah berikutnya', async () => {

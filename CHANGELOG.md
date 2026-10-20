@@ -21,12 +21,25 @@ bagian ini oleh workflow rilis.
 - Chat konvoi di detail perjalanan: riwayat 50 pesan + muat pesan lama (keyset), kirim idempoten,
   ubah/hapus 15 menit, pesan sistem untuk mulai/selesai/batal dan perubahan peserta, realtime
   Postgres Changes, serta penyembunyian pesan dari pengguna yang diblokir.
+- Dashboard moderasi laporan penyalahgunaan: antrean laporan atas hazard dan chat untuk host
+  perjalanan/admin klub, aksi hapus konten (soft delete), abaikan, dan tandai ditinjau, plus jejak
+  audit yang mencatat pelaku, alasan, dan waktu. Tanpa peran moderator global (ADR-067).
 - Migration `20261020090000_hazard_reports_m4.sql` dan `20261020100000_convoy_chat_m4.sql`:
   RPC `security definer`, idempotensi, batas laju, deteksi duplikat, trigger expiry/pesan sistem, dan
   pencabutan jalur tulis langsung. **Belum diterapkan** ke project development.
+- Migration `20261021120000_moderation_dashboard.sql`: tabel audit `moderation_actions`, helper
+  wewenang `can_moderate_*`, policy baca moderator pada `content_reports`, dan RPC
+  `get_moderation_subject`/`moderate_hazard`/`moderate_chat_message`/`review_content_report`/
+  `list_moderation_actions`. **Belum diterapkan**.
+- Migration `20261021130000_blocked_chat_server_filter.sql`: helper `is_blocked_by_me` dan policy
+  `chat_select_ride_member` baru yang menyaring pesan teks dari pengguna yang diblokir. **Belum
+  diterapkan**.
 
 ### Perbaikan
 
+- Pesan dari pengguna yang diblokir kini disaring **di server** lewat policy `chat_select_ride_member`
+  dan helper `is_blocked_by_me` (ADR-068), bukan disembunyikan di UI setelah isinya terkirim. Berlaku
+  untuk REST maupun realtime; pesan sistem tetap terlihat. Klien tidak lagi memuat daftar blokir.
 - `ROW_NOT_APPLIED_ERROR` dikembalikan ke `not_authorized`; sebelumnya (commit `2b84ec4`) berubah
   menjadi `not_found` dan membuat empat test garasi/klub gagal serta pesan yang tidak bisa
   ditindaklanjuti.

@@ -338,6 +338,15 @@ export default function ProfileScreen() {
 
       <Card padding="none">
         <LinkRow
+          detail="Laporan penyalahgunaan atas bahaya dan chat di perjalanan yang Anda pimpin. Hanya host perjalanan dan admin klub yang melihat laporan."
+          href="/moderation"
+          icon="shield-checkmark-outline"
+          label="Moderasi konten"
+        />
+      </Card>
+
+      <Card padding="none">
+        <LinkRow
           detail="Token desain, komponen dasar, dan status pemeriksaan."
           href="/system"
           icon="construct-outline"

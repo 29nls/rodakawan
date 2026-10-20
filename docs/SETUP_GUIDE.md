@@ -82,7 +82,7 @@ Bagian ini adalah urutan yang sudah disesuaikan dengan kode di repo. Project dev
 
 ### 4.3 Jalankan migration
 
-Repository ini sekarang memuat **lima belas** migration. Dua yang pertama adalah **sejarah penyiapan
+Repository ini sekarang memuat **tujuh belas** migration. Dua yang pertama adalah **sejarah penyiapan
 awal** dan urutannya penting:
 
 1. `supabase/migrations/20261013022938_initial_schema.sql` — skema fondasi (migration awal).
@@ -90,29 +90,34 @@ awal** dan urutannya penting:
    username, dan trigger `updated_at`. Migration ini idempotent (`create or replace`,
    `drop trigger if exists`) sehingga aman dijalankan ulang dan tidak menghapus data.
 
-Tiga belas migration berikutnya bersifat aditif (privasi follow, detail privat kendaraan, keanggotaan
+Lima belas migration berikutnya bersifat aditif (privasi follow, detail privat kendaraan, keanggotaan
 klub, kendaraan utama, akses perjalanan, tiga bucket Storage, pagar policy, alur perjalanan M3 di
 `20261019120000_ride_workflow.sql`, lalu Milestone 4:
-`20261020090000_hazard_reports_m4.sql` dan `20261020100000_convoy_chat_m4.sql`).
+`20261020090000_hazard_reports_m4.sql`, `20261020100000_convoy_chat_m4.sql`,
+`20261021120000_moderation_dashboard.sql`, dan
+`20261021130000_blocked_chat_server_filter.sql`).
 
-> **Status Milestone 4 (21 Oktober 2026): dua migration terakhir BELUM diterapkan ke project
+> **Status Milestone 4 (21 Oktober 2026): empat migration terakhir BELUM diterapkan ke project
 development mana pun.** Aplikasi sudah memanggil RPC-nya, jadi pada backend yang belum dimigrasikan tab
-Peringatan dan chat akan menampilkan galat `PGRST202`/`42883` ("Backend belum memuat fungsi yang
-dibutuhkan"), bukan data kosong yang menyesatkan. Terapkan kedua berkas itu dengan urutan di bawah,
-lalu jalankan uji M4:
+Peringatan, chat, dan dashboard moderasi akan menampilkan galat `PGRST202`/`42883` ("Backend belum
+memuat fungsi yang dibutuhkan"), bukan data kosong yang menyesatkan. Terapkan keempat berkas itu dengan
+urutan di bawah, lalu jalankan uji M4:
 >
 > ```powershell
-> npx supabase migration list          # pastikan 20261020090000 dan 20261020100000 masih kosong di remote
+> npx supabase migration list          # pastikan 20261020090000, 20261020100000, 20261021120000, 20261021130000 masih kosong di remote
 > npx supabase db push --dry-run
 > npx supabase db push --yes
 > npm run db:types                     # regenerasi tipe setelah RPC baru ada
 > npm run db:test -- --file supabase/tests/rls_hazards_test.sql
 > npm run db:test -- --file supabase/tests/rls_chat_test.sql
+> npm run db:test -- --file supabase/tests/rls_moderation_m4_test.sql
+> npm run db:test -- --file supabase/tests/rls_blocked_chat_test.sql
 > ```
 >
-> Dua berkas uji itu **belum** dimasukkan ke daftar bawaan `npm run db:test` supaya workflow
+> Keempat berkas uji itu **belum** dimasukkan ke daftar bawaan `npm run db:test` supaya workflow
 > `database-rls` tetap hijau sebelum migration diterapkan; jalankan eksplisit seperti di atas dan
-> pindahkan ke `DEFAULT_TEST_FILES` di `scripts/db-test.mjs` setelah keduanya hijau.
+> pindahkan ke `DEFAULT_TEST_FILES` di `scripts/db-test.mjs` (beserta pemeriksaan notice-nya di
+> `.github/workflows/database-rls.yml`) setelah semuanya hijau.
 >
 > Jangan menyunting migration yang sudah diterapkan ke remote; tambahkan migration baru. Jumlah
 > pastinya bisa diperiksa dengan `ls supabase/migrations` atau `npx supabase migration list` — jangan

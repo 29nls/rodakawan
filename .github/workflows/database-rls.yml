@@ -27,8 +27,7 @@ name: Database RLS
 # - Sebelum uji dijalankan, connection string diverifikasi menunjuk **project
 #   development** (ref `xvmcpfkkveeaevfcvfug`). Selain itu workflow berhenti,
 #   sehingga secret yang salah tempat tidak bisa menjalankan uji apa pun.
-# - Setiap berkas uji (`supabase/tests/rls_profiles_test.sql` dan
-#   `supabase/tests/rls_policy_guard_test.sql`) membungkus seluruh asersinya dalam
+# - Setiap berkas uji di `supabase/tests/` membungkus seluruh asersinya dalam
 #   transaksi yang di-ROLLBACK, sehingga menjalankannya ulang tidak menghapus atau
 #   meninggalkan data apa pun.
 # - Berkas kedua adalah pagar katalog policy: gagal bila ada policy pada tabel wadah
