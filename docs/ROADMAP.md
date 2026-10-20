@@ -214,7 +214,9 @@ dengan label live/basi/belum ada, bukan peta tiruan.
 - [x] Indikator live/basi/offline dan waktu pembaruan di layar detail.
 - [x] Stop task saat keluar/opt-out/ride berakhir; baris lokasi dihapus trigger.
 - [x] Migration, RPC, tipe generated, uji RLS/RPC, dan uji Jest.
-- [ ] Map markers (setelah provider dipilih dan renderer diuji di development build).
+- [ ] Map markers (setelah provider dipilih dan renderer diuji di development build). Kontrak
+      renderer, atribusi, dan keadaan konfigurasi/gagal sudah disiapkan di `src/features/map/`
+      (20 Oktober 2026) tanpa menambahkan dependency peta.
 - [ ] Test dua perangkat, GPS mati, mode pesawat, force-stop/reboot, dan baterai/network 30 menit.
 
 **Exit criteria:** anggota sah melihat update lokasi; non-member dan `anon` ditolak; menolak berbagi

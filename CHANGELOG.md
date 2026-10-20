@@ -18,7 +18,15 @@ workflow rilis.
 - Tambah 11 test komponen formulir buat/ubah perjalanan (`src/__tests__/ride-new.test.tsx`):
   render + label aksesibilitas, validasi judul/jadwal, payload `createRide`/`updateRide`, mode ubah
   yang hanya untuk host dan hanya saat `planned`, pesan galat service, retry tanpa duplikasi, dan
-  pencegahan kiriman ganda. `npm test` kini **33 suite / 364 test**.
+  pencegahan kiriman ganda. `npm test` kini **35 suite / 386 test** (termasuk 22 test lapisan peta).
+
+### Peta
+
+- Lapisan provider peta disiapkan tanpa dependency: `src/features/map/` memisahkan kontrak
+  renderer, atribusi wajib per provider, marker dari lokasi terakhir peserta, dan keadaan
+  "belum dikonfigurasi/renderer belum ada/siap". Layar perjalanan memakai slot itu, sehingga
+  pemasangan MapLibre nanti hanya butuh satu adapter. URL non-https, host tak dikenal, dan nilai
+  contoh `.env.example` berhenti sebagai keadaan eksplisit — bukan peta tanpa atribusi.
 
 ### Dokumentasi
 

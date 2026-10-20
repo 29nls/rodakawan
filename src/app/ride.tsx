@@ -8,7 +8,6 @@ import { Banner } from '@/components/ui/Banner';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Divider } from '@/components/ui/Divider';
-import { Icon } from '@/components/ui/Icon';
 import { InfoRow } from '@/components/ui/InfoRow';
 import { Screen } from '@/components/ui/Screen';
 import { ScreenHeader } from '@/components/ui/ScreenHeader';
@@ -17,6 +16,8 @@ import { ErrorState, LoadingState } from '@/components/ui/StateView';
 import { TextField } from '@/components/ui/TextField';
 import { colors, spacing } from '@/constants/theme';
 import { BackendUnavailableBanner } from '@/features/auth/components/BackendUnavailableBanner';
+import { MapCanvas } from '@/features/map/MapCanvas';
+import { buildRideMarkers, resolveMapRenderState } from '@/features/map/provider';
 import type { AppError } from '@/features/auth/errors';
 import { useAuthSession } from '@/features/auth/session';
 import {
@@ -498,7 +499,17 @@ export default function RideScreen() {
 
   const joinedMembers = details?.members.filter((member) => member.status === 'joined') ?? [];
   const invitedMembers = details?.members.filter((member) => member.status === 'invited') ?? [];
-  const mapStyleConfigured = readPublicEnv().EXPO_PUBLIC_MAP_STYLE_URL !== undefined;
+
+  // Selama ADR-064 belum disetujui, `renderer` tidak pernah didaftarkan sehingga
+  // keadaan tertinggi yang bisa dicapai adalah `renderer_missing`.
+  const mapState = useMemo(
+    () => resolveMapRenderState({ styleUrl: readPublicEnv().EXPO_PUBLIC_MAP_STYLE_URL }),
+    [],
+  );
+  const mapMarkers = useMemo(
+    () => buildRideMarkers(details?.members ?? [], details?.locations ?? [], now),
+    [details?.members, details?.locations, now],
+  );
 
   if (state.status === 'loading') {
     return (
@@ -760,7 +771,11 @@ export default function RideScreen() {
 
       <Card>
         <SectionHeader
-          subtitle="Peta belum digambar di build ini; daftar di bawah tetap menunjukkan kesegaran posisi."
+          subtitle={
+            mapState.kind === 'ready'
+              ? 'Posisi terakhir peserta; daftar di bawah tetap menunjukkan kesegaran posisi.'
+              : 'Peta belum digambar di build ini; daftar di bawah tetap menunjukkan kesegaran posisi.'
+          }
           title="Posisi peserta"
         />
         {!isActive ? (
@@ -810,14 +825,7 @@ export default function RideScreen() {
           </View>
         )}
 
-        <View style={styles.mapNotice}>
-          <Icon name="map-outline" size={20} color={colors.text.muted} />
-          <AppText tone="muted" variant="caption">
-            {mapStyleConfigured
-              ? 'Gaya peta sudah dikonfigurasi, tetapi renderer peta belum dipasang di build ini. Posisi ditampilkan sebagai daftar dengan waktu pembaruan.'
-              : 'Peta belum dikonfigurasi untuk build ini. Tidak ada peta tiruan atau koordinat contoh; posisi asli ditampilkan sebagai daftar.'}
-          </AppText>
-        </View>
+        <MapCanvas markers={mapMarkers} state={mapState} />
       </Card>
 
       <Card>
@@ -920,13 +928,5 @@ const styles = StyleSheet.create({
   memberActions: {
     alignItems: 'flex-end',
     gap: spacing.xs,
-  },
-  mapNotice: {
-    alignItems: 'center',
-    backgroundColor: colors.overlay.soft,
-    borderRadius: 12,
-    flexDirection: 'row',
-    gap: spacing.sm,
-    padding: spacing.md,
   },
 });

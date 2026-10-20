@@ -131,6 +131,18 @@ Alternatif bila ingin menghindari biaya bulanan pada pilot non-komersial: **MapL
 Starter** (US$20/bulan, 1 juta kredit, cache offline 100 MB). Alternatif bila prioritasnya kemudahan
 Android dan siap menerima telemetri serta lisensi kendaraan: **Google Maps SDK**.
 
+### Lapisan renderer yang sudah disiapkan (20 Oktober 2026)
+
+Tanpa menambahkan dependency, kontrak renderer sudah dipisahkan dari layar di
+[`src/features/map/`](../src/features/map/README.md): `provider.ts` (keadaan peta, atribusi wajib,
+marker dari lokasi terakhir, region awal), `MapAttribution.tsx`, dan `MapCanvas.tsx` (slot renderer
++ keadaan “belum dikonfigurasi/gagal”). Layar perjalanan memakai slot itu, jadi pemasangan MapLibre
+nanti hanya perlu satu adapter + pendaftaran renderer, bukan perubahan di layar.
+
+Konsekuensi yang sudah diuji: URL gaya non-https, host provider tak dikenal (atribusi tidak bisa
+ditentukan), dan nilai contoh `.env.example` semuanya berhenti sebagai keadaan eksplisit — bukan peta
+tanpa atribusi.
+
 ### Yang harus terjadi sebelum implementasi
 
 1. Pemilik produk menerima salah satu opsi dan status ADR-064 diubah dari **Proposed** menjadi

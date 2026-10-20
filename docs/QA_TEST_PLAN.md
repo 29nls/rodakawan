@@ -175,12 +175,13 @@ Yang **sudah otomatis** (`npm test`, jaringan dimatikan; client Supabase diganti
 | `src/features/rides/__tests__/*.test.ts` | Validasi perjalanan/jadwal, kebijakan sampling & kesegaran lokasi, API perjalanan (RPC, konsent, Postgres Changes tanpa `user_id` klien). |
 | `src/__tests__/rides-list.test.tsx` | Tab Perjalanan: daftar nyata, status, keadaan kosong, dan aksi buat. |
 | `src/__tests__/ride-detail.test.tsx` | Detail perjalanan: consent lokasi, penolakan izin, undangan, dan pembatasan non-anggota. |
+| `src/features/map/__tests__/*.test.ts?(x)` | Lapisan peta: keadaan belum dikonfigurasi/renderer belum ada/siap, atribusi wajib per provider, marker hanya untuk peserta `joined`, region awal, dan tidak ada peta tanpa atribusi. |
 | `src/__tests__/ride-new.test.tsx` | Formulir buat/ubah perjalanan: render & label aksesibilitas, validasi judul/klub/jadwal, payload `createRide`/`updateRide`, mode ubah (hanya host, hanya `planned`), pesan galat, retry, dan pencegahan kiriman ganda. |
 | `src/components/ui/__tests__/*` | Perilaku dasar komponen yang dipakai form (tombol, field). |
 
 Hasil terakhir dijalankan (19 Oktober 2026, Node 24.18.1, npm 12.0.2, setelah `npm ci` dari
 `package-lock.json`):
-`npm test -- --ci` → **33 suite, 364 test lulus** (20 Oktober 2026; termasuk suite perjalanan Milestone 3, 11 test komponen formulir perjalanan, dan 2 test siklus task lokasi, 14 test kompresi foto, 18 test
+`npm test -- --ci` → **35 suite, 386 test lulus** (20 Oktober 2026; termasuk suite perjalanan Milestone 3, 11 test komponen formulir perjalanan, 22 test lapisan peta, dan 2 test siklus task lokasi, 14 test kompresi foto, 18 test
 pembersihan objek yatim, dan 17 test foto profil: 12 API + 5 komponen layar); `npm run test:scripts`
 → **240 test lulus, exit 0** (termasuk 4 test penjaga Milestone 3);
 `npm run deps:check`, `npm run typecheck`, `npm run lint`, `npm run format:check`, dan
