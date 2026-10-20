@@ -113,20 +113,25 @@ export async function createHazard(
       return { ok: false, error: { code: 'not_found', message: 'Perjalanan untuk laporan ini tidak ditemukan', retryable: false } };
     }
 
+    const { data: userData } = await client.auth.getUser();
+    if (!userData?.user?.id) {
+      return { ok: false, error: { code: 'chat_unauthenticated', message: 'Mengirim laporan membutuhkan sesi', retryable: false } };
+    }
+
     const { data: member, error: memberError } = await client
       .from('ride_members')
       .select('role, status')
       .eq('ride_id', input.rideId)
-      .eq('user_id', (await client.getSession()).user.id)
+      .eq('user_id', userData.user.id)
       .maybeSingle();
 
     if (memberError) return { ok: false, error: mapTableError(memberError) };
-    if (!member || member.role !== 'host' && member.status !== 'joined') {
-      return { ok: false, error: { code: 'forbidden', message: 'Hanya peserta perjalanan yang dapat menautkan laporan ke perjalanan itu', retryable: false } };
+    if (!member || ((member as any).role !== 'host' && (member as any).status !== 'joined')) {
+      return { ok: false, error: { code: 'not_authorized', message: 'Hanya peserta perjalanan yang dapat menautkan laporan ke perjalanan itu', retryable: false } };
     }
   }
 
-  const { data, error } = await client.rpc('create_hazard', {
+  const { data, error } = await (client.rpc as any)('create_hazard', {
     p_category: input.category,
     p_severity: input.severity,
     p_latitude: input.latitude,
@@ -137,10 +142,11 @@ export async function createHazard(
   });
 
   if (error) {
-    if (error.detail && error.detail.includes('hazard_rate_limit')) {
-      return { ok: false, error: { code: 'rate_limit', message: hazardRateLimitMessage(), retryable: true } };
+    const detail = (error as any).details || (error as any).detail || '';
+    if (typeof detail === 'string' && detail.includes('hazard_rate_limit')) {
+      return { ok: false, error: { code: 'rate_limited', message: hazardRateLimitMessage(), retryable: true } };
     }
-    if (error.detail && error.detail.includes('hazard_duplicate_nearby')) {
+    if (typeof detail === 'string' && detail.includes('hazard_duplicate_nearby')) {
       return { ok: false, error: { code: 'duplicate', message: hazardDuplicateNearbyMessage(), retryable: false } };
     }
     return { ok: false, error: mapRpcError(error) };
@@ -154,7 +160,7 @@ export async function updateHazard(
   hazardId: string,
   input: HazardUpdateInput,
 ): Promise<ApiResult<HazardRow>> {
-  const { data, error } = await client.rpc('update_hazard', {
+  const { data, error } = await (client.rpc as any)('update_hazard', {
     p_hazard_id: hazardId,
     p_severity: input.severity,
     p_description: input.description ?? null,
@@ -169,7 +175,7 @@ export async function removeHazard(
   client: HazardClient,
   hazardId: string,
 ): Promise<ApiResult<HazardRow>> {
-  const { data, error } = await client.rpc('remove_hazard', {
+  const { data, error } = await (client.rpc as any)('remove_hazard', {
     p_hazard_id: hazardId,
   });
 
@@ -182,7 +188,7 @@ export async function confirmHazard(
   client: HazardClient,
   hazardId: string,
 ): Promise<ApiResult<{ total: number }>> {
-  const { data, error } = await client.rpc('confirm_hazard', {
+  const { data, error } = await (client.rpc as any)('confirm_hazard', {
     p_hazard_id: hazardId,
   });
 
@@ -194,31 +200,34 @@ export async function confirmHazard(
 export async function expireHazardReports(
   client: HazardClient,
 ): Promise<ApiResult<{ count: number }>> {
-  const { data, error } = await client.rpc('expire_hazard_reports', {});
+  const { data, error } = await (client.rpc as any)('expire_hazard_reports', {});
 
   if (error) return { ok: false, error: mapRpcError(error) };
 
   return { ok: true, data: { count: (data as number) || 0 } };
 }
 
-export async function listHazards(
+export async function getActiveHazards(
   client: HazardClient,
   filters: HazardFilters = {},
 ): Promise<ApiResult<HazardRow[]>> {
-  let query = client.from('hazard_reports').select('*');
+  let query = client
+    .from('hazard_reports')
+    .select('*')
+    .eq('status', 'active')
+    .gt('expires_at', new Date().toISOString())
+    .order('created_at', { ascending: false });
 
   if (filters.category) {
     query = query.eq('category', filters.category);
   }
-  if (filters.status) {
-    query = query.eq('status', filters.status);
+  if (filters.severity) {
+    query = query.eq('severity', filters.severity);
   }
-
-  query = query.eq('status', 'active').order('created_at', { ascending: false });
 
   const { data, error } = await query;
 
   if (error) return { ok: false, error: mapTableError(error) };
 
-  return { ok: true, data: data as HazardRow[] };
+  return { ok: true, data: (data || []) as HazardRow[] };
 }

@@ -11,8 +11,9 @@ export type ChatMessageRow = {
   sender_id: string;
   message_type: 'text' | 'system';
   content: string;
-  edit_timestamp: string | null;
+  edited_at: string | null;
   created_at: string;
+  deleted_at?: string | null;
 };
 export type SystemMessageRow = {
   id: string;
@@ -47,10 +48,6 @@ function chatSystemMessageMessage(): string {
   return 'Pesan sistem tidak dapat diubah/hapus';
 }
 
-// Type assertion for RPC function names not in the constraint union
-type RpcError = { message: string; details?: string; code?: string };
-type RpcResponse<T = any> = { data: T; error: RpcError | null };
-
 export async function sendChatMessage(
   client: ChatClient,
   rideId: string,
@@ -62,21 +59,26 @@ export async function sendChatMessage(
     return { ok: false, error: { code: 'chat_trim_invalid', message: chatTrimInvalidMessage(), retryable: false } };
   }
 
-  const result = await (client.rpc('send_chat_message', {
+  const { data, error } = await (client.rpc as any)('send_chat_message', {
     p_ride_id: rideId,
     p_content: content,
     p_client_message_id: clientMessageId ?? null,
-  } as any) as Promise<ApiResult<ChatMessageRow>>);
+  });
 
-  if (result.ok) return result;
+  if (error) {
+    const detail = (error as any).details || (error as any).detail || '';
+    // Deteksi rate limit
+    if (typeof detail === 'string' && detail.includes('chat_rate_limit')) {
+      return { ok: false, error: { code: 'chat_rate_limit', message: chatRateLimitMessage(), retryable: true } };
+    }
+    // Deteksi ride final
+    if (typeof detail === 'string' && detail.includes('chat_ride_final')) {
+      return { ok: false, error: { code: 'chat_ride_final', message: 'Perjalanan ini sudah selesai, pesan baru tidak dapat dikirim', retryable: false } };
+    }
+    return { ok: false, error: mapRpcError(error) };
+  }
 
-  if (result.error?.details?.includes('chat_rate_limit')) {
-    return { ok: false, error: { code: 'chat_rate_limit', message: chatRateLimitMessage(), retryable: true } };
-  }
-  if (result.error?.details?.includes('chat_ride_final')) {
-    return { ok: false, error: { code: 'chat_ride_final', message: 'Perjalanan ini sudah selesai, pesan baru tidak dapat dikirim', retryable: false } };
-  }
-  return { ok: false, error: mapRpcError(result.error) };
+  return { ok: true, data: data as ChatMessageRow };
 }
 
 /** Ubah pesan. Hanya pengirim, hanya `message_type = 'text'`, tidak boleh sudah dihapus, maksimal 15 menit sejak `created_at`. */
@@ -90,23 +92,29 @@ export async function editChatMessage(
     return { ok: false, error: { code: 'chat_trim_invalid', message: chatTrimInvalidMessage(), retryable: false } };
   }
 
-  const result = await (client.rpc('edit_chat_message', {
+  const { data, error } = await (client.rpc as any)('edit_chat_message', {
     p_message_id: messageId,
     p_content: content,
-  } as any) as Promise<ApiResult<ChatMessageRow>>);
+  });
 
-  if (result.ok) return result;
+  if (error) {
+    const detail = (error as any).details || (error as any).detail || '';
+    // Deteksi jendela edit
+    if (typeof detail === 'string' && detail.includes('jendela edit')) {
+      return { ok: false, error: { code: 'chat_edit_window', message: chatEditWindowMessage(), retryable: false } };
+    }
+    // Deteksi pesan sistem
+    if (typeof detail === 'string' && detail.includes('chat_system_message')) {
+      return { ok: false, error: { code: 'chat_system_message', message: chatSystemMessageMessage(), retryable: false } };
+    }
+    // Deteksi bukan pengirim
+    if (typeof detail === 'string' && detail.includes('chat_not_sender')) {
+      return { ok: false, error: { code: 'chat_not_sender', message: chatNotSenderMessage(), retryable: false } };
+    }
+    return { ok: false, error: mapRpcError(error) };
+  }
 
-  if (result.error?.details?.includes('jendela edit')) {
-    return { ok: false, error: { code: 'chat_edit_window', message: chatEditWindowMessage(), retryable: false } };
-  }
-  if (result.error?.details?.includes('chat_system_message')) {
-    return { ok: false, error: { code: 'chat_system_message', message: chatSystemMessageMessage(), retryable: false } };
-  }
-  if (result.error?.details?.includes('chat_not_sender')) {
-    return { ok: false, error: { code: 'chat_not_sender', message: chatNotSenderMessage(), retryable: false } };
-  }
-  return { ok: false, error: mapRpcError(result.error) };
+  return { ok: true, data: data as ChatMessageRow };
 }
 
 /** Hapus (soft delete) pesan: `deleted_at`, baris tetap ada untuk moderasi. Idempoten: menghapus pesan yang sudah terhapus mengembalikan baris yang sama. */
@@ -114,25 +122,32 @@ export async function deleteChatMessage(
   client: ChatClient,
   messageId: string,
 ): Promise<ApiResult<ChatMessageRow>> {
-  const result = await (client.rpc('delete_chat_message', {
+  const { data, error } = await (client.rpc as any)('delete_chat_message', {
     p_message_id: messageId,
-  } as any) as Promise<ApiResult<ChatMessageRow>>);
+  });
 
-  if (result.ok) return result;
+  if (error) {
+    const detail = (error as any).details || (error as any).detail || '';
+    // Deteksi rate limit
+    if (typeof detail === 'string' && detail.includes('chat_rate_limit')) {
+      return { ok: false, error: { code: 'chat_rate_limit', message: chatRateLimitMessage(), retryable: true } };
+    }
+    // Deteksi jendela edit
+    if (typeof detail === 'string' && detail.includes('jendela edit')) {
+      return { ok: false, error: { code: 'chat_edit_window', message: chatEditWindowMessage(), retryable: false } };
+    }
+    // Deteksi pesan sistem
+    if (typeof detail === 'string' && detail.includes('chat_system_message')) {
+      return { ok: false, error: { code: 'chat_system_message', message: chatSystemMessageMessage(), retryable: false } };
+    }
+    // Deteksi bukan pengirim
+    if (typeof detail === 'string' && detail.includes('chat_not_sender')) {
+      return { ok: false, error: { code: 'chat_not_sender', message: chatNotSenderMessage(), retryable: false } };
+    }
+    return { ok: false, error: mapRpcError(error) };
+  }
 
-  if (result.error?.details?.includes('chat_rate_limit')) {
-    return { ok: false, error: { code: 'chat_rate_limit', message: chatRateLimitMessage(), retryable: true } };
-  }
-  if (result.error?.details?.includes('jendela edit')) {
-    return { ok: false, error: { code: 'chat_edit_window', message: chatEditWindowMessage(), retryable: false } };
-  }
-  if (result.error?.details?.includes('chat_system_message')) {
-    return { ok: false, error: { code: 'chat_system_message', message: chatSystemMessageMessage(), retryable: false } };
-  }
-  if (result.error?.details?.includes('chat_not_sender')) {
-    return { ok: false, error: { code: 'chat_not_sender', message: chatNotSenderMessage(), retryable: false } };
-  }
-  return { ok: false, error: mapRpcError(result.error) };
+  return { ok: true, data: data as ChatMessageRow };
 }
 
 /** Dapatkan riwayat pesan. Menggunakan keyset pagination dengan ordering berdasarkan created_at dan id. */
@@ -145,13 +160,15 @@ export async function getChatHistory(
     .from('chat_messages')
     .select('id, ride_id, sender_id, message_type, content, edited_at, created_at')
     .eq('ride_id', rideId)
-    .eq('status', 'active')
+    .is('deleted_at', null)
     .order('created_at', { ascending: false })
     .order('id', { ascending: false });
 
   if (hasMore) {
+    // Ambil lebih sedikit untuk membuat space di UI
     query = query.limit(20);
   } else {
+    // Ambil pesan terbaru 50
     query = query.limit(50);
   }
 
@@ -159,7 +176,7 @@ export async function getChatHistory(
 
   if (error) return { ok: false, error: mapTableError(error) };
 
-  return { ok: true, data: data as ChatMessageRow[] };
+  return { ok: true, data: (data || []) as ChatMessageRow[] };
 }
 
 /** Kirim pesan sistem untuk transisi ride/membership. */
@@ -169,14 +186,14 @@ export async function insertRideSystemMessage(
   type: 'ride_started' | 'ride_completed' | 'ride_cancelled' | 'member_joined' | 'member_left' | 'member_removed',
   content: string,
 ): Promise<ApiResult<SystemMessageRow>> {
-  const result = await (client.rpc('insert_ride_system_message', {
+  const { data, error } = await (client.rpc as any)('insert_ride_system_message', {
     p_ride_id: rideId,
-    p_type: type,
     p_content: content,
-  } as any) as Promise<ApiResult<SystemMessageRow>>);
+  });
 
-  if (result.ok) return result;
-  return { ok: false, error: mapRpcError(result.error) };
+  if (error) return { ok: false, error: mapRpcError(error) };
+
+  return { ok: true, data: data as SystemMessageRow };
 }
 
 /** Filtri pesan: hanya anggota join aktif yang bisa membaca */
@@ -194,7 +211,7 @@ export async function filterActiveMembers(
 
   if (error) return { ok: false, error: mapTableError(error) };
 
-  if (!data || data.status !== 'joined') {
+  if (!data || (data as any).status !== 'joined') {
     return { ok: false, error: { code: 'chat_not_member', message: 'Anda bukan anggota aktif perjalanan ini', retryable: false } };
   }
 

@@ -418,3 +418,9 @@ export function mapRpcError(error: unknown): AppError {
       return mapTableError(error);
   }
 }
+/** Error ketika hasil query tidak ditemukan (PGRST116 atau data kosong). */
+export const ROW_NOT_APPLIED_ERROR: AppError = {
+  code: 'not_found',
+  message: 'Data tidak ditemukan.',
+  retryable: false,
+};
