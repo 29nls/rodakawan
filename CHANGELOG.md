@@ -8,6 +8,21 @@ sedangkan build preview (`v<versi>-build<N>`) diringkas di dalam blok yang bisa 
 versi adalah tautan ke halaman rilisnya di GitHub, sehingga riwayat ini bisa dinavigasi langsung
 dari berkas.
 
+## [v0.1.0-build28](https://github.com/29nls/rodakawan/releases/tag/v0.1.0-build28) — 2026-10-20 · pratinjau
+
+<details>
+<summary>Catatan rilis pratinjau</summary>
+
+### Fitur
+
+- add MapStatusCard component and corresponding tests for map rendering states (`794d473`)
+
+### Perubahan lain
+
+- selaraskan dokumentasi dengan rilis build26 (`0ff389d`)
+
+</details>
+
 ## [v0.1.0-build26](https://github.com/29nls/rodakawan/releases/tag/v0.1.0-build26) — 2026-10-20 · pratinjau
 
 <details>
