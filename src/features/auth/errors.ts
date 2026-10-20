@@ -1,12 +1,4 @@
-/**
- * Pemetaan error Supabase Auth/PostgREST menjadi pesan Bahasa Indonesia yang
- * bisa ditindaklanjuti pengguna (docs/UX_SITEMAP.md bagian 6: "error menggunakan
- * bahasa Indonesia sederhana dan menyebut tindakan pemulihan").
- *
- * Catatan implementasi: pemetaan memakai pemeriksaan struktural (code/status/name)
- * dan bukan `instanceof`, supaya pengujian tidak perlu membuat kelas error SDK
- * dan tetap akurat ketika SDK memperbarui diri.
- */
+/** Pemetaan error Supabase Auth/PostgREST menjadi pesan Bahasa Indonesia yang bisa ditindaklanjuti pengguna (docs/UX_SITEMAP.md bagian 6: "error menggunakan bahasa Indonesia sederhana dan menyebut tindakan pemulihan"). Catatan implementasi: pemetaan memakai pemeriksaan struktural (code/status/name) dan bukan `instanceof`, supaya pengujian tidak perlu membuat kelas error SDK dan tetap akurat ketika SDK memperbarui diri. */
 
 export type AppErrorCode =
   | 'backend_not_configured'
@@ -21,14 +13,38 @@ export type AppErrorCode =
   | 'username_taken'
   | 'profile_missing'
   | 'not_authorized'
-  /** Kode generik untuk tabel selain `public.profiles` (klub, garasi). */
   | 'conflict'
   | 'invalid_data'
   | 'not_found'
   | 'table_missing'
   | 'session_expired'
   | 'link_expired'
-  | 'unknown';
+  | 'unknown'
+  /** Hazard report specific codes. */
+  | 'invalid_category'
+  | 'invalid_severity'
+  | 'invalid_coordinates'
+  | 'invalid_description'
+  | 'duplicate'
+  /** Chat message specific codes. */
+  | 'chat_trim_invalid'
+  | 'chat_rate_limit'
+  | 'chat_edit_window'
+  | 'chat_not_authorized'
+  | 'chat_not_found'
+  /** Authentication/authorization codes for chat. */
+  | 'chat_unauthenticated'
+  | 'chat_ride_not_found'
+  | 'chat_ride_final'
+  | 'chat_not_member'
+  | 'message_type'
+  | 'chat_message_not_found'
+  | 'chat_not_sender'
+  | 'chat_system_message'
+  /** Report content specific codes. */
+  | 'report_invalid_target_type'
+  | 'report_invalid_reason'
+  | 'report_target_not_found';
 
 export type AppError = {
   code: AppErrorCode;
@@ -61,18 +77,6 @@ const NETWORK_ERROR: AppError = {
 };
 
 export const NETWORK_APP_ERROR = NETWORK_ERROR;
-
-/**
- * Update/delete tidak mengenai baris apa pun: barisnya tidak ada, bukan milik
- * akun ini, atau policy RLS menolaknya. Dipakai bersama `mapTableError` untuk
- * menghindari "sukses palsu" ketika 0 baris terpengaruh.
- */
-export const ROW_NOT_APPLIED_ERROR: AppError = {
-  code: 'not_authorized',
-  message:
-    'Perubahan tidak diterapkan: data ini bukan milik akun Anda, atau sesi Anda sudah berakhir. Muat ulang lalu coba lagi.',
-  retryable: false,
-};
 
 function toErrorLike(error: unknown): ErrorLike {
   if (typeof error === 'object' && error !== null) return error as ErrorLike;
@@ -199,7 +203,8 @@ export function mapProfileError(error: unknown): AppError {
     case '23505':
       return {
         code: 'username_taken',
-        message: 'Username sudah dipakai akun lain. Coba username lain, misalnya dengan angka.',
+        message:
+          'Username sudah dipakai akun lain. Coba username lain, misalnya dengan angka.',
         retryable: false,
       };
     case '23514':
@@ -238,14 +243,7 @@ export function mapProfileError(error: unknown): AppError {
   }
 }
 
-/**
- * Error dari PostgREST untuk tabel selain `public.profiles` (klub, garasi).
- *
- * Dipisahkan dari `mapProfileError` karena pesannya berbeda: benturan username
- * pada profil dan benturan nama/alamat klub sama-sama berkode `23505`, tetapi
- * saran perbaikannya tidak sama. Kode yang dikembalikan tetap himpunan `AppErrorCode`
- * sehingga pemanggil dapat menanganinya secara seragam.
- */
+/** Error dari PostgREST untuk tabel selain `public.profiles` (klub, garasi). */
 export function mapTableError(error: unknown): AppError {
   const like = toErrorLike(error);
 
@@ -316,13 +314,7 @@ export function mapTableError(error: unknown): AppError {
   }
 }
 
-/**
- * Error dari Supabase Storage (unggah, hapus, signed URL).
- *
- * Storage tidak memakai kode PostgREST; yang tersedia adalah status HTTP dan
- * pesan dari service. Pesan itu tidak pernah diteruskan apa adanya ke pengguna
- * karena bisa memuat detail internal (nama bucket, policy, path).
- */
+/** Error dari Supabase Storage (unggah, hapus, signed URL). */
 export function mapStorageError(error: unknown): AppError {
   const like = toErrorLike(error);
 
@@ -395,14 +387,7 @@ export function mapStorageError(error: unknown): AppError {
   };
 }
 
-/**
- * Error dari pemanggilan RPC (`client.rpc(...)`).
- *
- * Beda penting dibanding `mapTableError`: bila fungsi RPC-nya sendiri belum ada di
- * backend, PostgREST menjawab `PGRST202` (dan PostgreSQL `42883`). Itu bukan
- * kegagalan sementara, jadi pesannya harus menyebut migration yang belum
- * diterapkan — bukan "terjadi kesalahan" yang menyuruh pengguna mencoba lagi.
- */
+/** Error dari pemanggilan RPC (`client.rpc(...)`). */
 export function mapRpcError(error: unknown): AppError {
   const like = toErrorLike(error);
 
@@ -412,7 +397,7 @@ export function mapRpcError(error: unknown): AppError {
       return {
         code: 'table_missing',
         message:
-          'Backend belum memuat fungsi yang dibutuhkan. Terapkan migration Milestone 2 (20261016093000_club_membership_rpc.sql) dan Milestone 3 (20261019120000_ride_workflow.sql) lalu coba lagi — lihat docs/SETUP_GUIDE.md.',
+          'Backend belum memuat fungsi yang dibutuhkan. Terapkan migration Milestone 2 (20261016093000_club_membership_rpc.sql) dan Milestone 3 (20261019120000_ride_workflow.sql) lalu coba lagi -- lihat docs/SETUP_GUIDE.md.',
         retryable: false,
       };
     case '23514':

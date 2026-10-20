@@ -110,21 +110,16 @@ create table public.uji_guard_pengecualian (
   primary key (tabel, policy)
 );
 
+-- Dua pengecualian wajib Milestone 4 (ADR-066) tinggal dua: jalur tulis
+-- `chat_messages` (policy `chat_insert_self_member`/`chat_update_own_text`/
+-- `chat_delete_own`) dan `hazard_reports` (`hazards_insert_self`) sudah dicabut
+-- dan diganti RPC `security definer`, sehingga keduanya tidak lagi punya policy
+-- tulis tanpa penjaga keanggotaan.
 insert into public.uji_guard_pengecualian (tabel, policy, alasan) values
-  (
-    'chat_messages',
-    'chat_delete_own',
-    'DELETE pesan teks milik sendiri. Penulis berhak menarik kembali pesannya walau sudah keluar dari perjalanan, dan baris yang terbuka hanya pesannya sendiri — tidak ada pesan atau data anggota lain yang ikut terlihat.'
-  ),
   (
     'ride_locations',
     'ride_locations_delete_self',
     'DELETE baris lokasi milik sendiri. Setelah keluar dari perjalanan, pengguna justru harus tetap dapat membersihkan riwayat lokasinya; tidak ada baris pengguna lain yang dijangkau policy ini.'
-  ),
-  (
-    'hazard_reports',
-    'hazards_insert_self',
-    'INSERT laporan hazard (peringatan jalan). Sifatnya data komunitas: hazard memang dilaporkan semua pengguna terautentikasi untuk dilihat bersama, dan kolom ride_id di tabel ini hanya konteks opsional (nullable) — bukan wadah keanggotaan yang membatasi siapa boleh melihat. Pemiliknya sudah dibatasi (`reporter_id = auth.uid()`) dan baris yang dibuat hanya baris pelapor sendiri.'
   ),
   (
     'hazard_reports',
