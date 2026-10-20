@@ -76,8 +76,9 @@ karena berkasnya ditulis ulang (perlu dikonfirmasi di perangkat — checklist GA
 (`npm run db:test` bagian 13) dan lewat HTTP API Storage dengan akun uji sementara
 (`npm run storage:test`: unggah, signed URL, penolakan lintas pengguna, lalu pembersihan penuh).
 Modul native yang dipakai (`expo-image-picker`, `expo-file-system`, `expo-image-manipulator`) **sudah
-ada di APK `v0.1.0-build19` dan `v0.1.0-build20`**, dan tetap ada di build berikutnya termasuk `v0.1.0-build23` karena dependency native itu tidak berubah sejak `fa4397e`** — diperiksa di `classes*.dex` dan bundel JS kedua
-berkas rilis itu; yang
+ada di APK `v0.1.0-build19` dan `v0.1.0-build20`** — diperiksa di `classes*.dex` dan bundel JS kedua
+berkas rilis itu — dan tetap ada di build sesudahnya (termasuk `v0.1.0-build23`) karena dependency
+native itu tidak berubah sejak `fa4397e`; yang
 belum terbukti adalah pemakaian nyata di perangkat fisik (izin galeri, hasil kompresi, signed URL
 setelah aplikasi dibuka ulang).
 
@@ -454,8 +455,9 @@ tanpa filter).
 
 Status per 20 Oktober 2026: pada `df75ba1` (tag `v0.1.0-build23`), CI **#30** dan Release APK **#23**
 hijau, sebagai run pertama yang menerbitkan tag build23. Database RLS **#5** hijau pada merge `7cce0ef`.
-`origin/main` kini `117bed3` (pencatatan build23 di `CHANGELOG.md`), dan tidak ada perubahan kode
-aplikasi setelah `df75ba1`.
+Commit kode terakhir tetap `df75ba1`; setelah itu hanya ada commit dokumentasi (`117bed3`) dan commit
+dokumentasi + komponen test (`dde55d1`, 20 Oktober 2026) — keduanya tidak mengubah isi aplikasi,
+sehingga workflow rilis melewatkan build APK.
 
 Uji RLS berjalan **di GitHub Actions**, bukan hanya lokal: workflow `database-rls` memverifikasi
 connection string menunjuk project development sebelum menyentuh database, lalu menolak lulus bila

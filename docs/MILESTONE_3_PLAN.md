@@ -4,8 +4,8 @@ Status: **Implemented · Passed locally · Passed against dev backend**. Tanggal
 **Tested on physical device: Blocked** untuk alur perjalanan dua perangkat, background/reboot, dan
 pengukuran baterai. Pemilik aplikasi melaporkan build `v0.1.0-build23` dipakai tanpa galat yang
 teramati (**owner-reported**); laporan itu tidak menaikkan status uji perangkat khusus di atas karena
-tidak disertai bukti per kasus. Peta **belum dipasang** (ADR-064 masih **Proposed**); layar menampilkan daftar posisi
-dan keadaan “peta belum tersedia” yang eksplisit, bukan peta tiruan.
+tidak disertai bukti per kasus. Peta **belum dipasang** (ADR-064 masih **Proposed**); layar
+menampilkan daftar posisi dan keadaan “peta belum tersedia” yang eksplisit, bukan peta tiruan.
 
 **Gerbang masuk:** pemilik aplikasi melaporkan bahwa Milestone 2 sudah dicoba di perangkat tanpa galat
 yang teramati. Laporan itu dicatat sebagai **owner-reported**, bukan bukti uji yang direkam repository

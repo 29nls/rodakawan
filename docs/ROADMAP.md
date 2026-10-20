@@ -163,8 +163,8 @@ teramati; tag APK dan kasus uji per kasus **tidak tersedia sebagai artefak**, ja
 sebagai laporan pemilik, bukan bukti uji terverifikasi. Basis implementasi: `749424c` (tag
 `v0.1.0-build19`, 105.904.027 byte, SHA-256 `775a3309…b3d9`); build Milestone 2 terakhir:
 `v0.1.0-build20` dari `fa4397e` (105.904.031 byte, SHA-256 `a4ae87b4…fe9d`); build terbaru saat ini:
-`v0.1.0-build23` dari `df75ba1` (106.518.751 byte, SHA-256 `2f2890…9ee7`). Implementasi `cf818be`, checklist perangkat
-`1ef13a8`, perbaikan versi Expo `a9858a9`, perbaikan generator tipe `ca2461c`. CI #26/RLS #4/Release
+`v0.1.0-build23` dari `df75ba1` (106.518.751 byte, SHA-256 `2f2890…9ee7`). Implementasi `cf818be`,
+checklist perangkat `1ef13a8`, perbaikan versi Expo `a9858a9`, perbaikan generator tipe `ca2461c`. CI #26/RLS #4/Release
 #19 hijau pada `749424c`; CI #27/Release #20 hijau pada `fa4397e`. Setelah tag hanya ada commit
 dokumentasi `ee0a0bd`.
 
