@@ -15,6 +15,7 @@ import { ScreenHeader } from '@/components/ui/ScreenHeader';
 import { SectionHeader } from '@/components/ui/SectionHeader';
 import { spacing } from '@/constants/theme';
 import { useAuthSession } from '@/features/auth/session';
+import { MapStatusCard } from '@/features/map/MapStatusCard';
 import { useAppStatus } from '@/hooks/useAppStatus';
 import { installWebCrypto } from '@/lib/crypto/webcrypto';
 import { PUBLIC_ENV_KEYS } from '@/lib/env';
@@ -236,6 +237,8 @@ export default function SystemScreen() {
           </AppText>
         ) : null}
       </Card>
+
+      <MapStatusCard />
 
       {privilegedWarning ? (
         <Card variant="accent">
