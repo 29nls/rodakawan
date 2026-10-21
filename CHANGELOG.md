@@ -41,13 +41,13 @@ bagian ini oleh workflow rilis.
   audit yang mencatat pelaku, alasan, dan waktu. Tanpa peran moderator global (ADR-067).
 - Migration `20261020090000_hazard_reports_m4.sql` dan `20261020100000_convoy_chat_m4.sql`:
   RPC `security definer`, idempotensi, batas laju, deteksi duplikat, trigger expiry/pesan sistem, dan
-  pencabutan jalur tulis langsung. **Belum diterapkan** ke project development.
+  pencabutan jalur tulis langsung. **Sudah diterapkan** ke project development.
 - Migration `20261021120000_moderation_dashboard.sql`: tabel audit `moderation_actions`, helper
   wewenang `can_moderate_*`, policy baca moderator pada `content_reports`, dan RPC
   `get_moderation_subject`/`moderate_hazard`/`moderate_chat_message`/`review_content_report`/
-  `list_moderation_actions`. **Belum diterapkan**.
+  `list_moderation_actions`. **Sudah diterapkan**.
 - Migration `20261021130000_blocked_chat_server_filter.sql`: helper `is_blocked_by_me` dan policy
-  `chat_select_ride_member` baru yang menyaring pesan teks dari pengguna yang diblokir. **Belum
+  `chat_select_ride_member` baru yang menyaring pesan teks dari pengguna yang diblokir. **Sudah
   diterapkan**.
 
 ### Perbaikan

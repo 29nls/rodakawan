@@ -97,11 +97,12 @@ klub, kendaraan utama, akses perjalanan, tiga bucket Storage, pagar policy, alur
 `20261021120000_moderation_dashboard.sql`, dan
 `20261021130000_blocked_chat_server_filter.sql`).
 
-> **Status Milestone 4 (21 Oktober 2026): empat migration terakhir BELUM diterapkan ke project
-development mana pun.** Aplikasi sudah memanggil RPC-nya, jadi pada backend yang belum dimigrasikan tab
-Peringatan, chat, dan dashboard moderasi akan menampilkan galat `PGRST202`/`42883` ("Backend belum
-memuat fungsi yang dibutuhkan"), bukan data kosong yang menyesatkan. Terapkan keempat berkas itu dengan
-urutan di bawah, lalu jalankan uji M4:
+> **Status Milestone 4 (21 Oktober 2026): keempat migration terakhir SUDAH diterapkan ke project
+> development** (terverifikasi `npx supabase migration list --linked`: 17 local = remote). Pada project
+> baru atau project lain yang belum dimigrasikan, aplikasi sudah memanggil RPC-nya sehingga tab
+> Peringatan, chat, dan dashboard moderasi menampilkan galat `PGRST202`/`42883` ("Backend belum
+> memuat fungsi yang dibutuhkan"), bukan data kosong yang menyesatkan. Terapkan keempat berkas itu
+> dengan urutan di bawah (bila belum), lalu jalankan uji M4:
 >
 > ```powershell
 > npx supabase migration list          # pastikan 20261020090000, 20261020100000, 20261021120000, 20261021130000 masih kosong di remote

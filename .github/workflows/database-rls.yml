@@ -121,6 +121,14 @@ jobs:
       #     lewat kolom kepemilikan tanpa penjaga keanggotaan (ADR-060)
       #   - `UJI RLS PERJALANAN M3 LULUS`   — state machine, consent, dan pembersihan
       #     lokasi perjalanan (ADR-065)
+      #   - `UJI RLS LAKUAN M4 LULUS`       — laporan bahaya: RPC, expiry server, rate
+      #     limit, dan jalur tulis tertutup (Milestone 4)
+      #   - `UJI RLS CHAT M4 LULUS`         — chat konvoi: idempotensi, jendela edit,
+      #     rate limit, pesan sistem, dan ride final (Milestone 4)
+      #   - `UJI MODERASI M4 LULUS`         — antrean moderasi, aksi hapus, dan audit
+      #     sesuai wewenang host/admin klub (Milestone 4)
+      #   - `UJI FILTER BLOKIR CHAT LULUS`  — pesan teks pengguna yang diblokir tidak
+      #     pernah terkirim ke pemblokir (ADR-068, Milestone 4)
       #
       # Runner "hijau palsu" (mis. berkas uji terpotong) tidak bisa lolos karena
       # `scripts/db-test.mjs` hanya melaporkan lulus bila notice itu benar-benar diterima;
@@ -143,6 +151,22 @@ jobs:
           case "${OUTPUT}" in
             *"UJI RLS PERJALANAN M3 LULUS"*) ;;
             *) MISSING="${MISSING} UJI RLS PERJALANAN M3 LULUS" ;;
+          esac
+          case "${OUTPUT}" in
+            *"UJI RLS LAKUAN M4 LULUS"*) ;;
+            *) MISSING="${MISSING} UJI RLS LAKUAN M4 LULUS" ;;
+          esac
+          case "${OUTPUT}" in
+            *"UJI RLS CHAT M4 LULUS"*) ;;
+            *) MISSING="${MISSING} UJI RLS CHAT M4 LULUS" ;;
+          esac
+          case "${OUTPUT}" in
+            *"UJI MODERASI M4 LULUS"*) ;;
+            *) MISSING="${MISSING} UJI MODERASI M4 LULUS" ;;
+          esac
+          case "${OUTPUT}" in
+            *"UJI FILTER BLOKIR CHAT LULUS"*) ;;
+            *) MISSING="${MISSING} UJI FILTER BLOKIR CHAT LULUS" ;;
           esac
           if [ -n "${MISSING}" ]; then
             echo "::error::Penanda lulus berikut tidak diterima:${MISSING}. Berkas uji berhenti sebelum seluruh asersi dijalankan."

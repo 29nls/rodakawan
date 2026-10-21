@@ -148,7 +148,7 @@ Matrix ini harus disesuaikan dengan kebijakan final, lalu diimplementasikan menj
 
 ### 8.1 Milestone 4 — jalur tulis hazard dan chat (21 Oktober 2026)
 
-Perubahan yang **sudah ditulis** di migration (belum diterapkan ke project development):
+Perubahan yang **sudah ditulis** di migration (**sudah diterapkan** ke project development):
 
 - `INSERT`/`UPDATE`/`DELETE` langsung pada `public.hazard_reports` dan `public.chat_messages`
   **dicabut** dari `authenticated` dan `anon`. Seluruh mutasi lewat RPC `security definer` dengan

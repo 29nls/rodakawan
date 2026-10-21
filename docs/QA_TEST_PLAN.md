@@ -158,7 +158,7 @@ Ditambahkan 21 Oktober 2026. Status yang dipakai sama dengan bagian 9, ditambah 
 
 | Area | Implemented | Passed locally | Dev backend | Perangkat fisik |
 | --- | --- | --- | --- | --- |
-| Hazard: RPC + expiry server + idempotensi + rate limit + duplikat | Ya | Ya (29 test) | **Blocked** (migration belum diterapkan) | — |
+| Hazard: RPC + expiry server + idempotensi + rate limit + duplikat | Ya | Ya (29 test) | **Migration diterapkan**; uji live menunggu kredensial DB | — |
 | Hazard: tab Peringatan (filter, form, ubah/lepas, konfirmasi, lapor) | Ya | Ya (6 test layar) | **Blocked** | **Blocked** |
 | Chat: RPC + keyset pagination + pesan sistem + realtime | Ya | Ya (24 test API + 9 test panel) | **Blocked** | **Blocked** |
 | Chat: pesan teks dari pengguna yang diblokir disaring di server (REST + realtime) | Ya (policy `chat_select_ride_member` + `is_blocked_by_me`) | Ya (tidak ada daftar blokir di klien) | **Blocked** | **Blocked** |
