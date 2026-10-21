@@ -1,0 +1,106 @@
+# SEMENTARA — aktivasi backend Milestone 4 (dihapus sebelum merge ke main).
+#
+# Workflow sekali-pakai dengan input `stage`:
+#   inspect  — baca riwayat migration dan objek M4 di database development (read-only)
+#   dry-run  — tampilkan SQL yang akan diterapkan `supabase db push` tanpa menulis
+#   apply    — terapkan migration yang belum tercatat (membutuhkan hasil inspect/dry-run yang bersih)
+#   test     — jalankan seluruh berkas uji RLS (7 berkas) lewat `npm run db:test`
+#   types    — regenerate database.generated.ts lalu unggah sebagai artifact
+#   all      — inspect → dry-run → apply → test → types berurutan (dipakai setelah
+#              inspect terpisah menunjukkan hanya migration M4 yang tertinggal)
+#
+# Aturan keamanan sama dengan database-rls.yml: target harus project development
+# (ref xvmcpfkkveeaevfcvfug) dan nilai connection string tidak pernah dicetak.
+
+name: M4 backend activation (temporary)
+
+on:
+  workflow_dispatch:
+    inputs:
+      stage:
+        description: 'Tahap yang dijalankan'
+        required: true
+        default: 'inspect'
+        type: choice
+        options: [inspect, dry-run, apply, test, types, all]
+
+permissions:
+  contents: read
+
+jobs:
+  db:
+    name: Aktivasi backend Milestone 4
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      CI: 'true'
+      EXPO_NO_TELEMETRY: '1'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Siapkan Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24.x'
+          cache: npm
+
+      - name: Pasang dependency dari lockfile
+        run: npm ci
+
+      - name: Pastikan targetnya database development (nilai tidak dicetak)
+        env:
+          DATABASE_URL: ${{ secrets.DB_TEST_DATABASE_URL }}
+        run: |
+          DEV_REF="xvmcpfkkveeaevfcvfug"
+          if [ -z "${DATABASE_URL}" ]; then
+            echo "::error::Secret DB_TEST_DATABASE_URL belum diatur."
+            exit 1
+          fi
+          case "${DATABASE_URL}" in
+            *"${DEV_REF}"*) echo "Secret tersedia dan menunjuk project development; isinya tidak ditampilkan." ;;
+            *)
+              echo "::error::DATABASE_URL tidak menunjuk project development (ref ${DEV_REF})."
+              exit 1
+              ;;
+          esac
+
+      - name: Inspect skema (read-only)
+        if: inputs.stage == 'inspect' || inputs.stage == 'all'
+        env:
+          DATABASE_URL: ${{ secrets.DB_TEST_DATABASE_URL }}
+        run: node scripts/db-inspect.mjs
+
+      - name: Dry-run migration (tanpa menulis)
+        if: inputs.stage == 'dry-run' || inputs.stage == 'all'
+        env:
+          DATABASE_URL: ${{ secrets.DB_TEST_DATABASE_URL }}
+        run: npx --yes supabase@2.121.0 db push --dry-run --db-url "${DATABASE_URL}"
+
+      - name: Terapkan migration yang tertinggal
+        if: inputs.stage == 'apply' || inputs.stage == 'all'
+        env:
+          DATABASE_URL: ${{ secrets.DB_TEST_DATABASE_URL }}
+        run: |
+          printf 'y
+' | npx --yes supabase@2.121.0 db push --db-url "${DATABASE_URL}"
+
+      - name: Jalankan seluruh uji RLS (7 berkas)
+        if: inputs.stage == 'test' || inputs.stage == 'all'
+        env:
+          DATABASE_URL: ${{ secrets.DB_TEST_DATABASE_URL }}
+        run: npm run db:test
+
+      - name: Regenerate tipe database
+        if: inputs.stage == 'types' || inputs.stage == 'all'
+        env:
+          DATABASE_URL: ${{ secrets.DB_TEST_DATABASE_URL }}
+        run: npm run db:types
+
+      - name: Unggah tipe hasil generate
+        if: inputs.stage == 'types' || inputs.stage == 'all'
+        uses: actions/upload-artifact@v7
+        with:
+          name: database.generated.ts
+          path: src/lib/supabase/database.generated.ts
+          retention-days: 7
