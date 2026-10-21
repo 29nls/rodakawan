@@ -1,14 +1,18 @@
 # Rencana Milestone 4 — Laporan bahaya jalan & chat konvoi
 
-Status: **Diimplementasikan (kode), backend belum diterapkan.** Rencana ditulis 2026-10-20; implementasi
+Status: **Diimplementasikan (kode); migration M4 sudah diterapkan ke project development (17/17
+paritas), tetapi uji SQL RLS-nya belum dijalankan live (menunggu kredensial DB).** Rencana ditulis
+2026-10-20; implementasi
 21 Oktober 2026. Pemilik produk memilih jalur 2 di bawah: keputusan peta (ADR-064) dan uji perangkat
 khusus M3 **ditunda eksplisit**, dan M4 dikerjakan **tanpa marker peta**.
 
 Yang sudah ada di repository:
 
-- migration `supabase/migrations/20261020090000_hazard_reports_m4.sql` (bahaya) dan
-  `20261020100000_convoy_chat_m4.sql` (chat, pesan sistem, moderasi) — **belum diterapkan** ke project
-development;
+- migration `supabase/migrations/20261020090000_hazard_reports_m4.sql` (bahaya),
+  `20261020100000_convoy_chat_m4.sql` (chat, pesan sistem),
+  `20261021120000_moderation_dashboard.sql` (moderasi), dan
+  `20261021130000_blocked_chat_server_filter.sql` (filter blokir) — **sudah diterapkan** ke project
+development (terverifikasi lewat `npx supabase migration list --linked`: 17 local = remote);
 - `src/features/hazards/{api,errors,geo,labels}.ts` + tab `src/app/(tabs)/hazards.tsx`;
 - `src/features/chat/{api,errors}.ts` + `src/features/chat/ChatPanel.tsx`, dipasang di
   `src/app/ride.tsx`;

@@ -227,7 +227,8 @@ aktif; tracking tidak berjalan tanpa ride aktif dan opt-in.
 
 ## Milestone 4 — Hazard reports dan convoy chat
 
-**Status: diimplementasikan dan lulus lokal; backend belum diterapkan.** Pemilik produk memilih jalur
+**Status: diimplementasikan dan lulus lokal; migration M4 sudah diterapkan ke development (17/17),
+uji RLS live menunggu kredensial.** Pemilik produk memilih jalur
 kedua [`docs/MILESTONE_4_PLAN.md`](MILESTONE_4_PLAN.md): menunda keputusan peta (ADR-064) dan uji
 perangkat khusus M3, lalu mengerjakan M4 **tanpa marker peta**. Penundaan itu bukan bukti bahwa uji
 M3 sudah lulus.
@@ -249,12 +250,15 @@ M3 sudah lulus.
       perjalanan/admin klub, tiga tindakan (hapus konten, abaikan, tandai ditinjau), dan jejak audit
       `moderation_actions` yang hanya bisa dibaca lewat RPC (ADR-067).
 
-**Belum (blocked):** migration `20261020090000_hazard_reports_m4.sql`,
-`20261020100000_convoy_chat_m4.sql`, dan `20261021120000_moderation_dashboard.sql` belum diterapkan ke
-project development, jadi uji RLS/RPC M4 (`supabase/tests/rls_hazards_test.sql`,
-`rls_chat_test.sql`, `rls_moderation_m4_test.sql`) belum pernah dijalankan dan realtime lintas
-perangkat belum dibuktikan. CI untuk `2b84ec4` juga gagal di Lint; perbaikannya sudah diverifikasi
-lokal tetapi belum di-push.
+**Migration sudah diterapkan:** keempat migration M4 (`20261020090000_hazard_reports_m4.sql`,
+`20261020100000_convoy_chat_m4.sql`, `20261021120000_moderation_dashboard.sql`,
+`20261021130000_blocked_chat_server_filter.sql`) sudah masuk project development — terverifikasi
+lewat `npx supabase migration list --linked` (17 local = remote, tanpa selisih).
+
+**Belum (blocked):** uji RLS/RPC M4 (`supabase/tests/rls_hazards_test.sql`, `rls_chat_test.sql`,
+`rls_moderation_m4_test.sql`, `rls_blocked_chat_test.sql`) **belum pernah dijalankan live** karena
+kredensial database (`.env.db`) belum tersedia di lingkungan kerja ini, dan realtime lintas perangkat
+belum dibuktikan.
 
 **Exit criteria:** report kedaluwarsa tidak aktif; chat tidak dapat dibaca non-member; retry tidak
 membuat duplicate message; hanya host/admin klub yang dapat menghapus konten dan setiap penghapusan

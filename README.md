@@ -38,9 +38,9 @@ Istilah status dipakai konsisten di seluruh dokumentasi:
 | Milestone 3: perjalanan klub (buat, undang, gabung, keluar, host memulai/menyelesaikan/membatalkan) | Ya — RPC transactional, state machine di database | Ya (27 test fitur + 20 test layar, termasuk 11 test formulir buat/ubah) | **Ya** (uji RLS/RPC 67 perintah) | **Blocked** (dua perangkat) |
 | Milestone 3: berbagi lokasi opt-in (foreground + background) | Ya — consent terpisah dari izin OS, sampling 15 dtk/25 m, basi 60 dtk, lokasi terakhir dihapus saat opt-out/keluar/ride final | Ya | **Ya** (uji allow/deny lokasi) | **Blocked** (izin, GPS mati, force-stop, baterai 30 menit) |
 | Milestone 3: peta konvoi | **Belum** — ADR-064 masih **Proposed** (rekomendasi MapLibre + MapTiler Flex, riset ulang 20 Oktober 2026); layar menampilkan daftar posisi + status kesegaran, bukan peta tiruan | — | — | — |
-| Milestone 4: laporan bahaya jalan (buat, filter, ubah/lepas, konfirmasi, laporkan) | Ya — RPC transaksional, expiry dihitung server, idempotensi + rate limit + deteksi duplikat di database; tanpa peta, daftar memakai label area perkiraan | Ya (29 test fitur + 6 test layar) | **Blocked** — migration M4 belum diterapkan ke project development | **Blocked** (belum ada build perangkat) |
-| Milestone 4: chat konvoi (teks, ubah/hapus 15 menit, pesan sistem, realtime, laporkan, blokir) | Ya — Postgres Changes pada `chat_messages`, keyset pagination, idempotensi `client_message_id`, panel chat di detail perjalanan; pesan teks dari pengguna yang diblokir disaring **di server** (policy, ADR-068), bukan di UI | Ya (24 test API + 9 test panel) | **Blocked** — migration M4 belum diterapkan | **Blocked** |
-| Milestone 4: moderasi (`content_reports`, `moderation_actions`, `user_blocks`) | Ya — pelaporan lewat RPC `report_content`, dashboard `/moderation` untuk host perjalanan/admin klub dengan aksi hapus konten (soft delete), abaikan, dan tandai ditinjau, jejak audit yang hanya bisa dibaca lewat RPC; **tanpa** peran moderator global (ADR-067) | Ya (16 test layanan + 8 test layar) | **Blocked** — migration moderasi belum diterapkan | — |
+| Milestone 4: laporan bahaya jalan (buat, filter, ubah/lepas, konfirmasi, laporkan) | Ya — RPC transaksional, expiry dihitung server, idempotensi + rate limit + deteksi duplikat di database; tanpa peta, daftar memakai label area perkiraan | Ya (29 test fitur + 6 test layar) | **Migration diterapkan**; uji RLS live menunggu kredensial DB | **Blocked** (belum ada build perangkat) |
+| Milestone 4: chat konvoi (teks, ubah/hapus 15 menit, pesan sistem, realtime, laporkan, blokir) | Ya — Postgres Changes pada `chat_messages`, keyset pagination, idempotensi `client_message_id`, panel chat di detail perjalanan; pesan teks dari pengguna yang diblokir disaring **di server** (policy, ADR-068), bukan di UI | Ya (24 test API + 9 test panel) | **Migration diterapkan**; uji RLS live menunggu kredensial DB | **Blocked** |
+| Milestone 4: moderasi (`content_reports`, `moderation_actions`, `user_blocks`) | Ya — pelaporan lewat RPC `report_content`, dashboard `/moderation` untuk host perjalanan/admin klub dengan aksi hapus konten (soft delete), abaikan, dan tandai ditinjau, jejak audit yang hanya bisa dibaca lewat RPC; **tanpa** peran moderator global (ADR-067) | Ya (16 test layanan + 8 test layar) | **Migration diterapkan**; uji RLS live menunggu kredensial DB | — |
 | Milestone 5+: feed, musik, voice PTT | **Belum** | — | — | — |
 
 **Blocked** yang tersisa berarti: alur itu belum dijalankan terhadap backend nyata atau belum diuji di
@@ -49,11 +49,16 @@ HP fisik. Status **Ya** pada kolom perangkat Milestone 2 berasal dari laporan pe
 atau tag rilis per kasus yang disertakan. Project Supabase development **sudah ada**
 sejak 13 Oktober 2026, **tiga belas** migration (sampai `20261019120000_ride_workflow.sql`) sudah
 diterapkan, uji RLS sudah lulus (ADR-035), dan lubang privasi follow serta integritas detail privat
-kendaraan sudah diperbaiki dengan uji allow/deny (ADR-039, ADR-040). Tiga migration Milestone 4 —
-`20261020090000_hazard_reports_m4.sql`, `20261020100000_convoy_chat_m4.sql`, dan
-`20261021120000_moderation_dashboard.sql` — **belum diterapkan** ke project development mana pun;
-karena itu seluruh status “Dev backend” untuk hazard, chat, dan moderasi tetap **Blocked**, bukan
-lulus. Langkah penerapannya ada di
+kendaraan sudah diperbaiki dengan uji allow/deny (ADR-039, ADR-040). Empat migration Milestone 4 —
+`20261020090000_hazard_reports_m4.sql`, `20261020100000_convoy_chat_m4.sql`,
+`20261021120000_moderation_dashboard.sql`, dan
+`20261021130000_blocked_chat_server_filter.sql` — **sudah diterapkan** ke project development
+(terverifikasi lewat `npx supabase migration list --linked`: 17 migration local = remote, tanpa
+selisih). Namun uji SQL RLS Milestone 4 (`rls_hazards_test.sql`, `rls_chat_test.sql`,
+`rls_moderation_m4_test.sql`, `rls_blocked_chat_test.sql`) **belum dijalankan live** karena
+kredensial database (`.env.db`) belum tersedia di lingkungan kerja ini, jadi seluruh status “Dev
+backend” untuk hazard, chat, dan moderasi tetap **Blocked** — bukan lulus — sampai `npm run
+db:test` hijau terhadap project development. Langkah penerapannya ada di
 [`docs/SETUP_GUIDE.md`](docs/SETUP_GUIDE.md#4-menerapkan-migration). Semua langkah yang dapat
 dijalankan tanpa backend sudah dijalankan — lihat [Perintah pengujian](#perintah-pengujian).
 

@@ -2,8 +2,19 @@
 -- ============================================================================
 -- Uji RLS/RPC Milestone 4 — laporan bahaya jalan.
 -- ============================================================================
+-- Desain yang diuji (lihat supabase/migrations/20261020090000_hazard_reports_m4.sql
+-- dan MILESTONE_4_PLAN bagian 2): laporan bahaya bersifat GLOBAL per area —
+-- bukan di-scope ke klub/perjalanan. `ride_id` hanya konteks opsional, dan
+-- pelapor hanya harus peserta ride BILA menautkan laporan ke ride tertentu.
+-- Seluruh tulis melewati RPC `security definer`; jalur tulis langsung dicabut.
+--
 -- Seluruh asersi berjalan dalam satu transaksi dan diakhiri ROLLBACK, jadi tidak
 -- ada pengguna/laporan uji yang tertinggal.
+--
+-- Pola penangkapan galat: blok inner menangkap SQLSTATE yang diharapkan lalu
+-- `return`/null; bila RPC justru SUKSES, baris `raise exception 'UJI GAGAL ...'`
+-- (SQLSTATE P0001) ditembak dan TIDAK tertangkap handler (khusus SQLSTATE itu),
+-- sehingga kegagalan uji selalu terlihat jelas — tidak ada "hijau palsu".
 -- ============================================================================
 
 begin;
@@ -47,369 +58,474 @@ $$;
 -- 1. Tabel konteks uji hanya hidup di dalam transaksi dan ikut ROLLBACK.
 create table public.uji_m4_konteks (
   nama text primary key,
-  club_id uuid,
-  ride_id uuid
+  id uuid
 );
 grant select, insert, update, delete on public.uji_m4_konteks to authenticated;
 
--- 2. Empat akun: A host, B anggota, C non-anggota, D pelapor.
+-- 2. Lima akun: A host+anggota ride, B anggota ride, C orang luar, D pelapor
+--    rate-limit, E pelapor duplikat/edit/hapus/kedaluwarsa.
 insert into auth.users (
   id, instance_id, aud, role, email, email_confirmed_at,
   raw_app_meta_data, raw_user_meta_data, created_at, updated_at
-) values (
-  '11111111-1111-1111-1111-111111111111',
-  '00000000-0000-0000-0000-000000000000',
-  'authenticated', 'authenticated', 'm4.a@contoh.test', now(),
-  '{"provider":"email","providers":["email"]}',
-  '{"username":"m4_user_a","display_name":"M4 User A"}',
-  now(), now()
-), (
-  '22222222-2222-2222-2222-222222222222',
-  '00000000-0000-0000-0000-000000000000',
-  'authenticated', 'authenticated', 'm4.b@contoh.test', now(),
-  '{"provider":"email","providers":["email"]}',
-  '{"username":"m4_user_b","display_name":"M4 User B"}',
-  now(), now()
-), (
-  '33333333-3333-3333-3333-333333333333',
-  '00000000-0000-0000-0000-000000000000',
-  'authenticated', 'authenticated', 'm4.c@contoh.test', now(),
-  '{"provider":"email","providers":["email"]}',
-  '{"username":"m4_user_c","display_name":"M4 User C"}',
-  now(), now()
-), (
-  '44444444-4444-4444-4444-444444444444',
-  '00000000-0000-0000-0000-000000000000',
-  'authenticated', 'authenticated', 'm4.d@contoh.test', now(),
-  '{"provider":"email","providers":["email"]}',
-  '{"username":"m4_user_d","display_name":"M4 User D"}',
-  now(), now()
-);
+) values
+  ('11111111-1111-4111-8111-111111111111','00000000-0000-0000-0000-000000000000','authenticated','authenticated','m4hz.a@contoh.test',now(),'{"provider":"email","providers":["email"]}','{"username":"m4hz_a","display_name":"M4Hz A"}',now(),now()),
+  ('22222222-2222-4222-8222-222222222222','00000000-0000-0000-0000-000000000000','authenticated','authenticated','m4hz.b@contoh.test',now(),'{"provider":"email","providers":["email"]}','{"username":"m4hz_b","display_name":"M4Hz B"}',now(),now()),
+  ('33333333-3333-4333-8333-333333333333','00000000-0000-0000-0000-000000000000','authenticated','authenticated','m4hz.c@contoh.test',now(),'{"provider":"email","providers":["email"]}','{"username":"m4hz_c","display_name":"M4Hz C"}',now(),now()),
+  ('44444444-4444-4444-8444-444444444444','00000000-0000-0000-0000-000000000000','authenticated','authenticated','m4hz.d@contoh.test',now(),'{"provider":"email","providers":["email"]}','{"username":"m4hz_d","display_name":"M4Hz D"}',now(),now()),
+  ('55555555-5555-4555-8555-555555555555','00000000-0000-0000-0000-000000000000','authenticated','authenticated','m4hz.e@contoh.test',now(),'{"provider":"email","providers":["email"]}','{"username":"m4hz_e","display_name":"M4Hz E"}',now(),now());
 
--- 3. Klub privat dibuat A.
+-- 3. Konteks ride: A membuat klub + perjalanan (A otomatis host `joined`);
+--    B bergabung ke klub (disetujui A) lalu ke perjalanan. C/D/E orang luar.
 set local role authenticated;
-set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
-
+set local request.jwt.claims = '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}';
 do $$
 declare
   v_club jsonb;
+  v_ride public.rides;
 begin
-  v_club := public.create_club(
-    'Uji Hazard M4',
-    'uji-hazard-m4',
-    'Klub untuk uji Milestone 4.',
-    'private',
-    'approval'
-  );
-  insert into public.uji_m4_konteks (nama, club_id)
-  values ('klub', (v_club ->> 'id')::uuid);
+  v_club := public.create_club('Uji Hazard M4','uji-hazard-m4','Klub untuk uji hazard Milestone 4.','private','approval');
+  insert into public.uji_m4_konteks (nama, id) values ('klub', (v_club ->> 'id')::uuid);
+
+  v_ride := public.create_ride((v_club ->> 'id')::uuid, 'Ride Hazard M4', now() + interval '1 hour', 'Perjalanan uji hazard.', 'Titik kumpul', 'Tujuan');
+  insert into public.uji_m4_konteks (nama, id) values ('ride', v_ride.id);
 end;
 $$;
 
-set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
-
+set local request.jwt.claims = '{"sub":"22222222-2222-4222-8222-222222222222","role":"authenticated"}';
 do $$
-declare
-  v_club uuid;
 begin
-  select club_id into v_club from public.uji_m4_konteks where nama = 'klub';
-  perform public.request_club_membership(v_club);
+  perform public.request_club_membership((select id from public.uji_m4_konteks where nama = 'klub'));
 end;
 $$;
 
-set local request.jwt.claims = '{"sub":"44444444-4444-4444-4444-444444444444","role":"authenticated"}';
-
+set local request.jwt.claims = '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}';
 do $$
-declare
-  v_club uuid;
 begin
-  select club_id into v_club from public.uji_m4_konteks where nama = 'klub';
-  perform public.request_club_membership(v_club);
+  perform public.review_club_membership((select id from public.uji_m4_konteks where nama = 'klub'), '22222222-2222-4222-8222-222222222222', true);
 end;
 $$;
 
-set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
-
+set local request.jwt.claims = '{"sub":"22222222-2222-4222-8222-222222222222","role":"authenticated"}';
 do $$
-declare
-  v_club uuid;
 begin
-  select club_id into v_club from public.uji_m4_konteks where nama = 'klub';
-  perform public.review_club_membership(v_club, '22222222-2222-2222-2222-222222222222', true);
-  perform public.review_club_membership(v_club, '44444444-4444-4444-4444-444444444444', true);
+  perform public.join_ride((select id from public.uji_m4_konteks where nama = 'ride'));
 end;
 $$;
 
--- 4. Pembuatan laporan hanya untuk anggota klub.
-set local request.jwt.claims = '{"sub":"33333333-3333-3333-3333-333333333333","role":"authenticated"}';
-
+-- 4. Laporan GLOBAL: pengguna terautentikasi membuat laporan tanpa konteks ride;
+--    `expires_at` dihitung server dari `created_at` + kebijakan kategori.
+set local request.jwt.claims = '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}';
 do $$
 declare
-  v_club uuid;
+  v_h public.hazard_reports;
 begin
-  select club_id into v_club from public.uji_m4_konteks where nama = 'klub';
-  begin
-    perform public.create_hazard('pothole', 'moderate', -6.2, 106.8, 'Lubang di jalan', null, null);
-    raise exception 'UJI GAGAL: non-anggota klub dapat membuat laporan bahaya';
-  exception
-    when insufficient_privilege then null;
-  end;
-end;
-$$;
+  v_h := public.create_hazard('pothole','moderate',-6.2,106.8,'Lubang global',null,'a-client-001');
 
--- 5. Hanya pelapor yang boleh membaca laporannya sendiri (policy reporter).
-set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
-
-do $$
-declare
-  v_hazard uuid;
-begin
-  select id into v_hazard from public.hazard_reports where reporter_id = auth.uid() limit 1;
-
-  if not found then
-    raise exception 'UJI GAGAL: tidak ada laporan untuk pelapor ini';
+  if v_h.id is null then
+    raise exception 'UJI GAGAL: laporan global tidak dibuat';
   end if;
 
-  -- Pelapor sendiri boleh membaca laporannya (via policy hazards_select_current_or_reporter)
-  perform public.confirm_hazard(v_hazard);
+  -- pothole = 86400 detik (24 jam) per hazard_expiry_seconds; fungsi itu sendiri
+  -- di-revoke dari authenticated, jadi angka kebijakannya dipakai langsung di sini.
+  if v_h.expires_at <> v_h.created_at + interval '24 hours' then
+    raise exception 'UJI GAGAL: expires_at tidak dihitung server (created=%, expires=%)', v_h.created_at, v_h.expires_at;
+  end if;
+
+  insert into public.uji_m4_konteks (nama, id) values ('h_a_global', v_h.id);
 end;
 $$;
 
--- 6. Non-anggota tidak boleh membaca laporan aktif klub.
-set local request.jwt.claims = '{"sub":"33333333-3333-3333-3333-333333333333","role":"authenticated"}';
-
+-- 5. Idempotensi: client_report_id sama + pelapor sama → baris yang sama.
 do $$
 declare
-  v_count int;
+  v_first uuid;
+  v_again public.hazard_reports;
 begin
-  select count(*) into v_count from public.hazard_reports h
-  where h.status = 'active'
-    and h.expires_at > now();
+  select id into v_first from public.uji_m4_konteks where nama = 'h_a_global';
+  v_again := public.create_hazard('pothole','moderate',-6.2,106.8,'Ulang', null, 'a-client-001');
 
-  -- Policy hazards_select_current_or_reporter hanya membaca laporan aktif
-  -- dan reporter; non-anggota klub tidak boleh membaca laporan klub
-  if v_count > 0 then
-    raise exception 'UJI GAGAL: non-anggota membaca laporan aktif (% baris)', v_count;
+  if v_again.id is distinct from v_first then
+    raise exception 'UJI GAGAL: idempotensi client_report_id tidak mengembalikan baris yang sama';
   end if;
 end;
 $$;
 
--- 7. Hanya host/anggota ride yang boleh menautkan laporan ke perjalanan.
-set local request.jwt.claims = '{"sub":"33333333-3333-3333-3333-333333333333","role":"authenticated"}';
-
-do $$
-declare
-  v_club uuid;
-  v_hazard uuid;
-begin
-  select club_id into v_club from public.uji_m4_konteks where nama = 'klub';
-  v_hazard := public.create_hazard('pothole', 'moderate', -6.2, 106.8, 'Lubang dengan foto', null, null);
-
-  -- Bila tidak ada ride, create_hazard harus gagal atau sukses tanpa ride_id
-  -- Cek bahwa laporan dibuat dengan benar
-  if v_hazard is null then
-    raise exception 'UJI GAGAL: laporan bahaya tidak dibuat';
-  end if;
-end;
-$$;
-
--- 8. RPC create_hazard idempoten via client_report_id.
-set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
-
-do $$
-declare
-  v_hazard1 public.hazard_reports;
-  v_hazard2 public.hazard_reports;
-  v_same_id uuid;
-begin
-  v_hazard1 := public.create_hazard('pothole', 'moderate', -6.2, 106.8, 'Laporan pertama', null, 'client-uid-001');
-  v_hazard2 := public.create_hazard('pothole', 'moderate', -6.2, 106.8, 'Laporan pertama (ulang)', null, 'client-uid-001');
-
-  -- Harus mengembalikan baris yang sama (idempoten)
-  if v_hazard1.id <> v_hazard2.id then
-    raise exception 'UJI GAGAL: create_hazard idempoten tidak bekerja';
-  end if;
-end;
-$$;
-
--- 9. Rate limit create_hazard: 5 laporan / 10 menit.
-set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
-
+-- 6. Rate limit 5 laporan / 10 menit / pelapor (D). Percobaan ke-6 ditolak P0001.
+set local request.jwt.claims = '{"sub":"44444444-4444-4444-8444-444444444444","role":"authenticated"}';
 do $$
 declare
   v_i int;
-  v_exc exception;
+  v_state text := null;
+  v_detail text := null;
 begin
   for v_i in 1..6 loop
     begin
-      perform public.create_hazard('pothole', 'moderate', -6.2, 106.8, 'Laporan rate limit', null, null);
-    exception
-      when exception then
-        -- Harus error rate limit pada upaya ke-6
-        get stacked diag v_exc;
+      perform public.create_hazard('pothole','moderate', -5.0 + (v_i * 0.02), 107.0, 'Rate limit', null, null);
+    exception when others then
+      get stacked diag v_state = RETURNED_SQLSTATE, v_detail = PG_EXCEPTION_DETAIL;
+      exit when v_state = 'P0001';
     end;
   end loop;
 
-  -- Uji bahwa upaya ke-6 mengembalikan error rate limit
-  if v_exc is null or not (v_exc detail like 'hazard_rate_limit%' or v_exc message like 'Terlalu banyak laporan') then
-    raise exception 'UJI GAGAL: rate limit create_hazard tidak terdeteksi';
+  if v_state is distinct from 'P0001' or v_detail is distinct from 'hazard_rate_limit' then
+    raise exception 'UJI GAGAL: rate limit create_hazard tidak terdeteksi (state=%, detail=%)', v_state, v_detail;
   end if;
 end;
 $$;
 
--- 10. Konfirmasi laporan: satu konfirmasi per pengguna per laporan.
-set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
-
+-- 7. Duplikat terdekat: kategori sama dalam ±50 m / 10 menit ditolak 23505.
+set local request.jwt.claims = '{"sub":"55555555-5555-4555-8555-555555555555","role":"authenticated"}';
 do $$
 declare
-  v_hazard uuid;
+  v_h public.hazard_reports;
+  v_state text := null;
+  v_detail text := null;
+begin
+  v_h := public.create_hazard('crash','high',-7.0,108.0,'Kecelakaan pertama',null,null);
+  insert into public.uji_m4_konteks (nama, id) values ('h_e_dup', v_h.id);
+
+  begin
+    perform public.create_hazard('crash','high',-7.0001,108.0001,'Duplikat dekat',null,null);
+    raise exception 'UJI GAGAL: duplikat terdekat diterima';
+  exception when others then
+    get stacked diag v_state = RETURNED_SQLSTATE, v_detail = PG_EXCEPTION_DETAIL;
+  end;
+
+  if v_state is distinct from '23505' or v_detail is distinct from 'hazard_duplicate_nearby' then
+    raise exception 'UJI GAGAL: duplikat salah ditangani (state=%, detail=%)', v_state, v_detail;
+  end if;
+end;
+$$;
+
+-- 8. Koordinat di luar rentang ditolak 22023.
+do $$
+declare
+  v_state text := null;
+  v_detail text := null;
+begin
+  begin
+    perform public.create_hazard('pothole','moderate',99.0,106.8,'Lintang salah',null,null);
+    raise exception 'UJI GAGAL: koordinat di luar rentang diterima';
+  exception when others then
+    get stacked diag v_state = RETURNED_SQLSTATE, v_detail = PG_EXCEPTION_DETAIL;
+  end;
+
+  if v_state is distinct from '22023' or v_detail is distinct from 'hazard_invalid_coordinates' then
+    raise exception 'UJI GAGAL: validasi koordinat salah (state=%, detail=%)', v_state, v_detail;
+  end if;
+end;
+$$;
+
+-- 9. Penautan ke ride: hanya peserta ride. Orang luar (C) ditolak 42501; host
+--    ride (A) dapat menautkan.
+set local request.jwt.claims = '{"sub":"33333333-3333-4333-8333-333333333333","role":"authenticated"}';
+do $$
+declare
+  v_ride uuid;
+  v_state text := null;
+  v_detail text := null;
+begin
+  select id into v_ride from public.uji_m4_konteks where nama = 'ride';
+
+  begin
+    perform public.create_hazard('pothole','moderate',-6.9,107.9,'Taut ride', v_ride, null);
+    raise exception 'UJI GAGAL: non-peserta ride menautkan laporan ke ride';
+  exception when others then
+    get stacked diag v_state = RETURNED_SQLSTATE, v_detail = PG_EXCEPTION_DETAIL;
+  end;
+
+  if v_state is distinct from '42501' or v_detail is distinct from 'hazard_ride_not_member' then
+    raise exception 'UJI GAGAL: penautan ride salah ditangani (state=%, detail=%)', v_state, v_detail;
+  end if;
+end;
+$$;
+
+set local request.jwt.claims = '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}';
+do $$
+declare
+  v_ride uuid;
+  v_h public.hazard_reports;
+begin
+  select id into v_ride from public.uji_m4_konteks where nama = 'ride';
+  v_h := public.create_hazard('pothole','moderate',-6.25,106.85,'Taut ride host', v_ride, null);
+  if v_h.ride_id is distinct from v_ride then
+    raise exception 'UJI GAGAL: host ride tidak dapat menautkan laporannya';
+  end if;
+  insert into public.uji_m4_konteks (nama, id) values ('h_a_ride', v_h.id);
+end;
+$$;
+
+-- 10. Hanya pelapor yang dapat mengubah laporannya.
+set local request.jwt.claims = '{"sub":"55555555-5555-4555-8555-555555555555","role":"authenticated"}';
+do $$
+declare
+  v_h public.hazard_reports;
+begin
+  v_h := public.create_hazard('flood','info',-7.1,108.1,'Untuk edit',null,null);
+  insert into public.uji_m4_konteks (nama, id) values ('h_e_edit', v_h.id);
+end;
+$$;
+
+set local request.jwt.claims = '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}';
+do $$
+declare
+  v_h uuid;
+  v_state text := null;
+  v_detail text := null;
+begin
+  select id into v_h from public.uji_m4_konteks where nama = 'h_e_edit';
+
+  begin
+    perform public.update_hazard(v_h, 'high', 'Dicoba orang lain');
+    raise exception 'UJI GAGAL: pengguna lain mengubah laporan orang';
+  exception when others then
+    get stacked diag v_state = RETURNED_SQLSTATE, v_detail = PG_EXCEPTION_DETAIL;
+  end;
+
+  if v_state is distinct from '42501' or v_detail is distinct from 'hazard_not_reporter' then
+    raise exception 'UJI GAGAL: update lintas-pelapor salah (state=%, detail=%)', v_state, v_detail;
+  end if;
+end;
+$$;
+
+set local request.jwt.claims = '{"sub":"55555555-5555-4555-8555-555555555555","role":"authenticated"}';
+do $$
+declare
+  v_h uuid;
+  v_u public.hazard_reports;
+begin
+  select id into v_h from public.uji_m4_konteks where nama = 'h_e_edit';
+  v_u := public.update_hazard(v_h, 'high', 'Diperbarui pelapor');
+  if v_u.severity <> 'high' then
+    raise exception 'UJI GAGAL: pelapor tidak dapat mengubah severity laporannya';
+  end if;
+end;
+$$;
+
+-- 11. Jendela edit 15 menit: setelah lewat, pelapor sendiri ditolak 23514.
+set local request.jwt.claims = '{"sub":"55555555-5555-4555-8555-555555555555","role":"authenticated"}';
+do $$
+declare
+  v_h public.hazard_reports;
+begin
+  v_h := public.create_hazard('flood','info',-7.2,108.2,'Untuk jendela edit',null,null);
+  insert into public.uji_m4_konteks (nama, id) values ('h_e_win', v_h.id);
+end;
+$$;
+
+reset role;
+do $$
+declare v_id uuid;
+begin
+  select id into v_id from public.uji_m4_konteks where nama = 'h_e_win';
+  update public.hazard_reports set created_at = now() - interval '16 minutes' where id = v_id;
+end;
+$$;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"55555555-5555-4555-8555-555555555555","role":"authenticated"}';
+do $$
+declare
+  v_h uuid;
+  v_state text := null;
+  v_detail text := null;
+begin
+  select id into v_h from public.uji_m4_konteks where nama = 'h_e_win';
+  begin
+    perform public.update_hazard(v_h, 'high', 'Terlambat');
+    raise exception 'UJI GAGAL: update setelah jendela 15 menit diterima';
+  exception when others then
+    get stacked diag v_state = RETURNED_SQLSTATE, v_detail = PG_EXCEPTION_DETAIL;
+  end;
+
+  if v_state is distinct from '23514' or v_detail is distinct from 'hazard_edit_window' then
+    raise exception 'UJI GAGAL: jendela edit salah ditangani (state=%, detail=%)', v_state, v_detail;
+  end if;
+end;
+$$;
+
+-- 12. Hapus: hanya pelapor; status `removed`; jendela 15 menit berlaku.
+set local request.jwt.claims = '{"sub":"55555555-5555-4555-8555-555555555555","role":"authenticated"}';
+do $$
+declare
+  v_h public.hazard_reports;
+begin
+  v_h := public.create_hazard('flood','info',-7.3,108.3,'Untuk hapus',null,null);
+  insert into public.uji_m4_konteks (nama, id) values ('h_e_rm', v_h.id);
+end;
+$$;
+
+set local request.jwt.claims = '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}';
+do $$
+declare
+  v_h uuid;
+  v_state text := null;
+  v_detail text := null;
+begin
+  select id into v_h from public.uji_m4_konteks where nama = 'h_e_rm';
+  begin
+    perform public.remove_hazard(v_h);
+    raise exception 'UJI GAGAL: pengguna lain menghapus laporan orang';
+  exception when others then
+    get stacked diag v_state = RETURNED_SQLSTATE, v_detail = PG_EXCEPTION_DETAIL;
+  end;
+
+  if v_state is distinct from '42501' or v_detail is distinct from 'hazard_not_reporter' then
+    raise exception 'UJI GAGAL: hapus lintas-pelapor salah (state=%, detail=%)', v_state, v_detail;
+  end if;
+end;
+$$;
+
+set local request.jwt.claims = '{"sub":"55555555-5555-4555-8555-555555555555","role":"authenticated"}';
+do $$
+declare
+  v_h uuid;
+  v_r public.hazard_reports;
+begin
+  select id into v_h from public.uji_m4_konteks where nama = 'h_e_rm';
+  v_r := public.remove_hazard(v_h);
+  if v_r.status <> 'removed' then
+    raise exception 'UJI GAGAL: remove_hazard tidak menyetel status removed (%)', v_r.status;
+  end if;
+end;
+$$;
+
+-- 13. Laporan kedaluwarsa: tidak terbaca sebagai aktif oleh non-pelapor, tetap
+--     terbaca pelapor; konfirmasi ditolak 23514.
+set local request.jwt.claims = '{"sub":"55555555-5555-4555-8555-555555555555","role":"authenticated"}';
+do $$
+declare
+  v_h public.hazard_reports;
+begin
+  v_h := public.create_hazard('pothole','info',-7.5,108.5,'Untuk kedaluwarsa',null,null);
+  insert into public.uji_m4_konteks (nama, id) values ('h_e_exp', v_h.id);
+end;
+$$;
+
+reset role;
+do $$
+declare v_id uuid;
+begin
+  select id into v_id from public.uji_m4_konteks where nama = 'h_e_exp';
+  -- pothole kedaluwarsa 24 jam; mundurkan 25 jam supaya expires_at <= now().
+  update public.hazard_reports set created_at = now() - interval '25 hours' where id = v_id;
+end;
+$$;
+set local role authenticated;
+
+set local request.jwt.claims = '{"sub":"33333333-3333-4333-8333-333333333333","role":"authenticated"}';
+do $$
+declare
+  v_id uuid;
+  v_n int;
+begin
+  select id into v_id from public.uji_m4_konteks where nama = 'h_e_exp';
+  select count(*) into v_n from public.hazard_reports where id = v_id;
+  if v_n <> 0 then
+    raise exception 'UJI GAGAL: non-pelapor masih membaca laporan kedaluwarsa sebagai aktif';
+  end if;
+end;
+$$;
+
+set local request.jwt.claims = '{"sub":"55555555-5555-4555-8555-555555555555","role":"authenticated"}';
+do $$
+declare
+  v_id uuid;
+  v_n int;
+begin
+  select id into v_id from public.uji_m4_konteks where nama = 'h_e_exp';
+  select count(*) into v_n from public.hazard_reports where id = v_id;
+  if v_n <> 1 then
+    raise exception 'UJI GAGAL: pelapor tidak membaca laporan kedaluwarsa miliknya sendiri';
+  end if;
+end;
+$$;
+
+set local request.jwt.claims = '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}';
+do $$
+declare
+  v_id uuid;
+  v_state text := null;
+  v_detail text := null;
+begin
+  select id into v_id from public.uji_m4_konteks where nama = 'h_e_exp';
+  begin
+    perform public.confirm_hazard(v_id);
+    raise exception 'UJI GAGAL: konfirmasi laporan kedaluwarsa diterima';
+  exception when others then
+    get stacked diag v_state = RETURNED_SQLSTATE, v_detail = PG_EXCEPTION_DETAIL;
+  end;
+
+  if v_state is distinct from '23514' or v_detail is distinct from 'hazard_expired' then
+    raise exception 'UJI GAGAL: konfirmasi kedaluwarsa salah (state=%, detail=%)', v_state, v_detail;
+  end if;
+end;
+$$;
+
+-- 14. Konfirmasi: satu per pengguna per laporan; duplikat ditolak 23505.
+set local request.jwt.claims = '{"sub":"22222222-2222-4222-8222-222222222222","role":"authenticated"}';
+do $$
+declare
+  v_id uuid;
   v_total int;
+  v_state text := null;
+  v_detail text := null;
 begin
-  v_hazard := public.create_hazard('pothole', 'moderate', -6.2, 106.8, 'Laporan konfirmasi', null, null);
+  select id into v_id from public.uji_m4_konteks where nama = 'h_a_global';
 
-  -- Konfirmasi pertama kali
-  v_total := public.confirm_hazard(v_hazard);
-  if v_total <> 1 then
-    raise exception 'UJI GAGAL: konfirmasi pertama mengembalikan %', v_total;
+  v_total := public.confirm_hazard(v_id);
+  if v_total < 1 then
+    raise exception 'UJI GAGAL: konfirmasi pertama tidak menghasilkan hitungan >= 1';
   end if;
 
-  -- Konfirmasi kedua dari pelapor yang sama harus gagal
   begin
-    perform public.confirm_hazard(v_hazard);
-    raise exception 'UJI GAGAL: konfirmasi duplikat tidak ditangkap';
-  exception
-    when exception then
-      -- Harus error already_confirmed
-      if not (SQLSTATE_SUBSTR(v_exc, 1, 5) = '23505' or v_exc detail like 'sudah mengonfirmasi') then
-        raise exception 'UJI GAGAL: error duplikat salah: %', v_exc;
-      end if;
+    perform public.confirm_hazard(v_id);
+    raise exception 'UJI GAGAL: konfirmasi duplikat diterima';
+  exception when others then
+    get stacked diag v_state = RETURNED_SQLSTATE, v_detail = PG_EXCEPTION_DETAIL;
   end;
-end;
-$$;
 
--- 11. Rate limit konfirmasi: 10 konfirmasi per jam per pengguna.
-set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
-
-do $$
-declare
-  v_hazard uuid;
-  v_i int;
-  v_exc exception;
-begin
-  v_hazard := public.create_hazard('pothole', 'moderate', -6.2, 106.8, 'Laporan rate limit konfirmasi', null, null);
-
-  for v_i in 1..11 loop
-    begin
-      perform public.confirm_hazard(v_hazard);
-    exception
-      when exception then
-        get stacked diag v_exc;
-        exit when SQLSTATE_SUBSTR(v_exc, 1, 5) = 'P0001';
-    end;
-  end loop;
-
-  -- Uji bahwa upaya ke-11 mengembalikan error rate limit
-  if v_exc is null or not (v_exc detail like 'hazard_confirm_rate_limit%' or v_exc message like 'Terlalu banyak konfirmasi') then
-    raise exception 'UJI GAGAL: rate limit confirm_hazard tidak terdeteksi';
+  if v_state is distinct from '23505' or v_detail is distinct from 'hazard_already_confirmed' then
+    raise exception 'UJI GAGAL: konfirmasi duplikat salah (state=%, detail=%)', v_state, v_detail;
   end if;
 end;
 $$;
 
--- 12. Hanya pelapor yang boleh mengubah laporan (15 menit window).
-set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
-
+-- 15. Jalur tulis langsung dicabut: INSERT REST oleh authenticated ditolak.
+set local request.jwt.claims = '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}';
 do $$
-declare
-  v_hazard uuid;
-  v_updated public.hazard_reports;
 begin
-  v_hazard := public.create_hazard('pothole', 'moderate', -6.2, 106.8, 'Laporan update window', null, null);
-
-  -- Ubah dalam jendela 15 menit
-  v_updated := public.update_hazard(v_hazard.id, 'high', 'Deskripsi diupdate');
-  if v_updated.severity <> 'high' then
-    raise exception 'UJI GAGAL: update_hazard tidak mengubah severity';
-  end if;
-
-  -- Jendela 15 menit sudah lewat, coba lagi
   begin
-    perform public.update_hazard(v_hazard.id, 'info', 'Coba ubah lagi');
-    raise exception 'UJI GAGAL: update_hazard setelah jendela lewat harus gagal';
-  exception
-    when exception then
-      if not (v_exc errcode = '23514' or v_exc detail like 'jendela edit') then
-        raise exception 'UJI GAGAL: error edit window salah: %', v_exc;
-      end if;
+    insert into public.hazard_reports (reporter_id, category, severity, latitude, longitude)
+    values (auth.uid(), 'pothole', 'info', -6.0, 106.0);
+    raise exception 'UJI GAGAL: INSERT langsung ke hazard_reports diterima';
+  exception when insufficient_privilege then
+    null;
   end;
 end;
 $$;
 
--- 13. Hanya pelapor yang boleh melepas laporan (15 menit window).
-set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
-
-do $$
-declare
-  v_hazard uuid;
-  v_removed public.hazard_reports;
-begin
-  v_hazard := public.create_hazard('pothole', 'moderate', -6.2, 106.8, 'Laporan hapus window', null, null);
-
-  -- Hapus dalam jendela 15 menit
-  v_removed := public.remove_hazard(v_hazard.id);
-  if v_removed.status <> 'removed' then
-    raise exception 'UJI GAGAL: remove_hazard tidak mengubah status menjadi removed';
-  end if;
-
-  -- Jendela 15 menit sudah lewat, coba lagi
-  begin
-    perform public.remove_hazard(v_hazard.id);
-    raise exception 'UJI GAGAL: remove_hazard setelah jendela lewat harus gagal';
-  exception
-    when exception then
-      if not (v_exc errcode = '23514' or v_exc detail like 'jendela penghapusan') then
-        raise exception 'UJI GAGAL: error hapus window salah: %', v_exc;
-      end if;
-  end;
-end;
-$$;
-
--- 14. RPC update_hazard hanya untuk pelapor, hanya active, 15 menit window.
-set local request.jwt.claims = '{"sub":"33333333-3333-3333-3333-333333333333","role":"authenticated"}';
-
-do $$
-declare
-  v_hazard uuid;
-begin
-  -- User C membuat laporan
-  v_hazard := public.create_hazard('crash', 'high', -6.3, 106.9, 'Kecelakaan parang', null, null);
-
-  -- User A (host) mencoba mengubah laporan user C -> harus gagal
-  set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
-  begin
-    perform public.update_hazard(v_hazard.id, 'moderate', 'Dicoba host');
-    raise exception 'UJI GAGAL: host boleh mengubah laporan orang lain';
-  exception
-    when insufficient_privilege then null;
-  end;
-end;
-$$;
-
--- 15. Non-anon tidak boleh membaca/hapus/hapus laporan yang expired.
+-- 16. Anon: tidak membaca dan tidak menulis.
 set local role anon;
 set local request.jwt.claims = '{}';
-
 do $$
 declare
-  v_count int;
+  v_n int;
+  v_state text := null;
 begin
-  select count(*) into v_count from public.hazard_reports h
-  where h.status = 'active'
-    and h.expires_at > now();
+  select count(*) into v_n from public.hazard_reports;
+  if v_n > 0 then
+    raise exception 'UJI GAGAL: anon membaca % laporan hazard', v_n;
+  end if;
 
-  -- Anon tidak boleh membaca laporan aktif (policy hazards_select_current_or_reporter)
-  -- Tapi policy hanya berlaku untuk authenticated, cek bahwa tidak ada kebocoran
-  if v_count > 0 then
-    raise exception 'UJI GAGAL: anon membaca laporan aktif (% baris)', v_count;
+  begin
+    perform public.create_hazard('pothole','moderate',-6.0,106.0,'Anon',null,null);
+    raise exception 'UJI GAGAL: anon membuat laporan hazard';
+  exception when others then
+    get stacked diag v_state = RETURNED_SQLSTATE;
+  end;
+
+  if v_state is distinct from '42501' then
+    raise exception 'UJI GAGAL: anon create_hazard seharusnya 42501 (state=%)', v_state;
   end if;
 end;
 $$;
@@ -418,7 +534,7 @@ reset role;
 
 do $$
 begin
-  raise notice 'UJI RLS LAKUAN M4 LULUS: hazard RLS, RPC, expiry, confirm, rate limit semuanya lolos uji';
+  raise notice 'UJI RLS LAKUAN M4 LULUS: hazard RLS, RPC, expiry, konfirmasi, rate limit, dan jalur tulis tertutup semuanya lolos';
 end;
 $$;
 
