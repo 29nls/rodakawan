@@ -82,8 +82,7 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DB_TEST_DATABASE_URL }}
         run: |
-          printf 'y
-' | npx --yes supabase@2.121.0 db push --db-url "${DATABASE_URL}"
+          echo y | npx --yes supabase@2.121.0 db push --db-url "${DATABASE_URL}"
 
       - name: Jalankan seluruh uji RLS (7 berkas)
         if: inputs.stage == 'test' || inputs.stage == 'all'
