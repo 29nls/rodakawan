@@ -10,6 +10,10 @@
  *   `-- db:test notice: <teks>`, dan runner gagal bila notice itu tidak diterima.
  * - Yang belum ada sebelumnya adalah cara menjalankannya yang dapat diulang tanpa
  *   menyalin-tempel ke dashboard, dan tanpa menaruh kredensial di baris perintah.
+ * - Sebelum satu koneksi pun dibuka, runner menjalankan pemeriksaan **statis**: berkas uji
+ *   harus memuat direktif notice-nya, dan literal yang diberikan ke parameter bertipe
+ *   `uuid` harus benar-benar UUID. Pemeriksaan itu tidak butuh kredensial, jadi kelas
+ *   galat yang hanya muncul saat runtime database tertangkap lebih awal (ADR-069).
  *
  * Aturan keamanan yang dipegang file ini:
  * - Kredensial hanya dibaca dari environment (`DATABASE_URL`, atau `SUPABASE_DB_URL`). `npm run
@@ -45,11 +49,13 @@
  *   (perlu `sslrootcert` berisi CA project Supabase).
  */
 
-import { readFile } from 'node:fs/promises';
+import { readFile, readdir } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 
 import pg from 'pg';
+
+import { checkTestFiles } from './lib/sql-uuid-literals.mjs';
 
 /**
  * Berkas uji yang dijalankan `npm run db:test`, berurutan. Setiap berkas menyatakan
@@ -70,6 +76,13 @@ const DEFAULT_TEST_FILES = [
 /** Direktif di dalam berkas uji: notice yang harus diterima dari server. */
 const NOTICE_DIRECTIVE = /^\s*--\s*db:test notice:\s*(.+?)\s*$/m;
 
+/**
+ * Folder migration: sumber tanda tangan fungsi untuk pemeriksaan statis
+ * literal UUID. Alamatnya relatif ke berkas script ini, bukan ke folder kerja,
+ * supaya pemeriksaan tetap berjalan dari mana pun runner dipanggil.
+ */
+const MIGRATIONS_DIR = path.resolve(import.meta.dirname, '..', 'supabase', 'migrations');
+
 const HELP = `Uji RLS Supabase (project development).
 
 Pemakaian:
@@ -83,6 +96,13 @@ ${DEFAULT_TEST_FILES.map((file) => `  - ${file}`).join('\n')}
     -- db:test notice: UJI RLS PROFIL LULUS
   Runner hanya melaporkan lulus bila notice itu benar-benar diterima dari server,
   jadi berkas yang terpotong di tengah tidak bisa tampil hijau.
+
+Sebelum membuka koneksi, runner memeriksa berkas uji secara statis:
+  - direktif notice harus ada;
+  - literal yang diberikan ke parameter bertipe uuid harus benar-benar UUID
+    (PostgreSQL menolak yang lain dengan SQLSTATE 22P02 saat pemanggilan).
+  Pemeriksaan ini tidak butuh kredensial, jadi galatnya muncul lebih awal.
+  Jalankan sendiri: npm run db:test:lint
 
 Environment:
   DATABASE_URL (wajib)   Connection string PostgreSQL project DEVELOPMENT (host session pooler),
@@ -100,6 +120,31 @@ Catatan:
     tertinggal di database.
   - Password tidak pernah dicetak; hanya user@host:port/database yang ditampilkan.
 `;
+
+/**
+ * Membaca seluruh migration untuk sumber tanda tangan fungsi.
+ *
+ * Berkas dibaca berurutan berdasarkan nama, jadi definisi yang lebih baru
+ * menimpa definisi lama — sama seperti urutan saat migration diterapkan.
+ */
+async function readMigrations() {
+  let names;
+
+  try {
+    names = (await readdir(MIGRATIONS_DIR)).filter((name) => name.endsWith('.sql')).sort();
+  } catch {
+    return [];
+  }
+
+  const migrations = [];
+
+  for (const name of names) {
+    const sql = await readFile(path.join(MIGRATIONS_DIR, name), 'utf8');
+    migrations.push({ path: name, sql });
+  }
+
+  return migrations;
+}
 
 function readOption(argv, ...names) {
   for (let index = 0; index < argv.length; index += 1) {
@@ -225,20 +270,20 @@ async function main() {
   const singleFile = readOption(argv, '--file', '-f') ?? process.env.DB_TEST_FILE;
   const testFiles = singleFile ? [singleFile] : DEFAULT_TEST_FILES;
 
-  if (!connectionString) {
-    console.error('[db:test] DATABASE_URL belum diatur.');
+  // Semua berkas dibaca dan diperiksa lebih dulu: kesalahan penulisan direktif
+  // dan literal yang pasti ditolak PostgreSQL harus ketahuan sebelum satu
+  // transaksi pun dibuka di database. Pemeriksaan statis berjalan paling awal
+  // karena tidak butuh kredensial sama sekali — jadi galat literal UUID tetap
+  // dilaporkan pada mesin yang tidak punya `DATABASE_URL`.
+  const migrations = await readMigrations();
+
+  if (migrations.length === 0) {
     console.error(
-      '[db:test] Contoh (PowerShell): $env:DATABASE_URL="postgresql://postgres.<ref>:<password>@aws-0-<region>.pooler.supabase.com:5432/postgres?sslmode=require"; npm run db:test',
-    );
-    console.error('[db:test] Contoh (Bash)      : DATABASE_URL="postgresql://..." npm run db:test');
-    console.error(
-      '[db:test] Simpan connection string di berkas .env.db (diabaikan Git, tidak dibaca Expo), jangan di .env/.env.local.',
+      `[db:test] Folder migration tidak ditemukan (${path.relative(process.cwd(), MIGRATIONS_DIR)}), sehingga pemeriksaan literal UUID tidak bisa dijalankan.`,
     );
     return 1;
   }
 
-  // Semua berkas dibaca dan diperiksa lebih dulu: kesalahan penulisan direktif
-  // harus ketahuan sebelum satu transaksi pun dibuka di database.
   const tests = [];
 
   for (const file of testFiles) {
@@ -252,22 +297,59 @@ async function main() {
       return 1;
     }
 
-    const notice = NOTICE_DIRECTIVE.exec(sql)?.[1];
+    // Bentuk `{ path, sql }` ini yang dipakai pustaka pemeriksaan literal UUID.
+    tests.push({ path: relative, sql });
+  }
+
+  // Literal yang diberikan ke parameter bertipe `uuid` pasti ditolak
+  // PostgreSQL dengan SQLSTATE 22P02 saat pemanggilan — jadi galatnya sudah
+  // bisa diketahui tanpa membuka koneksi sama sekali.
+  const violations = checkTestFiles(migrations, tests);
+
+  if (violations.length > 0) {
+    for (const violation of violations) {
+      console.error(
+        `[db:test] ${violation.file}:${violation.line}:${violation.column} — parameter uuid ${violation.paramName} pada ${violation.functionName} menerima literal '${violation.literal}' yang bukan UUID.`,
+      );
+    }
+    console.error(
+      '[db:test] PostgreSQL akan menolak literal itu dengan SQLSTATE 22P02 (invalid input syntax for type uuid) saat pemanggilan, sebelum badan fungsi dijalankan.',
+    );
+    console.error(
+      "[db:test] Perbaiki nilainya menjadi literal UUID kanonis (8-4-4-4-12 heksadesimal), mis. 'a1111111-2222-4333-8444-555555555555'.",
+    );
+    return 1;
+  }
+
+  for (const test of tests) {
+    const notice = NOTICE_DIRECTIVE.exec(test.sql)?.[1];
 
     if (!notice) {
       console.error(
-        `[db:test] Berkas uji ${relative} tidak memuat direktif notice penanda lulus (contoh: "-- db:test notice: UJI ..."), sehingga keberhasilannya tidak dapat diverifikasi.`,
+        `[db:test] Berkas uji ${test.path} tidak memuat direktif notice penanda lulus (contoh: "-- db:test notice: UJI ..."), sehingga keberhasilannya tidak dapat diverifikasi.`,
       );
       return 1;
     }
 
-    tests.push({ file: relative, sql, notice });
+    test.notice = notice;
+  }
+
+  if (!connectionString) {
+    console.error('[db:test] DATABASE_URL belum diatur.');
+    console.error(
+      '[db:test] Contoh (PowerShell): $env:DATABASE_URL="postgresql://postgres.<ref>:<password>@aws-0-<region>.pooler.supabase.com:5432/postgres?sslmode=require"; npm run db:test',
+    );
+    console.error('[db:test] Contoh (Bash)      : DATABASE_URL="postgresql://..." npm run db:test');
+    console.error(
+      '[db:test] Simpan connection string di berkas .env.db (diabaikan Git, tidak dibaca Expo), jangan di .env/.env.local.',
+    );
+    return 1;
   }
 
   const { config: clientOptions, note: sslNote } = clientConfig(connectionString);
 
   console.log(`[db:test] Target : ${describeTarget(connectionString)}`);
-  console.log(`[db:test] Berkas : ${tests.map((test) => test.file).join(', ')}`);
+  console.log(`[db:test] Berkas : ${tests.map((test) => test.path).join(', ')}`);
   console.log('[db:test] Kredensial dibaca dari environment dan tidak ditampilkan di sini.');
   if (sslNote) console.log(`[db:test] TLS    : ${sslNote}`);
 
@@ -288,21 +370,21 @@ async function main() {
     await client.connect();
 
     for (const test of tests) {
-      current = { file: test.file, notice: test.notice, seen: false };
+      current = { file: test.path, notice: test.notice, seen: false };
 
       const results = await client.query(test.sql);
       const statementCount = Array.isArray(results) ? results.length : 1;
 
-      console.log(`[db:test] ${test.file}: ${statementCount} perintah selesai dijalankan.`);
+      console.log(`[db:test] ${test.path}: ${statementCount} perintah selesai dijalankan.`);
 
       if (!current.seen) {
         console.error(
-          `[db:test] GAGAL: notice "${test.notice}" dari ${test.file} tidak diterima, jadi uji tidak dianggap lulus walaupun server tidak mengembalikan error.`,
+          `[db:test] GAGAL: notice "${test.notice}" dari ${test.path} tidak diterima, jadi uji tidak dianggap lulus walaupun server tidak mengembalikan error.`,
         );
         return 1;
       }
 
-      console.log(`[db:test] LULUS: ${test.file} — notice "${test.notice}" diterima dari server.`);
+      console.log(`[db:test] LULUS: ${test.path} — notice "${test.notice}" diterima dari server.`);
     }
 
     console.log(

@@ -7,6 +7,9 @@
  * - berkas uji tanpa direktif notice **ditolak sebelum** satu koneksi pun dibuka,
  *   sehingga berkas yang tidak bisa diverifikasi keberhasilannya tidak pernah
  *   dijalankan;
+ * - literal non-UUID yang diberikan ke parameter bertipe `uuid` juga ditolak
+ *   lebih dulu — PostgreSQL akan menolaknya dengan SQLSTATE 22P02, jadi kelas
+ *   galat itu bisa diketahui tanpa database sama sekali;
  * - daftar berkas default benar-benar ada, dan setiap berkas menyatakan notice yang
  *   juga benar-benar di-`raise notice` di dalamnya (kalau tidak, uji itu selalu
  *   gagal di CI — atau lebih buruk, lulus karena notice berkas lain);
@@ -101,6 +104,65 @@ describe('db-test.mjs', () => {
     assert.match(result.stderr, /tidak memuat direktif notice penanda lulus/);
     assert.doesNotMatch(result.stdout, /Target :/, 'validasi berkas harus mendahului koneksi');
     assert.doesNotMatch(result.stderr, /GAGAL \[/, 'tidak boleh ada kegagalan database');
+  });
+
+  it('menolak literal non-UUID pada parameter uuid sebelum membuka koneksi', (t) => {
+    // `create_hazard` punya parameter `p_client_report_id uuid` di migration.
+    // Nilainya di sini bukan UUID — PostgreSQL akan menolaknya dengan SQLSTATE
+    // 22P02, jadi runner harus menangkapnya sebelum membuka koneksi.
+    const file = tempFile(
+      t,
+      'literal-salah.sql',
+      [
+        '-- db:test notice: UJI PALSU',
+        'do $$',
+        'declare',
+        '  v_h integer;',
+        'begin',
+        "  v_h := public.create_hazard('pothole','moderate',-6.2,106.8,'Lubang',null,'a-client-001');",
+        'end;',
+        '$$;',
+        '',
+      ].join('\n'),
+    );
+
+    const result = runScript(ROOT, RUNNER, ['--file', file], {
+      env: { DATABASE_URL: DATABASE_URL_PALSU, SUPABASE_DB_URL: '' },
+      unset: ['SUPABASE_DB_URL'],
+    });
+
+    assert.equal(result.code, 1);
+    assert.match(result.stderr, /p_client_report_id/);
+    assert.match(result.stderr, /a-client-001/);
+    assert.match(result.stderr, /22P02/);
+    // Pesan harus menyebut berkas uji yang bermasalah. Tanpa ini, nama berkas
+    // bisa hilang (jadi "undefined:12:3") tanpa test apa pun gagal.
+    assert.match(result.stderr, /literal-salah\.sql:\d+:\d+/);
+    assert.doesNotMatch(result.stderr, /undefined:/);
+    assert.doesNotMatch(result.stdout, /Target :/, 'pemeriksaan statis harus mendahului koneksi');
+    assert.doesNotMatch(result.stderr, /GAGAL \[/, 'tidak boleh ada kegagalan database');
+  });
+
+  it('memeriksa literal UUID bahkan tanpa DATABASE_URL', (t) => {
+    // Pemeriksaan statis tidak butuh kredensial, jadi galatnya harus tetap
+    // dilaporkan pada mesin yang tidak punya `DATABASE_URL`.
+    const file = tempFile(
+      t,
+      'literal-salah-tanpa-kredensial.sql',
+      [
+        '-- db:test notice: UJI PALSU',
+        "select public.create_hazard('pothole','moderate',-6.2,106.8,'Lubang',null,'a-client-001');",
+        '',
+      ].join('\n'),
+    );
+
+    const result = runScript(ROOT, RUNNER, ['--file', file], {
+      unset: ['DATABASE_URL', 'SUPABASE_DB_URL'],
+    });
+
+    assert.equal(result.code, 1);
+    assert.match(result.stderr, /a-client-001/);
+    assert.doesNotMatch(result.stderr, /DATABASE_URL belum diatur/, 'galat literal lebih dulu');
   });
 
   it('setiap berkas uji default ada, mencantumkan notice, dan benar-benar me-raise notice itu', () => {

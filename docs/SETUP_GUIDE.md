@@ -270,6 +270,17 @@ workflow `database-rls.yml` memeriksa kedua notice yang ada saat ini.
 
 `npm run db:test -- --help` menampilkan daftar berkas dan opsinya.
 
+**Literal UUID harus benar-benar UUID.** Parameter bertipe `uuid` hanya menerima nilai UUID; string
+teks seperti `'a-client-001'` ditolak PostgreSQL dengan SQLSTATE 22P02 (`invalid input syntax for
+type uuid`) tepat saat pemanggilan, jadi satu literal salah menghentikan seluruh berkas uji.
+Pemeriksaan statis `npm run db:test:lint` (**tanpa** database) membaca tanda tangan fungsi dari
+`supabase/migrations/*.sql` dan menandai literal yang diberikan ke parameter `uuid`; perintah yang
+sama berjalan sebagai pra-syarat `npm run db:test` sebelum satu koneksi pun dibuka, dan sebagai
+langkah CI di job `quality` yang tidak memakai secret sama sekali (ADR-069). Jadi kelas galat ini
+tertangkap di pull request, bukan setelah runner masuk ke database development. Gunakan literal UUID
+kanonis (8-4-4-4-12 heksadesimal); untuk uji idempotensi pakai UUID **tetap** yang sama di semua
+pemanggilan, bukan UUID acak.
+
 **Uji jalur HTTP Storage — `npm run storage:test`.** Runner ini melengkapi `db:test` dengan alur yang
 benar-benar dipakai aplikasi, dan memakai `DATABASE_URL` yang sama plus URL/publishable key publik
 dari `.env.local`:

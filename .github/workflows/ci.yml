@@ -7,6 +7,9 @@ name: CI
 #                 tidak memakai satu pun secret Supabase, dan justru membuktikan
 #                 aplikasi tetap bisa di-typecheck, di-test, dan dibundel ketika
 #                 konfigurasi backend belum ada (docs/QA_TEST_PLAN.md AUTH-13).
+#                 Termasuk pemeriksaan statis berkas uji SQL, sehingga kelas
+#                 galat yang hanya muncul saat runtime database tertangkap di
+#                 pull request.
 # - `workflows-lint`: pemeriksaan file workflow miliknya sendiri. File di
 #                 `.github/workflows/` tidak dijangkau tsc/eslint/prettier, dan
 #                 kesalahan YAML atau `${{ }}` yang salah baru terlihat saat
@@ -65,6 +68,14 @@ jobs:
 
       - name: Format
         run: npm run format:check
+
+      # Pemeriksaan statis literal UUID pada berkas uji SQL. Sengaja berada di
+      # job TANPA backend: galat kelas ini (literal teks yang diberikan ke
+      # parameter `uuid`) ditolak PostgreSQL dengan SQLSTATE 22P02, jadi bisa
+      # ditemukan tanpa membuka koneksi database sama sekali — dan hanya di
+      # sini, bukan di workflow RLS yang memakai secret.
+      - name: Pemeriksaan literal UUID pada berkas uji SQL
+        run: npm run db:test:lint
 
       - name: Unit & komponen test
         run: npm test -- --ci

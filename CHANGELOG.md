@@ -52,6 +52,12 @@ bagian ini oleh workflow rilis.
 
 ### Perbaikan
 
+- Literal yang diberikan ke parameter bertipe `uuid` di berkas uji SQL kini diperiksa **statis**
+  (`npm run db:test:lint`): tanda tangan fungsi dibaca dari `supabase/migrations/*.sql`, lalu literal
+  teks yang bukan UUID ditandai lengkap dengan berkas, baris, dan kolom. Pemeriksaan berjalan di CI
+  tanpa secret database dan juga sebagai pra-syarat `npm run db:test` sebelum koneksi dibuka —
+  PostgreSQL menolak nilai seperti itu dengan SQLSTATE 22P02 tepat saat pemanggilan, jadi satu
+  ketiksepele sempat menghentikan seluruh berkas uji (ADR-069).
 - Pesan dari pengguna yang diblokir kini disaring **di server** lewat policy `chat_select_ride_member`
   dan helper `is_blocked_by_me` (ADR-068), bukan disembunyikan di UI setelah isinya terkirim. Berlaku
   untuk REST maupun realtime; pesan sistem tetap terlihat. Klien tidak lagi memuat daftar blokir.

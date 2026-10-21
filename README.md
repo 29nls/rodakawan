@@ -222,6 +222,7 @@ npm test                 # unit + komponen test (jest-expo); menjalankan deps:ch
 npm run doctor           # expo-doctor (pemeriksaan menyeluruh)
 npm run export:android   # bundel Android (Metro + Hermes) tanpa perangkat
 npm run db:test          # uji RLS ke database development (butuh .env.db / DATABASE_URL)
+npm run db:test:lint     # periksa literal UUID di berkas uji SQL (statis, tanpa database)
 npm run storage:test     # uji integrasi HTTP Storage dengan akun uji sementara (.env.local + .env.db)
 npm run db:types         # generate ulang tipe database dari skema development
 npm run db:types:check   # periksa drift tipe (dijalankan CI database)
@@ -239,6 +240,14 @@ ini. Ongkosnya ±3 detik pada mesin pengembang
 yang menyeluruh tetap dijalankan di CI. Bila daftar versi resmi Expo tidak terjangkau
 (sedang offline), pemeriksaan melaporkan bahwa hasilnya **tidak bisa dipastikan** dengan
 `::warning::` dan tidak menggagalkan `npm test` — lulus hanya dilaporkan bila benar-benar diperiksa.
+
+`npm run db:test:lint` memeriksa **nilai** argumen di berkas uji SQL tanpa membuka koneksi database
+sama sekali: ia membaca tanda tangan fungsi dari `supabase/migrations/*.sql`, lalu menandai setiap
+literal teks yang diberikan ke parameter bertipe `uuid` (mis. `'a-client-001'` untuk parameter
+`p_client_report_id uuid`). PostgreSQL menolak nilai seperti itu dengan SQLSTATE 22P02 tepat saat
+pemanggilan — jadi satu ketiksepele sempat menghentikan seluruh berkas uji. Pemeriksaan ini berjalan
+di dua tempat: sebagai langkah CI di job `quality` (yang memang tidak memakai secret database), dan
+sebagai pra-syarat `npm run db:test` sebelum satu transaksi pun dibuka (ADR-069).
 
 Hasil nyata pada **21 Oktober 2026** (Windows, Node 24.x, npm 12.x) setelah pekerjaan Milestone 4 di
 `2b84ec4` + perbaikan lokal yang belum di-commit saat tabel ini ditulis:
