@@ -8,6 +8,20 @@ sedangkan build preview (`v<versi>-build<N>`) diringkas di dalam blok yang bisa 
 versi adalah tautan ke halaman rilisnya di GitHub, sehingga riwayat ini bisa dinavigasi langsung
 dari berkas.
 
+## [v0.1.0-build34](https://github.com/29nls/rodakawan/releases/tag/v0.1.0-build34) — 2026-10-21 · pratinjau
+
+<details>
+<summary>Catatan rilis pratinjau</summary>
+
+### Perubahan lain
+
+- Enhance RLS/RPC tests for hazard reports: - Updated user roles and context for testing. - Added new test cases for rate limiting, duplicate reports, and coordinate validation. - Improved error handling and assertions for various scenarios. - Ensured write paths are restricted and confirmed that only reporters can modify their reports. - Verified that anonymous users cannot read or write hazard reports. (`0839521`)
+- sementara: perbaiki sintaks YAML workflow aktivasi M4 (`a5edbf6`)
+- sementara: perbaiki sintaks YAML workflow aktivasi M4 (`d36c88a`)
+- masukkan empat berkas uji RLS M4 ke daftar default runner (`62285b9`)
+
+</details>
+
 ## [v0.1.0-build31](https://github.com/29nls/rodakawan/releases/tag/v0.1.0-build31) — 2026-10-20 · pratinjau
 
 <details>
