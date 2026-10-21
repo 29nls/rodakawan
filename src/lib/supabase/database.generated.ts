@@ -16,14 +16,14 @@ export type Database = {
           Tables: {
             "chat_messages": {
                   Row: {
-                    "content": string,"created_at": string,"deleted_at": string | null,"edited_at": string | null,"id": string,"message_type": string,"ride_id": string,"sender_id": string
+                    "client_message_id": string | null,"content": string,"created_at": string,"deleted_at": string | null,"edited_at": string | null,"id": string,"message_type": string,"ride_id": string,"sender_id": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "content": string,"created_at"?: string,"deleted_at"?: string | null,"edited_at"?: string | null,"id"?: string,"message_type"?: string,"ride_id": string,"sender_id": string
+                    "client_message_id"?: string | null,"content": string,"created_at"?: string,"deleted_at"?: string | null,"edited_at"?: string | null,"id"?: string,"message_type"?: string,"ride_id": string,"sender_id": string
                   }
                   Update: {
-                    "content"?: string,"created_at"?: string,"deleted_at"?: string | null,"edited_at"?: string | null,"id"?: string,"message_type"?: string,"ride_id"?: string,"sender_id"?: string
+                    "client_message_id"?: string | null,"content"?: string,"created_at"?: string,"deleted_at"?: string | null,"edited_at"?: string | null,"id"?: string,"message_type"?: string,"ride_id"?: string,"sender_id"?: string
                   }
                   Relationships: [
                     {
@@ -190,16 +190,42 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
-                },"hazard_reports": {
+                },"hazard_confirmations": {
                   Row: {
-                    "category": string,"created_at": string,"description": string | null,"expires_at": string,"id": string,"latitude": number,"longitude": number,"reporter_id": string,"ride_id": string | null,"severity": string,"status": string,"updated_at": string
+                    "created_at": string,"hazard_id": string,"user_id": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "category": string,"created_at"?: string,"description"?: string | null,"expires_at": string,"id"?: string,"latitude": number,"longitude": number,"reporter_id": string,"ride_id"?: string | null,"severity"?: string,"status"?: string,"updated_at"?: string
+                    "created_at"?: string,"hazard_id": string,"user_id": string
                   }
                   Update: {
-                    "category"?: string,"created_at"?: string,"description"?: string | null,"expires_at"?: string,"id"?: string,"latitude"?: number,"longitude"?: number,"reporter_id"?: string,"ride_id"?: string | null,"severity"?: string,"status"?: string,"updated_at"?: string
+                    "created_at"?: string,"hazard_id"?: string,"user_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "hazard_confirmations_hazard_id_fkey"
+      columns: ["hazard_id"]
+isOneToOne: false
+      referencedRelation: "hazard_reports"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "hazard_confirmations_user_id_fkey"
+      columns: ["user_id"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"hazard_reports": {
+                  Row: {
+                    "category": string,"client_report_id": string | null,"created_at": string,"description": string | null,"expires_at": string,"id": string,"latitude": number,"longitude": number,"reporter_id": string,"ride_id": string | null,"severity": string,"status": string,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "category": string,"client_report_id"?: string | null,"created_at"?: string,"description"?: string | null,"expires_at": string,"id"?: string,"latitude": number,"longitude": number,"reporter_id": string,"ride_id"?: string | null,"severity"?: string,"status"?: string,"updated_at"?: string
+                  }
+                  Update: {
+                    "category"?: string,"client_report_id"?: string | null,"created_at"?: string,"description"?: string | null,"expires_at"?: string,"id"?: string,"latitude"?: number,"longitude"?: number,"reporter_id"?: string,"ride_id"?: string | null,"severity"?: string,"status"?: string,"updated_at"?: string
                   }
                   Relationships: [
                     {
@@ -213,6 +239,26 @@ isOneToOne: false
       columns: ["ride_id"]
 isOneToOne: false
       referencedRelation: "rides"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"moderation_actions": {
+                  Row: {
+                    "action": string,"actor_id": string,"created_at": string,"id": string,"note": string | null,"reason": string,"target_id": string,"target_type": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "action": string,"actor_id": string,"created_at"?: string,"id"?: string,"note"?: string | null,"reason": string,"target_id": string,"target_type": string
+                  }
+                  Update: {
+                    "action"?: string,"actor_id"?: string,"created_at"?: string,"id"?: string,"note"?: string | null,"reason"?: string,"target_id"?: string,"target_type"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "moderation_actions_actor_id_fkey"
+      columns: ["actor_id"]
+isOneToOne: false
+      referencedRelation: "profiles"
       referencedColumns: ["id"]
     }
                   ]
@@ -496,12 +542,49 @@ isOneToOne: false
 "accept_ride_invite":
 { Args: { "p_ride_id": string }; Returns: string
                            },
+"can_moderate_chat_message":
+{ Args: { "p_message_id": string }; Returns: boolean
+                           },
+"can_moderate_content_report":
+{ Args: { "p_report_id": string }; Returns: boolean
+                           },
+"can_moderate_hazard":
+{ Args: { "p_hazard_id": string }; Returns: boolean
+                           },
+"can_moderate_ride":
+{ Args: { "p_ride_id": string }; Returns: boolean
+                           },
 "can_publish_ride_location":
 { Args: { "p_ride_id": string }; Returns: boolean
+                           },
+"confirm_hazard":
+{ Args: { "p_hazard_id": string }; Returns: number
                            },
 "create_club":
 { Args: { "p_description"?: string,"p_join_policy"?: string,"p_name": string,"p_slug"?: string,"p_visibility"?: string }; Returns: Json
                            },
+"create_hazard":
+{ Args: { "p_category": string,"p_client_report_id"?: string,"p_description"?: string,"p_latitude": number,"p_longitude": number,"p_ride_id"?: string,"p_severity": string }; Returns: {
+              "category": string,
+"client_report_id": string | null,
+"created_at": string,
+"description": string | null,
+"expires_at": string,
+"id": string,
+"latitude": number,
+"longitude": number,
+"reporter_id": string,
+"ride_id": string | null,
+"severity": string,
+"status": string,
+"updated_at": string
+            }
+                          SetofOptions: {
+        from: "*"
+        to: "hazard_reports"
+        isOneToOne: true
+        isSetofReturn: false
+      } },
 "create_ride":
 { Args: { "p_club_id": string,"p_description"?: string,"p_destination_label"?: string,"p_meeting_label"?: string,"p_starts_at"?: string,"p_title": string,"p_visibility"?: string }; Returns: {
               "activity_type": string,
@@ -531,8 +614,59 @@ isOneToOne: false
         isOneToOne: true
         isSetofReturn: false
       } },
+"delete_chat_message":
+{ Args: { "p_message_id": string }; Returns: {
+              "client_message_id": string | null,
+"content": string,
+"created_at": string,
+"deleted_at": string | null,
+"edited_at": string | null,
+"id": string,
+"message_type": string,
+"ride_id": string,
+"sender_id": string
+            }
+                          SetofOptions: {
+        from: "*"
+        to: "chat_messages"
+        isOneToOne: true
+        isSetofReturn: false
+      } },
+"edit_chat_message":
+{ Args: { "p_content": string,"p_message_id": string }; Returns: {
+              "client_message_id": string | null,
+"content": string,
+"created_at": string,
+"deleted_at": string | null,
+"edited_at": string | null,
+"id": string,
+"message_type": string,
+"ride_id": string,
+"sender_id": string
+            }
+                          SetofOptions: {
+        from: "*"
+        to: "chat_messages"
+        isOneToOne: true
+        isSetofReturn: false
+      } },
+"expire_hazard_reports":
+{ Args: Record<PropertyKey, never>; Returns: number
+                           },
+"get_moderation_subject":
+{ Args: { "p_target_id": string,"p_target_type": string }; Returns: Json
+                           },
+"hazard_expiry_seconds":
+{ Args: { "p_category": string }; Returns: number
+                           },
+"insert_ride_system_message":
+{ Args: { "p_actor"?: string,"p_content": string,"p_ride_id": string }; Returns: string
+                           },
 "invite_ride_member":
 { Args: { "p_ride_id": string,"p_user_id": string }; Returns: string
+                           },
+"is_blocked_by_me":
+{ Args: { "p_user_id": string }; Returns: boolean
                            },
 "is_club_admin":
 { Args: { "p_club_id": string }; Returns: boolean
@@ -558,6 +692,63 @@ isOneToOne: false
 "leave_ride":
 { Args: { "p_ride_id": string }; Returns: string
                            },
+"list_moderation_actions":
+{ Args: { "p_limit"?: number,"p_target_id"?: string,"p_target_type"?: string }; Returns: {
+              "action": string,
+"actor_id": string,
+"created_at": string,
+"id": string,
+"note": string | null,
+"reason": string,
+"target_id": string,
+"target_type": string
+            }[]
+                          SetofOptions: {
+        from: "*"
+        to: "moderation_actions"
+        isOneToOne: false
+        isSetofReturn: true
+      } },
+"moderate_chat_message":
+{ Args: { "p_message_id": string,"p_note"?: string,"p_reason": string }; Returns: {
+              "client_message_id": string | null,
+"content": string,
+"created_at": string,
+"deleted_at": string | null,
+"edited_at": string | null,
+"id": string,
+"message_type": string,
+"ride_id": string,
+"sender_id": string
+            }
+                          SetofOptions: {
+        from: "*"
+        to: "chat_messages"
+        isOneToOne: true
+        isSetofReturn: false
+      } },
+"moderate_hazard":
+{ Args: { "p_action": string,"p_hazard_id": string,"p_note"?: string,"p_reason": string }; Returns: {
+              "category": string,
+"client_report_id": string | null,
+"created_at": string,
+"description": string | null,
+"expires_at": string,
+"id": string,
+"latitude": number,
+"longitude": number,
+"reporter_id": string,
+"ride_id": string | null,
+"severity": string,
+"status": string,
+"updated_at": string
+            }
+                          SetofOptions: {
+        from: "*"
+        to: "hazard_reports"
+        isOneToOne: true
+        isSetofReturn: false
+      } },
 "publish_ride_location":
 { Args: { "p_accuracy_m"?: number,"p_heading_deg"?: number,"p_latitude": number,"p_longitude": number,"p_recorded_at"?: string,"p_ride_id": string,"p_speed_mps"?: number }; Returns: {
               "accuracy_m": number | null,
@@ -579,15 +770,91 @@ isOneToOne: false
 "remove_club_member":
 { Args: { "p_club_id": string,"p_user_id": string }; Returns: string
                            },
+"remove_hazard":
+{ Args: { "p_hazard_id": string }; Returns: {
+              "category": string,
+"client_report_id": string | null,
+"created_at": string,
+"description": string | null,
+"expires_at": string,
+"id": string,
+"latitude": number,
+"longitude": number,
+"reporter_id": string,
+"ride_id": string | null,
+"severity": string,
+"status": string,
+"updated_at": string
+            }
+                          SetofOptions: {
+        from: "*"
+        to: "hazard_reports"
+        isOneToOne: true
+        isSetofReturn: false
+      } },
 "remove_ride_member":
 { Args: { "p_ride_id": string,"p_user_id": string }; Returns: string
                            },
+"report_content":
+{ Args: { "p_details"?: string,"p_reason": string,"p_target_id": string,"p_target_type": string }; Returns: {
+              "created_at": string,
+"details": string | null,
+"id": string,
+"reason": string,
+"reporter_id": string,
+"reviewed_at": string | null,
+"status": string,
+"target_id": string,
+"target_type": string
+            }
+                          SetofOptions: {
+        from: "*"
+        to: "content_reports"
+        isOneToOne: true
+        isSetofReturn: false
+      } },
 "request_club_membership":
 { Args: { "p_club_id": string }; Returns: string
                            },
 "review_club_membership":
 { Args: { "p_approve": boolean,"p_club_id": string,"p_user_id": string }; Returns: string
                            },
+"review_content_report":
+{ Args: { "p_note"?: string,"p_report_id": string,"p_status": string }; Returns: {
+              "created_at": string,
+"details": string | null,
+"id": string,
+"reason": string,
+"reporter_id": string,
+"reviewed_at": string | null,
+"status": string,
+"target_id": string,
+"target_type": string
+            }
+                          SetofOptions: {
+        from: "*"
+        to: "content_reports"
+        isOneToOne: true
+        isSetofReturn: false
+      } },
+"send_chat_message":
+{ Args: { "p_client_message_id"?: string,"p_content": string,"p_ride_id": string }; Returns: {
+              "client_message_id": string | null,
+"content": string,
+"created_at": string,
+"deleted_at": string | null,
+"edited_at": string | null,
+"id": string,
+"message_type": string,
+"ride_id": string,
+"sender_id": string
+            }
+                          SetofOptions: {
+        from: "*"
+        to: "chat_messages"
+        isOneToOne: true
+        isSetofReturn: false
+      } },
 "set_club_member_role":
 { Args: { "p_club_id": string,"p_role": string,"p_user_id": string }; Returns: string
                            },
@@ -620,6 +887,28 @@ isOneToOne: false
                           SetofOptions: {
         from: "*"
         to: "rides"
+        isOneToOne: true
+        isSetofReturn: false
+      } },
+"update_hazard":
+{ Args: { "p_description"?: string,"p_hazard_id": string,"p_severity": string }; Returns: {
+              "category": string,
+"client_report_id": string | null,
+"created_at": string,
+"description": string | null,
+"expires_at": string,
+"id": string,
+"latitude": number,
+"longitude": number,
+"reporter_id": string,
+"ride_id": string | null,
+"severity": string,
+"status": string,
+"updated_at": string
+            }
+                          SetofOptions: {
+        from: "*"
+        to: "hazard_reports"
         isOneToOne: true
         isSetofReturn: false
       } },
