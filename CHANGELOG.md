@@ -8,6 +8,21 @@ sedangkan build preview (`v<versi>-build<N>`) diringkas di dalam blok yang bisa 
 versi adalah tautan ke halaman rilisnya di GitHub, sehingga riwayat ini bisa dinavigasi langsung
 dari berkas.
 
+## [v0.1.0-build38](https://github.com/29nls/rodakawan/releases/tag/v0.1.0-build38) — 2026-10-22 · pratinjau
+
+<details>
+<summary>Catatan rilis pratinjau</summary>
+
+### Fitur
+
+- update milestone plans and testing documentation (`d80b892`)
+
+### Perubahan lain
+
+- Buat fixture kedaluwarsa benar-benar lewat masa berlaku di uji hazard (`09ff2ae`)
+
+</details>
+
 ## [v0.1.0-build36](https://github.com/29nls/rodakawan/releases/tag/v0.1.0-build36) — 2026-10-22 · pratinjau
 
 <details>
