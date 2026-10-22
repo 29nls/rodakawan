@@ -1,8 +1,10 @@
 # Rencana Milestone 4 — Laporan bahaya jalan & chat konvoi
 
-Status: **Diimplementasikan (kode); migration M4 sudah diterapkan ke project development (17/17
-paritas), tetapi uji SQL RLS-nya belum dijalankan live (menunggu kredensial DB).** Rencana ditulis
-2026-10-20; implementasi
+Status: **Diimplementasikan (kode); migration M4 sudah diterapkan ke project development, dan uji SQL
+RLS-nya lulus terhadap backend development lewat GitHub Actions Database RLS run #19 (commit
+`1aa1480`, 22 Oktober 2026 — 7/7 berkas uji).** Paritas migration terakhir tercatat 17/17 (repo kini
+memuat 17 berkas di `supabase/migrations`); angka itu tidak diverifikasi ulang ke remote pada
+pembaruan ini. Uji perangkat fisik belum dilakukan. Rencana ditulis 2026-10-20; implementasi
 21 Oktober 2026. Pemilik produk memilih jalur 2 di bawah: keputusan peta (ADR-064) dan uji perangkat
 khusus M3 **ditunda eksplisit**, dan M4 dikerjakan **tanpa marker peta**.
 
@@ -18,11 +20,15 @@ development (terverifikasi lewat `npx supabase migration list --linked`: 17 loca
   `src/app/ride.tsx`;
 - `src/features/moderation/{api,errors}.ts` (RPC `report_content`);
 - uji Jest: 29 test hazard, 25 test API chat, 9 test panel chat, 6 test layar Peringatan;
-- berkas uji SQL `supabase/tests/rls_hazards_test.sql` dan `supabase/tests/rls_chat_test.sql`
-  (**belum dieksekusi** karena tidak ada target database yang terkonfirmasi).
+- berkas uji SQL `supabase/tests/rls_hazards_test.sql`, `supabase/tests/rls_chat_test.sql`,
+  `supabase/tests/rls_moderation_m4_test.sql`, dan `supabase/tests/rls_blocked_chat_test.sql` —
+  keempatnya ada di `DEFAULT_TEST_FILES` (`scripts/db-test.mjs`) dan **lulus terhadap backend
+  development** lewat Database RLS run #19 (22 Oktober 2026).
 
 Status per butir: Implemented = ya; Passed locally (Jest/typecheck/lint) = ya; Passed against dev
-backend = **belum**; Tested on physical device = **belum**; Deferred by owner = peta + uji perangkat M3.
+backend = **ya untuk SQL RLS/RPC** (`npm run db:test` di Database RLS #19: 7 berkas, 7 lulus) tetapi
+belum untuk alur aplikasi lewat perangkat; Tested on physical device = **belum**; Deferred by owner =
+peta + uji perangkat M3.
 
 Detail keputusan ada di ADR-066 (`docs/PROJECT_DECISIONS.md`) dan langkah penerapan di
 `docs/SETUP_GUIDE.md` bagian 4.

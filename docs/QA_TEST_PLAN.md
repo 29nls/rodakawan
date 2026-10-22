@@ -165,12 +165,12 @@ Ditambahkan 21 Oktober 2026. Status yang dipakai sama dengan bagian 9, ditambah 
 
 | Area | Implemented | Passed locally | Dev backend | Perangkat fisik |
 | --- | --- | --- | --- | --- |
-| Hazard: RPC + expiry server + idempotensi + rate limit + duplikat | Ya | Ya (29 test) | **Migration diterapkan**; uji live menunggu kredensial DB | — |
+| Hazard: RPC + expiry server + idempotensi + rate limit + duplikat | Ya | Ya (29 test) | **Lulus** — Database RLS #19 (SQL RLS/RPC) | — |
 | Hazard: tab Peringatan (filter, form, ubah/lepas, konfirmasi, lapor) | Ya | Ya (6 test layar) | **Blocked** | **Blocked** |
-| Chat: RPC + keyset pagination + pesan sistem + realtime | Ya | Ya (24 test API + 9 test panel) | **Blocked** | **Blocked** |
-| Chat: pesan teks dari pengguna yang diblokir disaring di server (REST + realtime) | Ya (policy `chat_select_ride_member` + `is_blocked_by_me`) | Ya (tidak ada daftar blokir di klien) | **Blocked** | **Blocked** |
-| Moderasi: layanan antrean/aksi/audit + layar dashboard | Ya (16 test layanan + 8 test layar) | Ya | **Blocked** | **Blocked** |
-| Uji RLS/RPC SQL M4 (hazard, chat, moderasi, filter blokir) | Ya (berkas siap) | — | **Blocked** (`npm run db:test` gagal `ECONNREFUSED`; `.env.db` menunjuk localhost) | — |
+| Chat: RPC + keyset pagination + pesan sistem + realtime | Ya | Ya (24 test API + 9 test panel) | **Lulus untuk RPC/paginasi** (Database RLS #19); pengiriman realtime belum diuji | **Blocked** |
+| Chat: pesan teks dari pengguna yang diblokir disaring di server (REST + realtime) | Ya (policy `chat_select_ride_member` + `is_blocked_by_me`) | Ya (tidak ada daftar blokir di klien) | **Lulus** — Database RLS #19 (`UJI FILTER BLOKIR CHAT LULUS`) | **Blocked** |
+| Moderasi: layanan antrean/aksi/audit + layar dashboard | Ya (16 test layanan + 8 test layar) | Ya | **Lulus untuk RPC/policy** (Database RLS #19); alur dua akun nyata belum diuji | **Blocked** |
+| Uji RLS/RPC SQL M4 (hazard, chat, moderasi, filter blokir) | Ya (4 berkas, ada di `DEFAULT_TEST_FILES`) | `db:test:lint` lulus | **Lulus** — Database RLS #19: 7 berkas, 7 lulus (22 Okt 2026) | — |
 | Peta/marker hazard | **Deferred by owner** — ADR-064 masih Proposed | — | — | — |
 | Uji M3 dua perangkat, izin dicabut, GPS mati, force-stop/reboot, baterai 30 menit | **Deferred by owner** — bukan lulus | — | — | **Blocked** |
 
@@ -180,11 +180,14 @@ Perintah yang benar-benar dijalankan pada 21 Oktober 2026: `npm run typecheck` (
 (**240 lulus**), `npm run export:android` (0), `npm run doctor` (gagal karena DNS `exp.host`),
 `npm run db:test` (exit 1, `ECONNREFUSED`).
 
+Diperbarui 22 Oktober 2026: `npm run db:test` di mesin lokal **masih** gagal (`ECONNREFUSED` karena
+`.env.db` menunjuk `localhost`; 0 lulus, 7 tidak dijalankan), jadi jalur lokal tetap **bukan** lulus.
+Yang lulus adalah **Database RLS run #19** di GitHub Actions terhadap backend development (7/7 berkas,
+termasuk keempat berkas M4). Bukti perangkat tetap terpisah dan belum ada — lihat bagian 8d.
+
 Uji manual yang **belum** dilakukan dan tidak boleh dianggap lulus: dua perangkat pada chat yang sama,
 realtime saat koneksi putus/nyambung ulang, izin lokasi ditolak saat melapor, GPS mati, laporan
-duplikat nyata dalam radius 50 m, dan alur moderasi dengan dua akun nyata.
-
-### 8b. Uji manual dashboard moderasi (ADR-067)
+duplikat nyata dalam radius 50 m, dan alur moderasi dengan dua akun nyata.### 8b. Uji manual dashboard moderasi (ADR-067)
 
 Dengan tiga akun: **A** host perjalanan, **B** peserta yang melapor, **C** anggota biasa klub.
 
@@ -217,6 +220,51 @@ realtime. Ini inti perubahannya — sebelumnya isinya tetap terkirim.
 4. Sebagai C, chat tetap menampilkan pesan teks B.
 5. Sebagai B, pesan sendiri tetap terlihat (blokir tidak menyembunyikan pesan dari penulisnya).
 6. Hapus blokir A, muat ulang chat: pesan B muncul kembali tanpa ada data yang ditulis ulang.
+
+### 8d. Uji manual hazard dan chat (sisa M4)
+
+Backend SQL-nya sudah lulus di Database RLS #19, jadi daftar ini **hanya** untuk perilaku aplikasi
+yang tidak bisa dibuktikan runner database. Jalankan pada APK preview terbaru dengan dua akun
+(**A** pelapor/host, **B** peserta lain) di satu perjalanan aktif.
+
+**Laporan bahaya**
+
+1. A membuat laporan dari tab Peringatan (satu per kategori, termasuk `pothole`) → laporan muncul di
+daftar dengan kategori, tingkat, dan waktu kedaluwarsa; B melihat laporan yang sama.
+2. A membuat laporan kedua dengan kategori dan lokasi yang sama dalam 10 menit → aplikasi
+   menampilkan pesan "Laporan serupa baru saja dikirim", bukan galat mentah, dan **tidak** ada baris
+ganda di daftar.
+3. A mengirim lima laporan berbeda dalam 10 menit lalu laporan keenam → pesan batas laju muncul dan
+   laporan keenam tidak tersimpan; setelah ~10 menit percobaan berikutnya berhasil.
+4. A mengubah deskripsi/tingkat laporannya dalam 15 menit → perubahan terlihat oleh B setelah muat
+   ulang; percobaan setelah 15 menit ditolak dengan pesan yang bisa dipahami.
+5. B menekan konfirmasi "masih ada" → jumlah konfirmasi bertambah satu; menekan lagi tidak menambah
+   (satu konfirmasi per pengguna).
+6. A melepas laporannya → laporan hilang dari daftar aktif B setelah muat ulang, dan tidak muncul
+   sebagai bahaya aktif.
+7. Biarkan satu laporan `pothole` melewati 24 jam (atau pakai laporan yang dibuat kemarin) → tidak
+tampil sebagai aktif; bila UI menampilkan riwayat, statusnya jelas kedaluwarsa.
+8. Tolak izin lokasi saat membuka form laporan → form menjelaskan akibatnya dan tidak mengirim
+   koordinat 0,0.
+
+**Chat konvoi**
+
+9. A mengirim pesan → B menerimanya tanpa muat ulang (realtime), dan pesan tetap ada setelah aplikasi
+ditutup lalu dibuka lagi.
+10. Gulir ke atas sampai lebih dari satu halaman → halaman sebelumnya dimuat tanpa duplikat dan tanpa
+    lompatan posisi (keyset pagination).
+11. Kirim pesan saat mode pesawat, lalu nyalakan jaringan dan coba lagi → pesan terkirim **sekali**
+    (idempotensi), tidak muncul dua kali.
+12. A menyunting pesannya dalam jendela yang diizinkan → B melihat isi baru dengan penanda "diedit";
+    percobaan setelah jendela habis ditolak dengan pesan, bukan gagal diam-diam.
+13. A menghapus pesannya → B melihat placeholder "Pesan dihapus", bukan isi aslinya.
+14. B keluar dari perjalanan (atau dikeluarkan host) lalu buka chat → isi chat tidak terbaca dan
+    pengiriman ditolak; pesan sistem tentang kejadian itu tetap tampil bagi peserta yang masih sah.
+15. Bukan peserta membuka detail perjalanan dan memanggil API chat langsung → ditolak; aplikasi tidak
+    menampilkan riwayat kosong yang menyesatkan.
+
+Hasil yang tidak bisa dibuktikan tanpa perangkat tetap dicatat **Blocked**, bukan lulus. Untuk butir
+backend (RLS/RPC) jangan mengulang pengujian yang sudah dicakup Database RLS #19.
 
 ## 9. Status otomatisasi dan verifikasi (Milestone 1–3)
 

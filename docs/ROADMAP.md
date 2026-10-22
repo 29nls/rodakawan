@@ -227,8 +227,9 @@ aktif; tracking tidak berjalan tanpa ride aktif dan opt-in.
 
 ## Milestone 4 — Hazard reports dan convoy chat
 
-**Status: diimplementasikan dan lulus lokal; migration M4 sudah diterapkan ke development (17/17),
-uji RLS live menunggu kredensial.** Pemilik produk memilih jalur
+**Status: diimplementasikan dan lulus lokal; migration M4 sudah diterapkan ke development, dan uji
+RLS/RPC-nya lulus terhadap backend development lewat Database RLS run #19 (commit `1aa1480`,
+22 Oktober 2026 — 7/7 berkas uji). Bukti perangkat belum ada.** Pemilik produk memilih jalur
 kedua [`docs/MILESTONE_4_PLAN.md`](MILESTONE_4_PLAN.md): menunda keputusan peta (ADR-064) dan uji
 perangkat khusus M3, lalu mengerjakan M4 **tanpa marker peta**. Penundaan itu bukan bukti bahwa uji
 M3 sudah lulus.
@@ -255,17 +256,23 @@ M3 sudah lulus.
 `20261021130000_blocked_chat_server_filter.sql`) sudah masuk project development — terverifikasi
 lewat `npx supabase migration list --linked` (17 local = remote, tanpa selisih).
 
-**Belum (blocked):** uji RLS/RPC M4 (`supabase/tests/rls_hazards_test.sql`, `rls_chat_test.sql`,
-`rls_moderation_m4_test.sql`, `rls_blocked_chat_test.sql`) **belum pernah dijalankan live** karena
-kredensial database (`.env.db`) belum tersedia di lingkungan kerja ini, dan realtime lintas perangkat
-belum dibuktikan.
+**Sudah terbukti di backend:** keempat berkas uji M4 (`rls_hazards_test.sql`, `rls_chat_test.sql`,
+`rls_moderation_m4_test.sql`, `rls_blocked_chat_test.sql`) ada di `DEFAULT_TEST_FILES` dan lulus di
+Database RLS run #19 terhadap project development (7 berkas, 7 lulus), bersama `npm run db:types:check`.
+`npm run db:test` di mesin lokal tetap **gagal** (`ECONNREFUSED`, `.env.db` menunjuk `localhost`), jadi
+bukan bukti yang bisa dipakai.
+
+**Belum:** realtime lintas perangkat (dua HP di satu perjalanan), perilaku UI hazard/chat di perangkat,
+dan alur moderasi dengan akun nyata — daftar periksanya di `docs/QA_TEST_PLAN.md` bagian 8d.
 
 **Exit criteria:** report kedaluwarsa tidak aktif; chat tidak dapat dibaca non-member; retry tidak
 membuat duplicate message; hanya host/admin klub yang dapat menghapus konten dan setiap penghapusan
-tercatat. Keempatnya **dirancang dan diuji di database**, tetapi baru terbukti setelah migration
-diterapkan dan `npm run db:test -- --file …` hijau.
+tercatat. Ketiga yang pertama sudah dibuktikan di backend lewat Database RLS #19; bukti perangkat
+(termasuk realtime chat dua perangkat) masih terbuka dan tidak boleh dicatat lulus.
 
 ## Milestone 5 — Push, polish dan beta
+
+Rencana terperinci, urutan prioritas, dan irisan vertikal pertama: [`docs/MILESTONE_5_PLAN.md`](MILESTONE_5_PLAN.md).
 
 - [ ] Push notification undangan/status perjalanan.
 - [ ] Kategori dan preferensi notifikasi dasar.

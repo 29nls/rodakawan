@@ -123,10 +123,11 @@ klub, kendaraan utama, akses perjalanan, tiga bucket Storage, pagar policy, alur
 > npm run db:test -- --file supabase/tests/rls_blocked_chat_test.sql
 > ```
 >
-> Keempat berkas uji itu **belum** dimasukkan ke daftar bawaan `npm run db:test` supaya workflow
-> `database-rls` tetap hijau sebelum migration diterapkan; jalankan eksplisit seperti di atas dan
-> pindahkan ke `DEFAULT_TEST_FILES` di `scripts/db-test.mjs` (beserta pemeriksaan notice-nya di
-> `.github/workflows/database-rls.yml`) setelah semuanya hijau.
+> Keempat berkas uji itu **sudah** ada di `DEFAULT_TEST_FILES` (`scripts/db-test.mjs`) dan notice
+> penandanya diperiksa `.github/workflows/database-rls.yml`, jadi `npm run db:test` menjalankan
+> ketujuh berkas sekaligus. Statusnya: **lulus terhadap backend development** lewat Database RLS
+> run #19 (commit `1aa1480`, 22 Oktober 2026 — 7 berkas, 7 lulus). Perintah `--file` di atas tinggal
+> cara menjalankan satu berkas saat sedang mengembangkan uji; tidak ada yang perlu dipindahkan lagi.
 >
 > Jangan menyunting migration yang sudah diterapkan ke remote; tambahkan migration baru. Jumlah
 > pastinya bisa diperiksa dengan `ls supabase/migrations` atau `npx supabase migration list` — jangan
@@ -403,11 +404,12 @@ perubahan ini pada mesin lain:
 npm ci
 npm_config_loglevel=error npx supabase db push --yes   # atau db push --db-url "$DATABASE_URL"
 npm run db:types                                       # tipe RPC perjalanan ikut diperbarui
-npm run db:test                                        # 3 berkas: profil, policy guard, perjalanan
+npm run db:test   # 7 berkas: profil, policy guard, perjalanan, bahaya M4, chat M4, moderasi M4, filter blokir
 ```
 
-`npm run db:test` harus mencetak tiga notice penanda: `UJI RLS PROFIL LULUS`,
-`UJI POLICY OWNER-GUARD LULUS`, dan `UJI RLS PERJALANAN M3 LULUS`. Berkas perjalanan berjalan dalam
+`npm run db:test` harus mencetak tujuh notice penanda: `UJI RLS PROFIL LULUS`,
+`UJI POLICY OWNER-GUARD LULUS`, `UJI RLS PERJALANAN M3 LULUS`, `UJI RLS LAKUAN M4 LULUS`,
+`UJI RLS CHAT M4 LULUS`, `UJI MODERASI M4 LULUS`, dan `UJI FILTER BLOKIR CHAT LULUS`. Berkas perjalanan berjalan dalam
 satu transaksi dan berakhir `ROLLBACK`, jadi tidak meninggalkan pengguna/klub/ride uji.
 
 **Dependency native.** `expo-location` dan `expo-task-manager` sudah ada di `package.json`
@@ -779,7 +781,8 @@ Aturan yang berlaku di kedua jalur:
   dilewati bersama `build-apk`.
 - **Pencatatan itu tidak bisa memicu rilis berantai** walau workflow-nya sampai berjalan:
   `scripts/should-release.mjs` melewati build APK bila seluruh perubahan sejak tag terakhir hanya
-  dokumentasi/test/CI, dan `CHANGELOG.md` termasuk di dalamnya.
+  dokumentasi/markdown, uji (Jest dan SQL `supabase/tests/**`), migration `supabase/migrations/**`,
+  tooling database, atau berkas CI, dan `CHANGELOG.md` termasuk di dalamnya.
 - Build EAS hanya dipanggil sekali per rilis: `concurrency: release-on-push` membuat dispatch manual
   yang datang saat rilis lain berjalan ikut mengantre, bukan berjalan bersamaan.
 - Rilis preview tidak pernah mengunggah apa pun ke Google Play; rilis produksi tetap lewat
