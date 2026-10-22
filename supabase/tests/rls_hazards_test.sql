@@ -397,23 +397,40 @@ $$;
 
 -- 13. Laporan kedaluwarsa: tidak terbaca sebagai aktif oleh non-pelapor, tetap
 --     terbaca pelapor; konfirmasi ditolak 23514.
-set local request.jwt.claims = '{"sub":"55555555-5555-4555-8555-555555555555","role":"authenticated"}';
-do $$
-declare
-  v_h public.hazard_reports;
-begin
-  v_h := public.create_hazard('pothole','info',-7.5,108.5,'Untuk kedaluwarsa',null,null);
-  insert into public.uji_m4_konteks (nama, id) values ('h_e_exp', v_h.id);
-end;
-$$;
-
+--
+--     Fixture dibuat sebagai owner dengan `created_at` mundur, supaya trigger
+--     sebelum-insert yang menghitung `expires_at` dari kategori (pothole 24 jam)
+--     menghasilkan baris yang memang sudah kedaluwarsa. Memundurkan `created_at`
+--     sesudah insert tidak cukup: `hazard_reports_expiry_guard` hanya menghitung
+--     ulang pada tulis ke `expires_at`, dan menulis kolom itu justru ditolak 42501
+--     karena masa berlaku hanya boleh dihitung server — akibatnya baris tetap
+--     terbaca aktif dan asersi di bawah tidak menguji kedaluwarsa sama sekali.
 reset role;
 do $$
-declare v_id uuid;
+declare
+  v_id uuid;
 begin
-  select id into v_id from public.uji_m4_konteks where nama = 'h_e_exp';
-  -- pothole kedaluwarsa 24 jam; mundurkan 25 jam supaya expires_at <= now().
-  update public.hazard_reports set created_at = now() - interval '25 hours' where id = v_id;
+  insert into public.hazard_reports (
+    reporter_id,
+    category,
+    severity,
+    latitude,
+    longitude,
+    description,
+    created_at
+  )
+  values (
+    '55555555-5555-4555-8555-555555555555',
+    'pothole',
+    'info',
+    -7.5,
+    108.5,
+    'Untuk kedaluwarsa',
+    now() - interval '25 hours'
+  )
+  returning id into v_id;
+
+  insert into public.uji_m4_konteks (nama, id) values ('h_e_exp', v_id);
 end;
 $$;
 set local role authenticated;
