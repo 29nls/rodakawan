@@ -180,13 +180,18 @@ Perintah yang benar-benar dijalankan pada 21 Oktober 2026: `npm run typecheck` (
 (**240 lulus**), `npm run export:android` (0), `npm run doctor` (gagal karena DNS `exp.host`),
 `npm run db:test` (exit 1, `ECONNREFUSED`).
 
-Diperbarui 22 Oktober 2026: `npm run db:test` di mesin lokal **masih** gagal (`ECONNREFUSED` karena
-`.env.db` menunjuk `localhost`; 0 lulus, 7 tidak dijalankan), jadi jalur lokal tetap **bukan** lulus.
-Yang lulus adalah **Database RLS run #19** di GitHub Actions terhadap backend development (7/7 berkas,
-termasuk keempat berkas M4). Bukti perangkat tetap terpisah dan belum ada — lihat bagian 8d.
+Diperbarui 22 Oktober 2026 (sore): password database development dirotasi dan `.env.db` diarahkan ke
+**Session Pooler** (`aws-0-ap-southeast-1.pooler.supabase.com:5432`, user `postgres.xvmcpfkkveeaevfcvfug`)
+— bukan lagi `localhost`. `npm run db:test` di mesin lokal kini **exit 0**: 7/7 berkas lulus dan seluruh
+notice penanda diterima (`UJI RLS PROFIL LULUS`, `UJI POLICY OWNER-GUARD LULUS`, `UJI RLS PERJALANAN M3
+LULUS`, `UJI RLS LAKUAN M4 LULUS`, `UJI RLS CHAT M4 LULUS`, `UJI MODERASI M4 LULUS`, `UJI FILTER BLOKIR
+CHAT LULUS`). Jalur lokal dan **Database RLS run #19** di GitHub Actions karena itu sepakat; secret
+`DB_TEST_DATABASE_URL` ikut diperbarui setelah rotasi. Bukti perangkat tetap terpisah dan belum ada —
+lihat bagian 8d.
 Pada 22 Oktober 2026 juga dijalankan ulang penuh: `npm test -- --ci` **0** (43 suite / 483 test),
 `npm run test:scripts` **0** (71 suite / 318 test), `typecheck`/`lint`/`format:check` **0**,
-`export:android` **0**; `db:test`, `db:types:check`, dan `storage:test` tetap **1** karena lokal.
+`export:android` **0**. `db:types:check` ikut dijalankan ulang dan **exit 0** (tipe generated sama dengan
+skema); `storage:test` **belum** dijalankan karena butuh kunci Storage project development.
 
 Uji manual yang **belum** dilakukan dan tidak boleh dianggap lulus: dua perangkat pada chat yang sama,
 realtime saat koneksi putus/nyambung ulang, izin lokasi ditolak saat melapor, GPS mati, laporan

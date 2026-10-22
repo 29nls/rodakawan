@@ -13,7 +13,7 @@ Dokumen ini tidak mengulang lingkup lama. Sumber kebenaran produk tetap
 | Bukti | Status |
 | --- | --- |
 | SQL RLS/RPC M4 (hazard, chat, moderasi, filter blokir) | **Lulus terhadap backend development** — Database RLS #19 |
-| `npm run db:test` di mesin lokal | **Gagal** — `.env.db` menunjuk `localhost`, `ECONNREFUSED` (0 lulus, 7 tidak dijalankan) |
+| `npm run db:test` di mesin lokal | **Lulus** — 7/7 berkas, exit 0 (22 Oktober 2026, setelah `.env.db` diarahkan ke Session Pooler dan password development dirotasi) |
 | UI hazard/chat, realtime dua perangkat, moderasi dengan akun nyata | **Belum** — daftar periksa di QA_TEST_PLAN 8d |
 | Klien notifikasi (`expo-notifications`), crash reporting, kebijakan privasi, hapus akun | **Belum ada di repository** |
 

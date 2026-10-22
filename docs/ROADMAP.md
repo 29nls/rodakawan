@@ -259,8 +259,9 @@ lewat `npx supabase migration list --linked` (17 local = remote, tanpa selisih).
 **Sudah terbukti di backend:** keempat berkas uji M4 (`rls_hazards_test.sql`, `rls_chat_test.sql`,
 `rls_moderation_m4_test.sql`, `rls_blocked_chat_test.sql`) ada di `DEFAULT_TEST_FILES` dan lulus di
 Database RLS run #19 terhadap project development (7 berkas, 7 lulus), bersama `npm run db:types:check`.
-`npm run db:test` di mesin lokal tetap **gagal** (`ECONNREFUSED`, `.env.db` menunjuk `localhost`), jadi
-bukan bukti yang bisa dipakai.
+`npm run db:test` di mesin lokal juga **lulus** (7/7 berkas, exit 0, 22 Oktober 2026) setelah `.env.db`
+diarahkan ke Session Pooler dan password development dirotasi — jadi backend M4 terbukti di dua jalur,
+lokal dan GitHub Actions.
 
 **Belum:** realtime lintas perangkat (dua HP di satu perjalanan), perilaku UI hazard/chat di perangkat,
 dan alur moderasi dengan akun nyata — daftar periksanya di `docs/QA_TEST_PLAN.md` bagian 8d.

@@ -57,9 +57,10 @@ kendaraan sudah diperbaiki dengan uji allow/deny (ADR-039, ADR-040). Empat migra
 selisih). Uji SQL RLS Milestone 4 (`rls_hazards_test.sql`, `rls_chat_test.sql`,
 `rls_moderation_m4_test.sql`, `rls_blocked_chat_test.sql`) **sudah dijalankan dan lulus** terhadap
 project development lewat GitHub Actions **Database RLS #19** (commit `1aa1480`, 22 Oktober 2026):
-tujuh berkas uji lulus dan semua notice penanda diterima. Itu **tidak** berarti `npm run db:test` di
-mesin ini lulus — `.env.db` lokal masih menunjuk `localhost` dan gagal `ECONNREFUSED` — dan tidak
-berarti pula fitur M4 sudah diuji di HP fisik; daftar uji manualnya ada di
+tujuh berkas uji lulus dan semua notice penanda diterima. Sejak 22 Oktober 2026 sore `npm run db:test`
+di mesin ini juga **lulus** (7/7 berkas, exit 0) setelah `.env.db` diarahkan ke Session Pooler dan
+password development dirotasi — tetapi itu tidak berarti fitur M4 sudah diuji di HP fisik; daftar
+uji manualnya ada di
 [`docs/QA_TEST_PLAN.md`](docs/QA_TEST_PLAN.md) bagian 8d. Langkah penerapannya ada di
 [`docs/SETUP_GUIDE.md`](docs/SETUP_GUIDE.md#4-menerapkan-migration). Semua langkah yang dapat
 dijalankan tanpa backend sudah dijalankan — lihat [Perintah pengujian](#perintah-pengujian).
@@ -275,16 +276,17 @@ runner test script (ADR-072) + perbaikan lokal yang belum di-commit saat tabel i
 | `npm run test:scripts` | **294 test lulus**, exit 0 — dijalankan dengan konkurensi tetap (`--test-concurrency=1`) dan batas waktu per test (`--test-timeout=180000`), ADR-072. |
 | `npm run doctor` | **Tidak dapat dipastikan**: pemeriksaan skema config gagal `TypeError: fetch failed` / `EAI_AGAIN exp.host` (DNS lingkungan ini), 1 dari 21 pemeriksaan gagal. Bukan temuan proyek. Pemeriksaan versi dependency **lulus** — tidak ada drift setelah ADR-071. |
 | `npm run export:android` | Exit 0, bundel Hermes `entry-*.hbc` 4 MB. |
-| `npm run db:test` | **Exit 1 — `ECONNREFUSED`**. `.env.db` di mesin ini menunjuk `postgres@localhost:5432`, bukan project development `xvmcpfkkveeaevfcvfug`, dan tidak ada server lokal. Uji RLS Milestone 4 **belum dijalankan**. |
-| `npm run db:types:check`, `npm run storage:test` | **Tidak dijalankan** — membutuhkan connection string project development yang terkonfirmasi. |
+| `npm run db:test` | **Exit 0 — 7/7 berkas lulus** (22 Oktober 2026, setelah `.env.db` diarahkan ke Session Pooler dan password development dirotasi). Seluruh notice penanda diterima, termasuk keempat berkas M4. |
+| `npm run db:types:check` | **Exit 0** — `src/lib/supabase/database.generated.ts` sama dengan skema database (22 Oktober 2026, target session pooler project development). |
+| `npm run storage:test` | **Belum dijalankan** — butuh kunci Storage project development; tidak diperlukan oleh uji RLS. |
 
 Hasil historis pada commit `749424c` (19 Oktober 2026, Node 24.18.1, npm 12.0.2):
 
 **Diperbarui 22 Oktober 2026:** `npm test -- --ci` **43 suite / 483 test lulus**, `npm run test:scripts`
 **71 suite / 318 test lulus**, `typecheck`/`lint`/`format:check`/`export:android` exit 0. Angka
-bertanggal di tabel ini adalah hasil saat perintah itu dijalankan, bukan status terkini; `npm run
-db:test` lokal masih gagal (`ECONNREFUSED` karena `.env.db` menunjuk `localhost`), sedangkan uji RLS
-lulus di GitHub Actions (**Database RLS #19**, 7/7 berkas).
+bertanggal di tabel ini adalah hasil saat perintah itu dijalankan, bukan status terkini. `npm run
+db:test` lokal kini **lulus** (7/7 berkas, exit 0) dan uji RLS juga lulus di GitHub Actions
+(**Database RLS #19**, 7/7 berkas).
 
 | Perintah               | Hasil                                                        |
 | ---------------------- | ------------------------------------------------------------ |
