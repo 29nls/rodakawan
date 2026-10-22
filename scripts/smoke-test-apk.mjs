@@ -17,7 +17,10 @@
  *   2. `adb install -r` melaporkan `Success`.
  *   3. `am start -W` melaporkan `Status: ok` untuk aktivitas peluncur paket itu.
  *   4. Dalam batas waktu, proses paketnya hidup (`pidof`) **dan** aktivitasnya
- *      menjadi aktivitas terdepan (`dumpsys activity activities`).
+ *      menjadi aktivitas terdepan (`dumpsys activity activities`). Keadaan
+ *      aplikasi diamati sedikitnya dua kali, supaya "sempat hidup lalu berhenti"
+ *      bisa dibedakan dari "tidak pernah hidup" meski satu pemeriksaan
+ *      memakan seluruh batas waktu.
  *   5. Logcat sejak peluncuran tidak memuat crash milik paket ini
  *      (`FATAL EXCEPTION`, `Fatal signal`, `ANR in`).
  *
@@ -66,6 +69,23 @@ const DEFAULT_TIMEOUT_SECONDS = 60;
 
 /** Jeda antar pemeriksaan saat menunggu aplikasi hidup. */
 const POLL_INTERVAL_MS = 2000;
+
+/**
+ * Jumlah pemeriksaan minimum sebelum script menyerah.
+ *
+ * Satu putaran pemeriksaan bisa memakan seluruh batas waktu — di perangkat
+ * lambat, atau ketika mesinnya sedang sibuk, `dumpsys` dan `pidof` bisa
+ * berlangsung lebih lama daripada timeout-nya sendiri. Kalau script menyerah
+ * setelah satu putaran saja, keadaan yang diamati hanya satu titik waktu:
+ * proses yang sempat hidup lalu mati terlihat sama dengan proses yang tidak
+ * pernah hidup (dan lebih jauh lagi, dengan aplikasi yang hidup tapi layarnya
+ * belum di depan). Karena itu minimal dua putaran dijalankan — keadaan aplikasi
+ * diamati dua kali — sehingga kesimpulannya tidak bergantung pada berapa lama
+ * satu pemeriksaan kebetulan berlangsung. Tambahan biayanya hanya beberapa
+ * perintah adb, dan hanya pada jalur gagal: begitu aktivitasnya terdeteksi di
+ * depan, script berhenti seketika seperti sebelumnya.
+ */
+const MIN_POLL_ATTEMPTS = 2;
 
 /** Batas keluaran adb: `dumpsys` bisa mencetak puluhan ribu baris. */
 const MAX_ADB_OUTPUT = 64 * 1024 * 1024;
@@ -467,7 +487,9 @@ function main() {
   let aliveOnce = false;
   let resumed = null;
   let dumpsys = '';
+  let attempts = 0;
   for (;;) {
+    attempts += 1;
     pid = pidOf(packageId);
     if (pid !== null) {
       aliveOnce = true;
@@ -478,7 +500,10 @@ function main() {
         break;
       }
     }
-    if (Date.now() >= deadline) break;
+    // Batas waktu baru berlaku setelah jumlah pemeriksaan minimum tercapai:
+    // satu pemeriksaan yang lambat tidak boleh menghapus kesempatan melihat
+    // keadaan berikutnya (mis. proses yang sempat hidup lalu mati).
+    if (attempts >= MIN_POLL_ATTEMPTS && Date.now() >= deadline) break;
     sleep(Math.min(POLL_INTERVAL_MS, Math.max(0, deadline - Date.now())));
   }
 

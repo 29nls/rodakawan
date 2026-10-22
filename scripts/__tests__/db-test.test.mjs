@@ -13,11 +13,16 @@
  * - daftar berkas default benar-benar ada, dan setiap berkas menyatakan notice yang
  *   juga benar-benar di-`raise notice` di dalamnya (kalau tidak, uji itu selalu
  *   gagal di CI — atau lebih buruk, lulus karena notice berkas lain);
- * - setiap notice itu juga dicari oleh workflow `database-rls.yml`.
+ * - setiap notice itu juga dicari oleh workflow `database-rls.yml`;
+ * - **satu berkas yang gagal tidak menghentikan berkas lain**: seluruh berkas
+ *   tetap dijalankan dan semua kegagalan diringkas sekaligus, jadi satu putaran
+ *   uji menunjukkan semua masalah — bukan hanya yang pertama.
  *
  * Test tidak menyentuh jaringan: kasus "tanpa DATABASE_URL" tidak pernah membuka
- * koneksi, dan kasus "berkas tanpa direktif" berhenti sebelum mencetak target
- * koneksi. Jalankan: `npm run test:scripts`.
+ * koneksi, kasus "berkas tanpa direktif" berhenti sebelum mencetak target
+ * koneksi, dan perilaku "lanjut setelah gagal" diuji dengan client pg tiruan
+ * (`support/fake-pg-client.mjs`).
+ * Jalankan: `npm run test:scripts`.
  */
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -25,6 +30,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { describe, it } from 'node:test';
 
+import { main as runDbTest } from '../db-test.mjs';
+import { createFakePgClient } from './support/fake-pg-client.mjs';
 import { runScript } from './support/git-repo.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
@@ -65,6 +72,45 @@ function defaultTestFiles() {
 
 function readRepoFile(relativePath) {
   return fs.readFileSync(path.join(ROOT, relativePath), 'utf8').split('\r\n').join('\n');
+}
+
+/**
+ * Isi berkas uji palsu: memuat direktif notice (wajib, kalau tidak berkas
+ * ditolak pada pemeriksaan statis) plus satu penanda unik yang dipakai tiruan
+ * client pg untuk mengenali berkas mana yang sedang dijalankan.
+ */
+function sqlWithMarker(label, marker) {
+  return [`-- db:test notice: UJI ${label} LULUS`, `-- ${marker}`, 'select 1;', ''].join('\n');
+}
+
+/**
+ * Jalankan runner dengan client pg tiruan dan tangkap keluarannya.
+ *
+ * `createClient` sengaja disuntikkan supaya test bisa memastikan apakah koneksi
+ * pernah dibuka — dan tidak perlu database sungguhan.
+ */
+async function runWithFakeClient(args, client) {
+  const out = [];
+  const err = [];
+  const opened = [];
+
+  const code = await runDbTest(args, {
+    env: { DATABASE_URL: DATABASE_URL_PALSU },
+    cwd: ROOT,
+    createClient: (config) => {
+      opened.push(config);
+      return client;
+    },
+    out: (...lines) => out.push(lines.join(' ')),
+    err: (...lines) => err.push(lines.join(' ')),
+  });
+
+  return {
+    code,
+    out: out.join('\n'),
+    err: err.join('\n'),
+    opened,
+  };
 }
 
 describe('db-test.mjs', () => {
@@ -198,5 +244,139 @@ describe('db-test.mjs', () => {
         `workflow tidak memeriksa notice "${directive[1]}" dari ${file}`,
       );
     }
+  });
+
+  it('melanjutkan berkas uji lain setelah satu berkas gagal', async (t) => {
+    const fileA = tempFile(t, 'berkas-a.sql', sqlWithMarker('A', 'BERKAS_A'));
+    const fileB = tempFile(t, 'berkas-b.sql', sqlWithMarker('B', 'BERKAS_B'));
+
+    const client = createFakePgClient([
+      { match: 'BERKAS_A', error: { code: 'P0001', message: 'asersi gagal' } },
+      { match: 'BERKAS_B', notice: 'UJI B LULUS' },
+    ]);
+
+    const result = await runWithFakeClient(['--file', fileA, '--file', fileB], client);
+
+    // Ada berkas yang gagal, jadi keluarannya harus non-nol.
+    assert.equal(result.code, 1);
+
+    // Berkas kedua tetap dijalankan meski berkas pertama gagal.
+    const indexA = client.queries.findIndex((sql) => sql.includes('BERKAS_A'));
+    const indexB = client.queries.findIndex((sql) => sql.includes('BERKAS_B'));
+    assert.ok(indexA >= 0, 'berkas pertama harus dijalankan');
+    assert.ok(indexB > indexA, 'berkas kedua harus dijalankan setelah berkas pertama gagal');
+    assert.match(result.out, /LULUS: .*berkas-b\.sql/);
+
+    // Kegagalan berkas pertama dilaporkan.
+    assert.match(result.err, /berkas-a\.sql/);
+    assert.match(result.err, /asersi gagal/);
+
+    // Ringkasan menyebut semuanya sekaligus.
+    assert.match(result.out, /Ringkasan: 2 berkas uji — 1 lulus, 1 gagal, 0 tidak dijalankan/);
+  });
+
+  it('membersihkan transaksi dengan ROLLBACK sebelum menjalankan berkas berikutnya', async (t) => {
+    // Tanpa ROLLBACK, PostgreSQL membatalkan transaksi yang gagal dan menolak
+    // perintah berikutnya dengan "current transaction is aborted" — berkas
+    // berikutnya tidak akan pernah bisa dijalankan.
+    const fileA = tempFile(t, 'berkas-a.sql', sqlWithMarker('A', 'BERKAS_A'));
+    const fileB = tempFile(t, 'berkas-b.sql', sqlWithMarker('B', 'BERKAS_B'));
+
+    const client = createFakePgClient([
+      { match: 'BERKAS_A', error: { code: 'P0001', message: 'asersi gagal' } },
+      { match: 'BERKAS_B', notice: 'UJI B LULUS' },
+    ]);
+
+    await runWithFakeClient(['--file', fileA, '--file', fileB], client);
+
+    const indexA = client.queries.findIndex((sql) => sql.includes('BERKAS_A'));
+    const indexB = client.queries.findIndex((sql) => sql.includes('BERKAS_B'));
+    const between = client.queries.slice(indexA + 1, indexB);
+
+    assert.ok(
+      between.some((sql) => /rollback/i.test(sql)),
+      'koneksi harus dibersihkan dengan ROLLBACK sebelum berkas berikutnya dijalankan',
+    );
+  });
+
+  it('melaporkan seluruh kegagalan sekaligus, bukan hanya yang pertama', async (t) => {
+    const fileA = tempFile(t, 'berkas-a.sql', sqlWithMarker('A', 'BERKAS_A'));
+    const fileB = tempFile(t, 'berkas-b.sql', sqlWithMarker('B', 'BERKAS_B'));
+    const fileC = tempFile(t, 'berkas-c.sql', sqlWithMarker('C', 'BERKAS_C'));
+
+    const client = createFakePgClient([
+      { match: 'BERKAS_A', error: { code: 'P0001', message: 'gagal pertama' } },
+      { match: 'BERKAS_B', error: { code: 'P0001', message: 'gagal kedua' } },
+      { match: 'BERKAS_C', notice: 'UJI C LULUS' },
+    ]);
+
+    const result = await runWithFakeClient(
+      ['--file', fileA, '--file', fileB, '--file', fileC],
+      client,
+    );
+
+    assert.equal(result.code, 1);
+    assert.match(result.err, /gagal pertama/);
+    assert.match(result.err, /gagal kedua/);
+    assert.match(result.err, /berkas-a\.sql/);
+    assert.match(result.err, /berkas-b\.sql/);
+    // Berkas ketiga tetap dijalankan dan tetap dihitung lulus.
+    assert.match(result.out, /LULUS: .*berkas-c\.sql/);
+    assert.match(result.out, /Ringkasan: 3 berkas uji — 1 lulus, 2 gagal, 0 tidak dijalankan/);
+  });
+
+  it('menandai sisa berkas sebagai tidak dijalankan ketika koneksi terputus', async (t) => {
+    const fileA = tempFile(t, 'berkas-a.sql', sqlWithMarker('A', 'BERKAS_A'));
+    const fileB = tempFile(t, 'berkas-b.sql', sqlWithMarker('B', 'BERKAS_B'));
+
+    const client = createFakePgClient([
+      {
+        match: 'BERKAS_A',
+        error: { code: 'ECONNRESET', message: 'Connection terminated unexpectedly' },
+      },
+      { match: 'BERKAS_B', notice: 'UJI B LULUS' },
+    ]);
+
+    const result = await runWithFakeClient(['--file', fileA, '--file', fileB], client);
+
+    assert.equal(result.code, 1);
+    // Berkas kedua memang tidak pernah diuji, jadi tidak boleh diklaim lulus.
+    assert.ok(
+      !client.queries.some((sql) => sql.includes('BERKAS_B')),
+      'berkas kedua tidak boleh dijalankan setelah koneksi terputus',
+    );
+    assert.match(result.out, /Ringkasan: 2 berkas uji — 0 lulus, 0 gagal, 2 tidak dijalankan/);
+    assert.match(result.err, /Berkas uji yang tidak dijalankan/);
+    assert.match(result.err, /berkas-b\.sql/);
+  });
+
+  it('melaporkan seluruh masalah statis sekaligus tanpa membuka koneksi', async (t) => {
+    const missing = path.join(os.tmpdir(), 'berkas-yang-tidak-ada-12345.sql');
+    const withoutNotice = tempFile(t, 'tanpa-notice.sql', 'select 1;\n');
+    const badUuid = tempFile(
+      t,
+      'literal-salah.sql',
+      [
+        '-- db:test notice: UJI PALSU',
+        "select public.create_hazard('pothole','moderate',-6.2,106.8,'Lubang',null,'a-client-001');",
+        '',
+      ].join('\n'),
+    );
+
+    const client = createFakePgClient([]);
+    const result = await runWithFakeClient(
+      ['--file', missing, '--file', withoutNotice, '--file', badUuid],
+      client,
+    );
+
+    assert.equal(result.code, 1);
+    assert.match(result.err, /Pemeriksaan statis menemukan 3 masalah/);
+    assert.match(result.err, /Berkas uji tidak ditemukan/);
+    assert.match(result.err, /tidak memuat direktif notice penanda lulus/);
+    assert.match(result.err, /a-client-001/);
+    assert.match(result.err, /22P02/);
+    // Tidak ada koneksi yang boleh dibuka selama pemeriksaan statis gagal.
+    assert.equal(result.opened.length, 0, 'koneksi tidak boleh dibuka');
+    assert.doesNotMatch(result.out, /Target :/);
   });
 });

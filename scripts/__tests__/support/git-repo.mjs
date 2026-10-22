@@ -15,6 +15,22 @@ import { pathToFileURL } from 'node:url';
 
 const SCRIPTS_DIR = path.resolve(import.meta.dirname, '..', '..');
 
+/**
+ * Batas waktu satu proses anak yang dispawn test (ms).
+ *
+ * Batas runner (`--test-timeout` di `package.json`) tidak bisa menyentuh
+ * proses anak yang sedang memblokir: `spawnSync` menahan event loop, sehingga
+ * timer runner tidak pernah berbunyi sampai panggilan itu kembali. Tanpa
+ * batas di sini, satu script yang menggantung (mis. menunggu input yang
+ * tak pernah datang) membuat CI menggantung sampai batas job, bukan gagal
+ * dengan pesan.
+ * * Nilainya longgar: pemanggilan child terpanjang diukur 25 detik di mesin
+ * Windows devs (lihat ADR-072), jadi 120 detik memberi beberapa kali
+ * lipatan. Uji yang memang sengaja menunggu proses yang menggantung memakai
+ * `timeoutMs` yang lebih kecil.
+ */
+export const CHILD_TIMEOUT_MS = 120_000;
+
 /** URL berkas (untuk `import` di dalam proses Node lain) dari script di `scripts/`. */
 export function scriptUrl(relativePath) {
   return pathToFileURL(path.resolve(SCRIPTS_DIR, relativePath)).href;
@@ -77,8 +93,17 @@ export function createRepo(t) {
  * membuktikan perilaku "variabel benar-benar tidak ada": tanpa ini, variabel yang
  * kebetulan diset di mesin penguji akan lolos ke proses anak dan hasil test
  * bergantung pada mesin, bukan pada kode.
+ *
+ * `timeoutMs` overriding batas waktu proses anak (lihat `CHILD_TIMEOUT_MS`).
+ * Proses yang melewati batas dibunuh, dan hasilnya ditandai lewat `timedOut`
+ * supaya test bisa membedakan "gagal" dari "menggantung".
  */
-export function runScript(dir, relativePath, args = [], { env = {}, unset = [], input } = {}) {
+export function runScript(
+  dir,
+  relativePath,
+  args = [],
+  { env = {}, unset = [], input, timeoutMs = CHILD_TIMEOUT_MS } = {},
+) {
   const childEnv = { ...process.env, ...env };
   for (const nama of unset) delete childEnv[nama];
 
@@ -87,9 +112,16 @@ export function runScript(dir, relativePath, args = [], { env = {}, unset = [], 
     encoding: 'utf8',
     env: childEnv,
     input: input ?? '',
+    timeout: timeoutMs,
   });
 
-  return { stdout: result.stdout ?? '', stderr: result.stderr ?? '', code: result.status };
+  return {
+    stdout: result.stdout ?? '',
+    stderr: result.stderr ?? '',
+    code: result.status,
+    signal: result.signal ?? null,
+    timedOut: result.error?.code === 'ETIMEDOUT',
+  };
 }
 
 /**
@@ -99,11 +131,18 @@ export function runScript(dir, relativePath, args = [], { env = {}, unset = [], 
  * `process.cwd()` (mis. `resolvePreviousTag`), sehingga test tidak perlu
  * `process.chdir` dan tetap aman dijalankan paralel dengan test lain.
  */
-export function evalInRepo(dir, source) {
+export function evalInRepo(dir, source, { timeoutMs = CHILD_TIMEOUT_MS } = {}) {
   const result = spawnSync(process.execPath, ['--input-type=module', '-e', source], {
     cwd: dir,
     encoding: 'utf8',
+    timeout: timeoutMs,
   });
 
-  return { stdout: (result.stdout ?? '').trim(), stderr: result.stderr ?? '', code: result.status };
+  return {
+    stdout: (result.stdout ?? '').trim(),
+    stderr: result.stderr ?? '',
+    code: result.status,
+    signal: result.signal ?? null,
+    timedOut: result.error?.code === 'ETIMEDOUT',
+  };
 }
