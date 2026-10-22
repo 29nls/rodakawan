@@ -11,14 +11,20 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 
 import type { AppError } from '@/features/auth/errors';
 import { mapModerationError } from '@/features/moderation/errors';
-import type { Database } from '@/lib/supabase/database.types';
+import type { ContentReportRow, Database, ModerationReason } from '@/lib/supabase/database.types';
 
 export type ModerationClient = SupabaseClient<Database>;
 
 export type ContentReportTarget = 'hazard' | 'chat_message';
 
-export type ContentReportReason =
-  'spam' | 'harassment' | 'false_information' | 'unsafe_content' | 'privacy' | 'other';
+/**
+ * Alasan laporan memakai union yang sama dengan CHECK constraint
+ * `content_reports.reason` dan `moderation_actions.reason`.
+ */
+export type ContentReportReason = ModerationReason;
+
+/** Bentuk baris `public.content_reports` (union sesuai CHECK constraint). */
+export type { ContentReportRow };
 
 export const CONTENT_REPORT_REASONS: readonly {
   value: ContentReportReason;
@@ -39,17 +45,6 @@ export type ContentReportInput = {
   targetId: string;
   reason: ContentReportReason;
   details?: string;
-};
-
-export type ContentReportRow = {
-  id: string;
-  reporter_id: string;
-  target_type: string;
-  target_id: string;
-  reason: string;
-  details: string | null;
-  status: string;
-  created_at: string;
 };
 
 export type ModerationResult<T> = { ok: true; data: T } | { ok: false; error: AppError };

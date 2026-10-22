@@ -22,25 +22,14 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { NETWORK_APP_ERROR, type AppError } from '@/features/auth/errors';
 import { mapChatError } from '@/features/chat/errors';
 import { reportContent, type ContentReportReason } from '@/features/moderation/api';
-import type { Database } from '@/lib/supabase/database.types';
+import type { ChatMessageRow, ChatMessageType, Database } from '@/lib/supabase/database.types';
 
 export type ChatClient = SupabaseClient<Database>;
 
 export type ChatResult<T> = { ok: true; data: T } | { ok: false; error: AppError };
 
-export type ChatMessageType = 'text' | 'system';
-
-export type ChatMessageRow = {
-  id: string;
-  ride_id: string;
-  sender_id: string;
-  message_type: ChatMessageType;
-  content: string;
-  created_at: string;
-  edited_at: string | null;
-  deleted_at: string | null;
-  client_message_id: string | null;
-};
+/** Bentuk baris `public.chat_messages` (union sesuai CHECK constraint). */
+export type { ChatMessageRow, ChatMessageType };
 
 /** Pesan yang aman ditampilkan: isi pesan terhapus sudah dikosongkan. */
 export type ChatMessage = ChatMessageRow & { deleted: boolean };
@@ -219,7 +208,7 @@ export async function getChatMessages(
     const { data, error } = await query;
     if (error) return { ok: false, error: mapChatError(error) };
 
-    const rows = ((data ?? []) as unknown as ChatMessageRow[]).map(toChatMessage);
+    const rows = (data ?? []).map(toChatMessage);
     const hasMore = rows.length > limit;
     const page = hasMore ? rows.slice(0, limit) : rows;
 

@@ -5,12 +5,13 @@ import {
   removeReportedContent,
   reviewReport,
   type ModerationQueueItem,
+  type ModerationReport,
 } from '@/features/moderation/queue';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@/lib/supabase/database.types';
 import { createQueryClient, type QueryResponse } from '@/test-support/fakeSupabase';
 
-const HAZARD_REPORT = {
+const HAZARD_REPORT: ModerationReport = {
   id: 'repo-1',
   reporter_id: 'user-b',
   target_type: 'hazard',
@@ -22,7 +23,7 @@ const HAZARD_REPORT = {
   reviewed_at: null,
 };
 
-const CHAT_REPORT = {
+const CHAT_REPORT: ModerationReport = {
   id: 'repo-2',
   reporter_id: 'user-b',
   target_type: 'chat_message',

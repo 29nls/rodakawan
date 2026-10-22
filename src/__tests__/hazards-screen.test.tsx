@@ -62,7 +62,7 @@ function buildRow(overrides: Partial<HazardRow> = {}): HazardRow {
     status: 'active',
     expires_at: '2026-10-20T11:00:00.000Z',
     created_at: '2026-10-20T09:30:00.000Z',
-    updated_at: null,
+    updated_at: '2026-10-20T09:30:00.000Z',
     client_report_id: null,
     ...overrides,
   };

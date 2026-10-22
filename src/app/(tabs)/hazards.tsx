@@ -683,7 +683,7 @@ export default function HazardsScreen() {
                       onPress={() =>
                         setEditing({
                           id: hazard.id,
-                          severity: hazard.severity as HazardSeverity,
+                          severity: hazard.severity,
                           description: hazard.description ?? '',
                         })
                       }
