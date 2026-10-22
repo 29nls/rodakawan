@@ -8,6 +8,17 @@ sedangkan build preview (`v<versi>-build<N>`) diringkas di dalam blok yang bisa 
 versi adalah tautan ke halaman rilisnya di GitHub, sehingga riwayat ini bisa dinavigasi langsung
 dari berkas.
 
+## [v0.1.0-build36](https://github.com/29nls/rodakawan/releases/tag/v0.1.0-build36) — 2026-10-22 · pratinjau
+
+<details>
+<summary>Catatan rilis pratinjau</summary>
+
+### Perubahan lain
+
+- Perbaiki kata kunci get stacked diagnostics di uji RLS hazard dan chat (`1bf2c62`)
+
+</details>
+
 ## [v0.1.0-build35](https://github.com/29nls/rodakawan/releases/tag/v0.1.0-build35) — 2026-10-22 · pratinjau
 
 <details>
