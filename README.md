@@ -41,7 +41,9 @@ Istilah status dipakai konsisten di seluruh dokumentasi:
 | Milestone 4: laporan bahaya jalan (buat, filter, ubah/lepas, konfirmasi, laporkan) | Ya — RPC transaksional, expiry dihitung server, idempotensi + rate limit + deteksi duplikat di database; tanpa peta, daftar memakai label area perkiraan | Ya (29 test fitur + 6 test layar) | **Ya** (uji RLS LULUS — Database RLS #19) | **Blocked** (belum ada build perangkat) |
 | Milestone 4: chat konvoi (teks, ubah/hapus 15 menit, pesan sistem, realtime, laporkan, blokir) | Ya — Postgres Changes pada `chat_messages`, keyset pagination, idempotensi `client_message_id`, panel chat di detail perjalanan; pesan teks dari pengguna yang diblokir disaring **di server** (policy, ADR-068), bukan di UI | Ya (24 test API + 9 test panel) | **Ya** (uji RLS LULUS — Database RLS #19) | **Blocked** |
 | Milestone 4: moderasi (`content_reports`, `moderation_actions`, `user_blocks`) | Ya — pelaporan lewat RPC `report_content`, dashboard `/moderation` untuk host perjalanan/admin klub dengan aksi hapus konten (soft delete), abaikan, dan tandai ditinjau, jejak audit yang hanya bisa dibaca lewat RPC; **tanpa** peran moderator global (ADR-067) | Ya (16 test layanan + 8 test layar) | **Ya** (uji RLS LULUS — Database RLS #19) | — |
-| Milestone 5+: feed, musik, voice PTT | **Belum** | — | — | — |
+| Milestone 5: hapus akun (anonimisasi) + kebijakan privasi | Ya — RPC `delete_my_account()` idempoten, layar `/account-delete` dengan konfirmasi ketik username, halaman `/privacy`; foto dihapus lewat Storage API sebelum RPC karena Supabase menolak DELETE SQL pada `storage.objects` | Ya (10 test layanan + 4 test layar) | **Ya** (uji RLS LULUS — `db:test` 8/8, 23 Okt 2026) | **Blocked** (belum ada build perangkat) |
+| Milestone 5: push notification, crash monitoring, device matrix | **Belum** — rencana di `docs/MILESTONE_5_PLAN.md`; push butuh modul native + kredensial FCM | — | — | — |
+| Milestone 6+: feed, musik, voice PTT | **Belum** | — | — | — |
 
 **Blocked** yang tersisa berarti: alur itu belum dijalankan terhadap backend nyata atau belum diuji di
 HP fisik. Status **Ya** pada kolom perangkat Milestone 2 berasal dari laporan pemilik aplikasi
@@ -58,9 +60,12 @@ selisih). Uji SQL RLS Milestone 4 (`rls_hazards_test.sql`, `rls_chat_test.sql`,
 `rls_moderation_m4_test.sql`, `rls_blocked_chat_test.sql`) **sudah dijalankan dan lulus** terhadap
 project development lewat GitHub Actions **Database RLS #19** (commit `1aa1480`, 22 Oktober 2026):
 tujuh berkas uji lulus dan semua notice penanda diterima. Sejak 22 Oktober 2026 sore `npm run db:test`
-di mesin ini juga **lulus** (7/7 berkas, exit 0) setelah `.env.db` diarahkan ke Session Pooler dan
-password development dirotasi — tetapi itu tidak berarti fitur M4 sudah diuji di HP fisik; daftar
-uji manualnya ada di
+di mesin ini juga **lulus** setelah `.env.db` diarahkan ke Session Pooler dan password development
+dirotasi; pada 23 Oktober 2026 hasilnya **8/8 berkas** karena sudah termasuk `rls_account_delete_test.sql`.
+Dua migration Milestone 5 — `20261022190000_account_deletion_m5.sql` dan
+`20261022193000_account_deletion_storage_api.sql` — juga **sudah diterapkan** ke project development
+(19 migration; `npm run db:types:check` lulus, yang berarti skema remote sama dengan tipe generated).
+Itu tidak berarti fitur M4/M5 sudah diuji di HP fisik; daftar uji manualnya ada di
 [`docs/QA_TEST_PLAN.md`](docs/QA_TEST_PLAN.md) bagian 8d. Langkah penerapannya ada di
 [`docs/SETUP_GUIDE.md`](docs/SETUP_GUIDE.md#4-menerapkan-migration). Semua langkah yang dapat
 dijalankan tanpa backend sudah dijalankan — lihat [Perintah pengujian](#perintah-pengujian).
@@ -83,6 +88,19 @@ admin klub melihat antrean laporan atas konten yang mereka awasi, menghapus kont
 atau menutup laporan sebagai diabaikan/ditinjau — setiap tindakan tercatat di jejak audit.
 Karena ADR-064 belum disetujui, laporan bahaya **tidak** digambar di peta: setiap laporan menampilkan
 label area perkiraan (±1 km) dari koordinatnya, tanpa tile, marker, atau koordinat contoh.
+
+**Hapus akun sudah berfungsi dan memakai anonimisasi, bukan hard delete** (ADR-076). Dari tab Profil,
+**Hapus akun** membuka `/account-delete`: konsekuensinya dijelaskan lebih dulu, tombol baru aktif
+setelah username diketik ulang, lalu aplikasi menghapus avatar dan foto kendaraan lewat Storage API,
+memanggil RPC `delete_my_account()`, dan keluar dari perangkat. RPC itu menghapus token push, posisi
+terakhir, notifikasi pribadi, follow/blokir, dan kendaraan; mengubah keanggotaan klub/perjalanan
+menjadi `left`; serta mengganti username/nama/avatar/bio/kota dengan nilai anonim — sementara laporan
+bahaya dan jejak audit tetap ada tanpa identitas, karena keduanya data keselamatan bersama.
+Kegagalan Storage **tidak** dipalsukan menjadi sukses: layar memberi tahu bahwa sebagian foto akan
+dibersihkan pengelola. `auth.users` sengaja tidak dihapus dari SQL, jadi penghapusan identitas login
+masih tugas operator. Kebijakan privasi (retensi per jenis data, apa yang tidak dibagikan, kontak
+dukungan) tersedia di `/privacy` dan juga di [`docs/SECURITY_PRIVACY.md`](docs/SECURITY_PRIVACY.md)
+bagian 8.4.
 
 **Unggah foto kendaraan, logo klub, dan foto profil sudah berfungsi.** `vehicle-photos`,
 `club-logos`, dan `avatars` adalah bucket privat: foto kendaraan dan foto profil hanya bisa dibaca
@@ -274,19 +292,22 @@ runner test script (ADR-072) + perbaikan lokal yang belum di-commit saat tabel i
 | `npm run deps:check` | Exit 0 — versi dependency cocok dengan Expo SDK 57.0.31 (`expo` 57.0.31, `expo-location` 57.0.22, `expo-router` 57.0.29), ADR-071. |
 | `npm test -- --ci` | **43 suite, 483 test lulus**, exit 0 — termasuk 24 test API chat, 9 test panel chat, 29 test hazard (API + label area), 6 test layar Peringatan, serta 16 test layanan + 8 test layar moderasi. |
 | `npm run test:scripts` | **294 test lulus**, exit 0 — dijalankan dengan konkurensi tetap (`--test-concurrency=1`) dan batas waktu per test (`--test-timeout=180000`), ADR-072. |
-| `npm run doctor` | **Tidak dapat dipastikan**: pemeriksaan skema config gagal `TypeError: fetch failed` / `EAI_AGAIN exp.host` (DNS lingkungan ini), 1 dari 21 pemeriksaan gagal. Bukan temuan proyek. Pemeriksaan versi dependency **lulus** — tidak ada drift setelah ADR-071. |
-| `npm run export:android` | Exit 0, bundel Hermes `entry-*.hbc` 4 MB. |
-| `npm run db:test` | **Exit 0 — 7/7 berkas lulus** (22 Oktober 2026, setelah `.env.db` diarahkan ke Session Pooler dan password development dirotasi). Seluruh notice penanda diterima, termasuk keempat berkas M4. |
+| `npm run doctor` | **Tidak dapat dipastikan**: pemeriksaan skema config gagal `TypeError: fetch failed` / `ENOTFOUND exp.host` (DNS lingkungan ini), 1 dari 21 pemeriksaan gagal (diperiksa ulang 23 Oktober 2026). Bukan temuan proyek. Pemeriksaan versi dependency **lulus** — tidak ada drift setelah ADR-071. |
+| `npm run export:android` | Exit 0, bundel Hermes `entry-*.hbc` 4.1 MB (diperiksa ulang 23 Oktober 2026 setelah layar hapus akun dan kebijakan privasi ditambahkan). |
+| `npm run db:test` | **Exit 0 — 8/8 berkas lulus** (23 Oktober 2026, `.env.db` menunjuk Session Pooler project development). Seluruh notice penanda diterima, termasuk keempat berkas M4 dan `rls_account_delete_test.sql`. |
 | `npm run db:types:check` | **Exit 0** — `src/lib/supabase/database.generated.ts` sama dengan skema database (22 Oktober 2026, target session pooler project development). |
-| `npm run storage:test` | **Belum dijalankan** — butuh kunci Storage project development; tidak diperlukan oleh uji RLS. |
+| `npm run storage:test` | **Exit 0 — 27 langkah lulus** (23 Oktober 2026), termasuk verifikasi kebersihan objek/akun uji. |
 
 Hasil historis pada commit `749424c` (19 Oktober 2026, Node 24.18.1, npm 12.0.2):
 
-**Diperbarui 22 Oktober 2026:** `npm test -- --ci` **43 suite / 483 test lulus**, `npm run test:scripts`
-**71 suite / 318 test lulus**, `typecheck`/`lint`/`format:check`/`export:android` exit 0. Angka
-bertanggal di tabel ini adalah hasil saat perintah itu dijalankan, bukan status terkini. `npm run
-db:test` lokal kini **lulus** (7/7 berkas, exit 0) dan uji RLS juga lulus di GitHub Actions
-(**Database RLS #19**, 7/7 berkas).
+**Diperbarui 23 Oktober 2026:** `npm test -- --ci` **45 suite / 497 test lulus**, `npm run test:scripts`
+**71 suite / 318 test lulus**, `typecheck`/`lint`/`format:check` exit 0, `npm run db:test` **8/8 berkas**,
+`npm run db:types:check` exit 0, `npm run storage:test` **27 langkah**, `npm run export:android` exit 0
+(bundel Hermes 4.1 MB, tanpa string mirip JWT di dalamnya), dan `npm run doctor` **20 dari 21**
+pemeriksaan — satu yang gagal adalah pemeriksaan skema `app.json` yang butuh `exp.host` (DNS lingkungan
+ini, `ENOTFOUND`), bukan temuan proyek. Angka yang lebih lama di tabel ini adalah hasil saat perintah
+itu dijalankan, bukan status terkini. Uji RLS terakhir yang tercatat di GitHub Actions adalah
+**Database RLS #19** (7/7 berkas, commit `1aa1480`); berkas kedelapan baru terbukti lewat jalur lokal.
 
 | Perintah               | Hasil                                                        |
 | ---------------------- | ------------------------------------------------------------ |
@@ -669,6 +690,8 @@ src/
     auth/       # callback tautan email (konfirmasi / pemulihan)
     profile/    # ubah profil
     index.tsx   # gerbang sesi (loading → area privat atau alur masuk)
+    account-delete.tsx  # hapus akun (anonimisasi) dengan konfirmasi ketik username
+    privacy.tsx         # kebijakan privasi & retensi data
     system.tsx  # pratinjau fondasi & sistem (privat)
     reset-password.tsx
   components/   # ui/ (primitif), feedback/ (error boundary), foundation/ (pratinjau token)
@@ -679,6 +702,7 @@ src/
     garage/     # api.ts + validation.ts (CRUD kendaraan, kendaraan utama)
     clubs/      # api.ts + validation.ts (RPC keanggotaan, jelajah klub)
     media/      # photos.ts, picker.ts, imageCompression.ts, photoCleanup.ts, components/
+    account/    # api.ts (kumpulkan media, Storage API, RPC hapus akun), errors.ts
   hooks/        # useAppStatus
   lib/          # env.ts (konfigurasi publik + validasi), supabase/client.ts, crypto/webcrypto.ts
   services/     # appInfo.ts (metadata build)
@@ -697,13 +721,14 @@ scripts/        # generate-assets.mjs, db-test.mjs (runner uji RLS), verify-apk.
                 # preview lama)
 docs/           # sumber kebenaran produk
 supabase/
-  migrations/   # tujuh belas migration: dua berkas fondasi awal
+  migrations/   # sembilan belas migration: dua berkas fondasi awal
                 # (20261013022938_initial_schema.sql, 20261013023038_auth_profile_bootstrap.sql)
                 # + lima belas migration aditif (privasi, klub, garasi, Storage, perjalanan M3,
                 # empat migration M4: hazard, chat konvoi, dashboard moderasi, filter blokir)
-  tests/        # tujuh berkas uji RLS/RPC; rls_profiles_test.sql (dua akun + kontrol positif),
-                # rls_policy_guard_test.sql (pagar policy wadah), rls_rides_test.sql, dan empat
-                # berkas M4 (hazard, chat, moderasi, filter blokir)
+                # + dua migration M5: hapus akun (anonimisasi) dan perbaikan Storage untuknya
+  tests/        # delapan berkas uji RLS/RPC; rls_profiles_test.sql (dua akun + kontrol positif),
+                # rls_policy_guard_test.sql (pagar policy wadah), rls_rides_test.sql, empat
+                # berkas M4 (hazard, chat, moderasi, filter blokir), dan rls_account_delete_test.sql
   drafts/       # draf migration yang belum diterapkan (M5: preferensi notifikasi)
 .github/
   workflows/    # ci.yml

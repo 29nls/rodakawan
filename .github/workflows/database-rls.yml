@@ -33,7 +33,7 @@ name: Database RLS
 # - Setiap berkas uji di `supabase/tests/` membungkus seluruh asersinya dalam
 #   transaksi yang di-ROLLBACK, sehingga menjalankannya ulang tidak menghapus atau
 #   meninggalkan data apa pun.
-# - `npm run db:test` menjalankan tujuh berkas (daftar di `DEFAULT_TEST_FILES`), dan setiap
+# - `npm run db:test` menjalankan delapan berkas (daftar di `DEFAULT_TEST_FILES`), dan setiap
 #   berkas harus memancarkan notice penandanya sendiri. Berkas kedua adalah pagar katalog
 #   policy: gagal bila ada policy pada tabel wadah yang memberi akses lewat kolom kepemilikan
 #   (created_by/author_id/owner_id/…) tanpa penjaga keanggotaan. Detektornya diuji-diri di
@@ -175,6 +175,10 @@ jobs:
           case "${OUTPUT}" in
             *"UJI FILTER BLOKIR CHAT LULUS"*) ;;
             *) MISSING="${MISSING} UJI FILTER BLOKIR CHAT LULUS" ;;
+          esac
+          case "${OUTPUT}" in
+            *"UJI HAPUS AKUN LULUS"*) ;;
+            *) MISSING="${MISSING} UJI HAPUS AKUN LULUS" ;;
           esac
           if [ -n "${MISSING}" ]; then
             echo "::error::Penanda lulus berikut tidak diterima:${MISSING}. Berkas uji berhenti sebelum seluruh asersi dijalankan."

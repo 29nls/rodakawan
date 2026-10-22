@@ -90,7 +90,7 @@ Bagian ini adalah urutan yang sudah disesuaikan dengan kode di repo. Project dev
 
 ### 4.3 Jalankan migration
 
-Repository ini sekarang memuat **tujuh belas** migration. Dua yang pertama adalah **sejarah penyiapan
+Repository ini sekarang memuat **sembilan belas** migration. Dua yang pertama adalah **sejarah penyiapan
 awal** dan urutannya penting:
 
 1. `supabase/migrations/20261013022938_initial_schema.sql` — skema fondasi (migration awal).
@@ -103,7 +103,10 @@ klub, kendaraan utama, akses perjalanan, tiga bucket Storage, pagar policy, alur
 `20261019120000_ride_workflow.sql`, lalu Milestone 4:
 `20261020090000_hazard_reports_m4.sql`, `20261020100000_convoy_chat_m4.sql`,
 `20261021120000_moderation_dashboard.sql`, dan
-`20261021130000_blocked_chat_server_filter.sql`).
+`20261021130000_blocked_chat_server_filter.sql`), serta dua migration Milestone 5:
+`20261022190000_account_deletion_m5.sql` (kolom `profiles.deleted_at` + RPC `delete_my_account()`)
+dan `20261022193000_account_deletion_storage_api.sql` (mengganti badan fungsi itu supaya tidak
+menghapus `storage.objects` dari SQL — lihat ADR-076).
 
 > **Status Milestone 4 (21 Oktober 2026): keempat migration terakhir SUDAH diterapkan ke project
 > development** (terverifikasi `npx supabase migration list --linked`: 17 local = remote). Pada project
@@ -125,9 +128,26 @@ klub, kendaraan utama, akses perjalanan, tiga bucket Storage, pagar policy, alur
 >
 > Keempat berkas uji itu **sudah** ada di `DEFAULT_TEST_FILES` (`scripts/db-test.mjs`) dan notice
 > penandanya diperiksa `.github/workflows/database-rls.yml`, jadi `npm run db:test` menjalankan
-> ketujuh berkas sekaligus. Statusnya: **lulus terhadap backend development** lewat Database RLS
+> kedelapan berkas sekaligus. Statusnya: **lulus terhadap backend development** lewat Database RLS
 > run #19 (commit `1aa1480`, 22 Oktober 2026 — 7 berkas, 7 lulus). Perintah `--file` di atas tinggal
 > cara menjalankan satu berkas saat sedang mengembangkan uji; tidak ada yang perlu dipindahkan lagi.
+>
+> **Status Milestone 5 (23 Oktober 2026): kedua migration hapus akun SUDAH diterapkan ke project
+> development** (19 local = remote; `npm run db:types:check` lulus). Pada project yang belum
+> dimigrasikan, layar `/account-delete` menampilkan galat backend, bukan klaim sukses. Terapkan dan
+> uji dengan urutan yang sama seperti M4:
+>
+> ```powershell
+> npx supabase db push --dry-run
+> npx supabase db push --yes
+> npm run db:types
+> npm run db:test -- --file supabase/tests/rls_account_delete_test.sql
+> ```
+>
+> Berkas uji itu sudah ada di `DEFAULT_TEST_FILES` dan notice `UJI HAPUS AKUN LULUS` diperiksa
+> workflow, jadi `npm run db:test` menjalankan **delapan** berkas sekaligus. Satu catatan yang mahal
+> dipelajari: `delete from storage.objects` **ditolak** Supabase ("Direct deletion from storage tables
+> is not allowed") — objek Storage harus dihapus lewat Storage API di klien atau service role.
 >
 > Jangan menyunting migration yang sudah diterapkan ke remote; tambahkan migration baru. Jumlah
 > pastinya bisa diperiksa dengan `ls supabase/migrations` atau `npx supabase migration list` — jangan

@@ -280,7 +280,11 @@ Rencana terperinci, urutan prioritas, dan irisan vertikal pertama: [`docs/MILEST
 - [ ] Loading/offline/error/empty states lengkap.
 - [ ] Android device matrix dan accessibility pass.
 - [ ] Crash/error monitoring tanpa lokasi presisi.
-- [ ] Privacy policy, delete account flow, support contact.
+- [x] Privacy policy, delete account flow, support contact — **Implemented** dan **Passed against dev backend**
+      (23 Oktober 2026): RPC `delete_my_account()` dengan anonimisasi, layar `/account-delete`, halaman
+      `/privacy`, tautan dukungan ke issue GitHub; uji SQL `rls_account_delete_test.sql` lulus di
+      `npm run db:test` 8/8. **Belum** diuji di perangkat fisik, dan `auth.users` masih harus dihapus
+      operator (ADR-076).
 - [ ] Security and release checklist.
 
 **Exit criteria:** semua P0 acceptance test lulus dan tidak ada blocker severity tinggi.

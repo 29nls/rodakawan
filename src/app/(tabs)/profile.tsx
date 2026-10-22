@@ -34,8 +34,8 @@ import { useAppStatus } from '@/hooks/useAppStatus';
 /**
  * Tab Profil: identitas akun, profil publik, dan pengaturan sesi.
  *
- * Semua aksi di layar ini benar-benar berfungsi (edit profil, foto profil, keluar).
- * Fitur yang belum dibangun (hapus akun) dinyatakan jelas sebagai belum tersedia.
+ * Semua aksi di layar ini benar-benar berfungsi (edit profil, foto profil, keluar,
+ * hapus akun, dan kebijakan privasi).
  */
 export default function ProfileScreen() {
   const router = useRouter();
@@ -342,6 +342,21 @@ export default function ProfileScreen() {
           href="/moderation"
           icon="shield-checkmark-outline"
           label="Moderasi konten"
+        />
+      </Card>
+
+      <Card padding="none">
+        <LinkRow
+          detail="Data apa yang disimpan, berapa lama, dan cara menghubungi dukungan."
+          href="/privacy"
+          icon="lock-closed-outline"
+          label="Kebijakan privasi"
+        />
+        <LinkRow
+          detail="Anonimkan akun dan hapus data pribadi. Tindakan ini tidak bisa dibatalkan."
+          href="/account-delete"
+          icon="trash-outline"
+          label="Hapus akun"
         />
       </Card>
 

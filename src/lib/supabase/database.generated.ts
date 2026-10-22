@@ -394,14 +394,14 @@ isOneToOne: false
                   ]
                 },"profiles": {
                   Row: {
-                    "avatar_url": string | null,"bio": string | null,"city": string | null,"created_at": string,"display_name": string,"id": string,"is_private": boolean,"updated_at": string,"username": string
+                    "avatar_url": string | null,"bio": string | null,"city": string | null,"created_at": string,"deleted_at": string | null,"display_name": string,"id": string,"is_private": boolean,"updated_at": string,"username": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "avatar_url"?: string | null,"bio"?: string | null,"city"?: string | null,"created_at"?: string,"display_name": string,"id": string,"is_private"?: boolean,"updated_at"?: string,"username": string
+                    "avatar_url"?: string | null,"bio"?: string | null,"city"?: string | null,"created_at"?: string,"deleted_at"?: string | null,"display_name": string,"id": string,"is_private"?: boolean,"updated_at"?: string,"username": string
                   }
                   Update: {
-                    "avatar_url"?: string | null,"bio"?: string | null,"city"?: string | null,"created_at"?: string,"display_name"?: string,"id"?: string,"is_private"?: boolean,"updated_at"?: string,"username"?: string
+                    "avatar_url"?: string | null,"bio"?: string | null,"city"?: string | null,"created_at"?: string,"deleted_at"?: string | null,"display_name"?: string,"id"?: string,"is_private"?: boolean,"updated_at"?: string,"username"?: string
                   }
                   Relationships: [
 
@@ -632,6 +632,9 @@ isOneToOne: false
         isOneToOne: true
         isSetofReturn: false
       } },
+"delete_my_account":
+{ Args: Record<PropertyKey, never>; Returns: undefined
+                           },
 "edit_chat_message":
 { Args: { "p_content": string,"p_message_id": string }; Returns: {
               "client_message_id": string | null,

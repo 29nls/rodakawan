@@ -1,8 +1,9 @@
 # Rencana Milestone 5 — Push, polish, dan beta
 
-Status: **rencana saja (belum ada implementasi M5 di repository).** Ditulis 22 Oktober 2026 setelah
-Milestone 4 dinyatakan **lulus di backend** (Database RLS run #19, commit `1aa1480` — 7 berkas uji,
-7 lulus) dan **belum lulus di perangkat** (lihat `docs/QA_TEST_PLAN.md` bagian 8a dan 8d).
+Status: **irisan pertama sudah diimplementasikan** (hapus akun + kebijakan privasi, 22–23 Oktober 2026);
+sisa M5 masih rencana. Ditulis 22 Oktober 2026 setelah Milestone 4 dinyatakan **lulus di backend**
+(Database RLS run #19, commit `1aa1480` — 7 berkas uji, 7 lulus) dan **belum lulus di perangkat**
+(lihat `docs/QA_TEST_PLAN.md` bagian 8a dan 8d).
 
 Dokumen ini tidak mengulang lingkup lama. Sumber kebenaran produk tetap
 [`docs/PRD.md`](PRD.md) (FR-09, PRD §12) dan urutan milestone tetap di
@@ -13,9 +14,10 @@ Dokumen ini tidak mengulang lingkup lama. Sumber kebenaran produk tetap
 | Bukti | Status |
 | --- | --- |
 | SQL RLS/RPC M4 (hazard, chat, moderasi, filter blokir) | **Lulus terhadap backend development** — Database RLS #19 |
-| `npm run db:test` di mesin lokal | **Lulus** — 7/7 berkas, exit 0 (22 Oktober 2026, setelah `.env.db` diarahkan ke Session Pooler dan password development dirotasi) |
+| `npm run db:test` di mesin lokal | **Lulus** — 8/8 berkas, exit 0 (23 Oktober 2026; termasuk `rls_account_delete_test.sql`) |
 | UI hazard/chat, realtime dua perangkat, moderasi dengan akun nyata | **Belum** — daftar periksa di QA_TEST_PLAN 8d |
-| Klien notifikasi (`expo-notifications`), crash reporting, kebijakan privasi, hapus akun | **Belum ada di repository** |
+| Hapus akun + kebijakan privasi (irisan M5 §4) | **Implemented** dan **Passed against dev backend** — lihat §4a |
+| Klien notifikasi (`expo-notifications`), crash reporting | **Belum ada di repository** |
 
 Artinya: M5 tidak boleh dimulai dengan menganggap M4 tuntas. Yang boleh dimulai adalah pekerjaan yang
 **tidak** bergantung pada hasil uji perangkat M4.
@@ -102,6 +104,27 @@ Rekomendasi: **A**, karena laporan bahaya adalah data keselamatan bersama dan `c
 - Tidak ada data lokasi presisi di log, pesan galat, atau audit.
 
 **Yang belum termasuk irisan ini:** push notification, crash monitoring, dan seluruh M6.
+
+### 4a. Status implementasi (23 Oktober 2026)
+
+Irisan ini **selesai untuk cakupan 1–5** dan sudah diverifikasi terhadap project development.
+
+| Bagian | Berkas | Bukti |
+| --- | --- | --- |
+| Anonimisasi + RPC idempoten | `supabase/migrations/20261022190000_account_deletion_m5.sql` | diterapkan ke development (19 migration, tipe generated cocok) |
+| Perbaikan Storage (Storage API, bukan SQL) | `supabase/migrations/20261022193000_account_deletion_storage_api.sql` | uji RLS lulus setelah fungsi diganti; alasannya di ADR-076 |
+| Uji SQL | `supabase/tests/rls_account_delete_test.sql` (34 perintah) | `npm run db:test` **8/8 lulus**, notice `UJI HAPUS AKUN LULUS`; terdaftar di `DEFAULT_TEST_FILES` dan di pemeriksaan notice `database-rls.yml` |
+| Layanan klien | `src/features/account/api.ts`, `src/features/account/errors.ts` | 10 test (`src/features/account/__tests__/api.test.ts`) |
+| Layar | `src/app/account-delete.tsx`, `src/app/privacy.tsx`, tautan di tab Profil | 4 test layar (`src/__tests__/account-delete.test.tsx`) |
+
+Perintah yang benar-benar dijalankan: `npm test -- --ci` **0** (45 suite / 497 test), `npm run test:scripts`
+**0** (71 suite / 318 test), `npm run db:test` **0** (8/8 berkas), `npm run db:types:check` **0**,
+`npm run storage:test` **0** (27 langkah), `npm run db:test:lint` **0** (8 berkas uji, 19 migration),
+`typecheck`/`lint`/`format:check` **0**.
+
+**Yang tetap terbuka dan tidak boleh dicatat lulus:** alur ini belum dicoba di perangkat fisik;
+`auth.users` tidak dihapus (butuh tindakan operator/Edge Function); berkas Storage yang gagal dihapus
+menunggu pembersihan operator; dan batas retensi otomatis untuk baris profil anonim belum ada.
 
 ## 5. Rancangan data notifikasi (desain saja, belum diterapkan)
 

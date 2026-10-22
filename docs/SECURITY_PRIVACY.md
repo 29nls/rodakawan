@@ -252,6 +252,38 @@ sebagai hardening M6 di ROADMAP). Uji `rls_blocked_chat_test.sql` **sudah** diek
 project development: Database RLS run #19 (commit `1aa1480`, 22 Oktober 2026) menerima notice
 `UJI FILTER BLOKIR CHAT LULUS` bersama enam notice lain (7/7 berkas lulus).
 
+### 8.4 Hapus akun — anonimisasi dan batas retensi (22–23 Oktober 2026)
+
+Keputusan lengkapnya di ADR-076; ini ringkasan yang berlaku untuk privasi.
+
+**Apa yang dihapus ketika pengguna menghapus akunnya** (RPC `delete_my_account()`, idempoten):
+
+| Data | Perlakuan |
+| --- | --- |
+| Token push, posisi terakhir, notifikasi pribadi | baris dihapus |
+| Relasi follow dan blokir | baris dihapus (dua arah) |
+| Kendaraan + `motorcycle_private_details` (nomor polisi, catatan) | baris dihapus (cascade) |
+| Keanggotaan klub dan perjalanan | `status = 'left'`, baris tidak dihapus |
+| `username`, `display_name`, `avatar_url`, `bio`, `city` | diganti anonim (`deleted_…`, “Akun dihapus”), foto dikosongkan |
+| Baris `public.profiles` | **dipertahankan** dengan `deleted_at` terisi, dan tidak lagi terbaca siapa pun |
+| Laporan bahaya, pesan konvoi, laporan moderasi, jejak audit | **dipertahankan** tanpa identitas (alasannya: data keselamatan bersama dan audit) |
+| Avatar dan foto kendaraan di Storage | dihapus klien lewat Storage API **sebelum** RPC; kegagalan dilaporkan, tidak dipalsukan sukses |
+| `auth.users` | **tidak** dihapus oleh SQL; penghapusan identitas login adalah tindakan operator |
+
+**Batas yang diketahui dan disengaja:** sesi dicabut oleh `signOut()` di klien, bukan oleh database;
+berkas Storage yang gagal dihapus tetap ada sampai dibersihkan operator (tidak bisa dibaca siapa pun
+karena bucket privat dan policy memakai folder uid); email masih terdaftar di `auth.users` sehingga
+tidak bisa dipakai mendaftar ulang; dan **belum ada retensi otomatis** untuk baris profil anonim
+maupun konten publik sisa akun.
+
+**Bukti:** migration `20261022190000_account_deletion_m5.sql` dan `20261022193000_account_deletion_storage_api.sql`
+diterapkan ke project development (19 migration, `db:types:check` lulus); `supabase/tests/rls_account_delete_test.sql`
+(34 perintah) lulus di `npm run db:test` **8/8** pada 23 Oktober 2026 dengan notice `UJI HAPUS AKUN LULUS`,
+termasuk kasus panggilan berulang, penolakan `anon`, dan "konten bersama tetap utuh". Uji layar dan
+layanan ada di `src/__tests__/account-delete.test.tsx` (4 test) dan `src/features/account/__tests__/api.test.ts`
+(10 test). **Belum:** uji di perangkat fisik, dan pekerjaan operator (hapus `auth.users`, bersihkan
+berkas yatim).
+
 ## 9. Security release checklist
 
 Status per Milestone 1.5 (diperbarui pada milestone ini). Istilah status: **Implemented**,
@@ -263,7 +295,7 @@ Status per Milestone 1.5 (diperbarui pada milestone ini). Istilah status: **Impl
 - Kredensial database untuk pengujian: **Implemented** — `DATABASE_URL` dibaca dari environment (atau otomatis dari berkas `.env.db` oleh `npm run db:test`), hanya `user@host:port/database` yang dicetak, dan nilainya **tidak** boleh berada di `.env`/`.env.local` karena kedua berkas itu dibaca Expo sehingga variabel `EXPO_PUBLIC_*` di dalamnya ikut ke bundel aplikasi. `.env.db` diabaikan Git, tidak dibaca Expo, dan sudah dicoba tanpa pernah menampilkan password di output.
 - CI tidak diberi akses database pada push/PR biasa: **Implemented** dan **berjalan di GitHub** — job `quality` di `ci.yml` berjalan tanpa satu pun secret Supabase. Uji RLS mempunyai workflow terpisah (`database-rls.yml`, ADR-055) yang memegang secret `DB_TEST_DATABASE_URL`, berjalan otomatis hanya ketika file database berubah, **memverifikasi connection string menunjuk project development sebelum menyentuhnya**, dan menolak lulus bila notice penanda dari server tidak diterima. Pada `749424c` run **#4** hijau (kedua notice: `UJI RLS PROFIL LULUS` 171 perintah + `UJI POLICY OWNER-GUARD LULUS` 17 perintah); run **#3** sempat gagal di langkah `gen types` tanpa target dan diperbaiki di ADR-061. Status terbaru: pada `1aa1480` run **#19** hijau untuk ketujuh berkas uji (M3 + M4, termasuk `UJI FILTER BLOKIR CHAT LULUS`) dan `npm run db:types:check` lulus di job yang sama. PR dari fork tidak menerima secret dan jobnya dilewati.
 - Storage policies: **Passed against dev backend** (bucket privat, owner-only foto kendaraan, logo klub per peran, penolakan `anon`, dan CHECK path; 17 Oktober 2026). Yang belum diuji adalah unggahan HTTP nyata dari perangkat dan kedaluwarsa signed URL di klien — lihat `docs/QA_TEST_PLAN.md` (GAR-05/CLUB-11).
-- **Sudah dibangun tetapi belum diuji perangkat:** berbagi lokasi opt-in dan pembersihannya (bagian 4.2), dengan Realtime Postgres Changes yang tunduk pada RLS. **Belum dibangun:** rate limit, flow hapus akun, kebijakan privasi, dan renderer peta.
+- **Sudah dibangun tetapi belum diuji perangkat:** berbagi lokasi opt-in dan pembersihannya (bagian 4.2), dengan Realtime Postgres Changes yang tunduk pada RLS, serta flow hapus akun dan halaman kebijakan privasi (bagian 8.4). **Belum dibangun:** rate limit untuk endpoint auth, pembuangan `auth.users` oleh operator, retensi otomatis untuk baris profil anonim, dan renderer peta.
 
 - [ ] RLS aktif pada semua tabel/API yang terekspos.
 - [ ] Negative tests untuk akses non-member dan revoked member lulus.
@@ -275,8 +307,11 @@ Status per Milestone 1.5 (diperbarui pada milestone ini). Istilah status: **Impl
 - [ ] Tidak ada service role/private key di mobile bundle, git, issue, log, atau dokumentasi publik.
 - [x] Storage policies sudah diuji, termasuk penolakan signed URL/direct URL dan delete — `npm run db:test` bagian 13, lulus 17 Oktober 2026 (bucket privat; foto kendaraan owner-only; logo klub hanya owner/admin yang menulis).
 - [ ] Input disanitasi/ditangani aman; rate limits aktif.
-- [ ] Flow hapus akun dan data terdokumentasi.
-- [ ] Privacy policy dan syarat komunitas tersedia.
+- [x] Flow hapus akun dan data terdokumentasi — RPC `delete_my_account()` (anonimisasi) + layar
+      `/account-delete`, uji SQL `rls_account_delete_test.sql` lulus terhadap project development
+      (8/8 berkas, 23 Oktober 2026); rincian perlakuan data di bagian 8.4 dan ADR-076.
+- [x] Privacy policy tersedia di aplikasi — halaman `/privacy` (retensi, data yang disimpan, kontak
+      dukungan lewat issue GitHub). **Syarat komunitas** belum ditulis sebagai halaman tersendiri.
 - [ ] Error log tidak membocorkan koordinat, isi chat, credential, atau identitas sensitif.
 - [ ] Prosedur melaporkan dan menangani insiden dibuat sebelum membuka akses publik.
 

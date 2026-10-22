@@ -320,6 +320,7 @@ export function buildProfileRow(overrides: Partial<ProfileRow> = {}): ProfileRow
     bio: null,
     city: null,
     is_private: false,
+    deleted_at: null,
     created_at: '2026-10-12T00:00:00.000Z',
     updated_at: '2026-10-12T00:00:00.000Z',
     ...overrides,
