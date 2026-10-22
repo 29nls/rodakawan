@@ -402,6 +402,32 @@ describe('CLI smoke-test-apk.mjs', () => {
     assert.ok(stderr.includes('sempat hidup lalu berhenti'), stderr);
   });
 
+  it('tetap membedakan proses yang sempat hidup lalu mati meski pemeriksaan pertama memakan seluruh batas waktu', (t) => {
+    // Keadaan yang sama seperti test di atas, tapi perangkatnya lambat: satu
+    // putaran pemeriksaan (pidof + dua dumpsys) memakan lebih lama daripada
+    // batas waktu 1 detik. Script tetap harus melakukan pemeriksaan kedua —
+    // kalau tidak, proses yang sempat hidup lalu mati terlihat sama dengan
+    // proses yang tidak pernah hidup, dan kesimpulannya bergantung pada
+    // kecepatan mesin, bukan pada keadaan perangkat. Ini yang membuat test
+    // ini sering gagal saat seluruh suite script berjalan bersamaan.
+    const { run, commands } = harness(t, {
+      delayMs: { pidof: 500, activities: 500, window: 500 },
+      pidof: ['12345\n', ''],
+      activities:
+        '  topResumedActivity=ActivityRecord{ab12 u0 com.android.launcher3/.Launcher t1}\n',
+      window:
+        '  mCurrentFocus=Window{ab12 u0 com.android.launcher3/com.android.launcher3.Launcher}\n',
+    });
+    const { stderr, code } = run(['--apk', APK, '--timeout', '1']);
+
+    assert.equal(code, 1);
+    assert.ok(stderr.includes('sempat hidup lalu berhenti'), stderr);
+    assert.ok(
+      commands().filter((argv) => argv.join(' ').includes('pidof')).length >= 2,
+      'pemeriksaan kedua harus tetap dijalankan meski batas waktu sudah habis',
+    );
+  });
+
   it('gagal bila aplikasinya tidak pernah berada di depan', (t) => {
     const { run } = harness(t, {
       activities:

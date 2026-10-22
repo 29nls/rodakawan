@@ -219,9 +219,11 @@ npm run format:check     # pastikan format Prettier
 npm run deps:check       # TypeScript editor = CI + versi dependency terhadap Expo SDK (≈3 detik)
 npm run check:editor-ts  # hanya pemeriksaan TypeScript editor (lokal, tanpa jaringan)
 npm test                 # unit + komponen test (jest-expo); menjalankan deps:check lebih dulu
+npm run test:scripts     # test script rilis (node:test): konkurensi tetap + batas waktu per test
 npm run doctor           # expo-doctor (pemeriksaan menyeluruh)
 npm run export:android   # bundel Android (Metro + Hermes) tanpa perangkat
 npm run db:test          # uji RLS ke database development (butuh .env.db / DATABASE_URL)
+npm run db:test:lint     # periksa literal UUID di berkas uji SQL (statis, tanpa database)
 npm run storage:test     # uji integrasi HTTP Storage dengan akun uji sementara (.env.local + .env.db)
 npm run db:types         # generate ulang tipe database dari skema development
 npm run db:types:check   # periksa drift tipe (dijalankan CI database)
@@ -240,17 +242,35 @@ yang menyeluruh tetap dijalankan di CI. Bila daftar versi resmi Expo tidak terja
 (sedang offline), pemeriksaan melaporkan bahwa hasilnya **tidak bisa dipastikan** dengan
 `::warning::` dan tidak menggagalkan `npm test` — lulus hanya dilaporkan bila benar-benar diperiksa.
 
-Hasil nyata pada **21 Oktober 2026** (Windows, Node 24.x, npm 12.x) setelah pekerjaan Milestone 4 di
-`2b84ec4` + perbaikan lokal yang belum di-commit saat tabel ini ditulis:
+`npm run db:test:lint` memeriksa **nilai** argumen di berkas uji SQL tanpa membuka koneksi database
+sama sekali: ia membaca tanda tangan fungsi dari `supabase/migrations/*.sql`, lalu menandai setiap
+literal teks yang diberikan ke parameter bertipe `uuid` (mis. `'a-client-001'` untuk parameter
+`p_client_report_id uuid`). PostgreSQL menolak nilai seperti itu dengan SQLSTATE 22P02 tepat saat
+pemanggilan — jadi satu ketiksepele sempat menghentikan seluruh berkas uji. Pemeriksaan ini berjalan
+di dua tempat: sebagai langkah CI di job `quality` (yang memang tidak memakai secret database), dan
+sebagai pra-syarat `npm run db:test` sebelum satu transaksi pun dibuka (ADR-069).
+
+`npm run test:scripts` menjalankan test script rilis dengan runner bawaan Node dan **konfigurasi yang
+dikunci**: `--test-concurrency=1` (berkas uji satu per satu, jadi hasilnya tidak bergantung jumlah CPU
+mesin) dan `--test-timeout=180000` (setiap test punya batas waktu, jadi yang menggantung menggagalkan
+run, bukan menggantungkan pipeline). Flag itu ditulis di `package.json` — **wajib** berada sebelum glob
+berkas uji, karena Node mengabaikan opsi yang diletakkan setelah argumen berkas, tanpa pesan apa pun.
+CI menjalankan perintah yang sama, jadi kegagalan di runner GitHub bisa direproduksi persis di laptop
+(ADR-072).
+
+Hasil nyata pada **22 Oktober 2026** (Windows, Node 24.x, npm 12.x) setelah pekerjaan Milestone 4 di
+`2b84ec4`, perbaikan runner uji RLS (ADR-070), kenaikan patch Expo SDK (ADR-071), dan penguncian
+runner test script (ADR-072) + perbaikan lokal yang belum di-commit saat tabel ini ditulis:
 
 | Perintah | Hasil |
 | --- | --- |
 | `npm run typecheck` | Exit 0. |
 | `npm run lint` | Exit 0 setelah memperbaiki 430 galat `prettier/prettier` (akhiran baris CRLF pada lima berkas) dan dua pelanggaran `react-hooks` di `ChatPanel.tsx`. |
 | `npm run format:check` | Exit 0. |
+| `npm run deps:check` | Exit 0 — versi dependency cocok dengan Expo SDK 57.0.31 (`expo` 57.0.31, `expo-location` 57.0.22, `expo-router` 57.0.29), ADR-071. |
 | `npm test -- --ci` | **43 suite, 483 test lulus**, exit 0 — termasuk 24 test API chat, 9 test panel chat, 29 test hazard (API + label area), 6 test layar Peringatan, serta 16 test layanan + 8 test layar moderasi. |
-| `npm run test:scripts` | **240 test lulus**, exit 0. |
-| `npm run doctor` | **Tidak dapat dipastikan**: pemeriksaan skema config gagal `TypeError: fetch failed` / `EAI_AGAIN exp.host` (DNS lingkungan ini), 1 dari 21 pemeriksaan gagal. Bukan temuan proyek. |
+| `npm run test:scripts` | **294 test lulus**, exit 0 — dijalankan dengan konkurensi tetap (`--test-concurrency=1`) dan batas waktu per test (`--test-timeout=180000`), ADR-072. |
+| `npm run doctor` | **Tidak dapat dipastikan**: pemeriksaan skema config gagal `TypeError: fetch failed` / `EAI_AGAIN exp.host` (DNS lingkungan ini), 1 dari 21 pemeriksaan gagal. Bukan temuan proyek. Pemeriksaan versi dependency **lulus** — tidak ada drift setelah ADR-071. |
 | `npm run export:android` | Exit 0, bundel Hermes `entry-*.hbc` 4 MB. |
 | `npm run db:test` | **Exit 1 — `ECONNREFUSED`**. `.env.db` di mesin ini menunjuk `postgres@localhost:5432`, bukan project development `xvmcpfkkveeaevfcvfug`, dan tidak ada server lokal. Uji RLS Milestone 4 **belum dijalankan**. |
 | `npm run db:types:check`, `npm run storage:test` | **Tidak dijalankan** — membutuhkan connection string project development yang terkonfirmasi. |
@@ -444,7 +464,8 @@ tanpa filter).
 
 - [`.github/workflows/ci.yml`](.github/workflows/ci.yml) — pemeriksaan rutin, berisi tiga job:
   - **`quality`** berjalan pada push ke `main` dan setiap pull request: `npm ci`, `typecheck`, `lint`,
-    `format:check`, `npm test -- --ci`, `npm run test:scripts` (test script rilis), `doctor`, dan
+    `format:check`, `npm test -- --ci`, `npm run test:scripts` (test script rilis, dijalankan dengan
+    konkurensi tetap dan batas waktu per test — ADR-072), `doctor`, dan
     `export:android`. Job ini **tidak memakai satu
     pun secret** Supabase dan justru membuktikan aplikasi tetap bersih saat backend belum
     dikonfigurasi.

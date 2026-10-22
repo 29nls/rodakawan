@@ -119,7 +119,11 @@ do $$
 declare
   v_h public.hazard_reports;
 begin
-  v_h := public.create_hazard('pothole','moderate',-6.2,106.8,'Lubang global',null,'a-client-001');
+  -- `p_client_report_id` bertipe uuid (lihat tanda tangan create_hazard di
+  -- migration), jadi nilainya HARUS literal UUID yang valid — string teks
+  -- seperti 'a-client-001' ditolak PostgreSQL dengan SQLSTATE 22P02 saat
+  -- argumen itu di-cast ke uuid.
+  v_h := public.create_hazard('pothole','moderate',-6.2,106.8,'Lubang global',null,'a1111111-2222-4333-8444-555555555555');
 
   if v_h.id is null then
     raise exception 'UJI GAGAL: laporan global tidak dibuat';
@@ -142,7 +146,9 @@ declare
   v_again public.hazard_reports;
 begin
   select id into v_first from public.uji_m4_konteks where nama = 'h_a_global';
-  v_again := public.create_hazard('pothole','moderate',-6.2,106.8,'Ulang', null, 'a-client-001');
+  -- UUID yang SAMA dengan section 4: itu inti uji idempotensi — kunci
+  -- idempotensi sama + pelapor sama harus mengembalikan baris yang sama.
+  v_again := public.create_hazard('pothole','moderate',-6.2,106.8,'Ulang', null, 'a1111111-2222-4333-8444-555555555555');
 
   if v_again.id is distinct from v_first then
     raise exception 'UJI GAGAL: idempotensi client_report_id tidak mengembalikan baris yang sama';

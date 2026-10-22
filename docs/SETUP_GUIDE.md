@@ -56,6 +56,14 @@ Script rilis di `scripts/` diuji dengan runner bawaan Node (`node:test`, lewat
 directori sementara untuk membuktikan parsing keluaran `git log` dan pemilihan tag masih benar. Jest
 tetap dipakai untuk kode aplikasi di `src/`. Keduanya berjalan di CI.
 
+Perintah itu dijalankan dengan konfigurasi yang dikunci: `--test-concurrency=1` (berkas uji satu per
+satu, jadi hasilnya tidak bergantung jumlah CPU mesin) dan `--test-timeout=180000` (setiap test punya
+batas waktu, jadi yang menggantung menggagalkan run, bukan menggantungkan pipeline). Kedua flag itu
+berada di `package.json` dan **wajib ditulis sebelum glob berkas uji** — Node mengabaikan opsi yang
+diletakkan setelah argumen berkas tanpa memberi pesan apa pun, sehingga menambahkan flag lewat
+`npm run test:scripts -- --test-timeout=1` tidak mengubah apa pun. CI memakai perintah yang sama
+persis, sehingga kegagalan di runner GitHub bisa direproduksi di laptop (ADR-072).
+
 Tetap pakai satu package manager (npm) dan commit lockfile. Sebelum memasang dependency native baru,
 baca dokumentasi kompatibilitasnya dengan Expo SDK aktif, lalu jalankan `npm run deps:check` lebih
 dulu — ia menjalankan dua pemeriksaan: `check:editor-ts` (lokal, tanpa jaringan: `.vscode/settings.json`
@@ -242,19 +250,43 @@ Di Bash/Git Bash:
 DATABASE_URL="postgresql://..." npm run db:test
 ```
 
-Runner menjalankan **dua** berkas uji secara berurutan, dan hanya melaporkan lulus bila notice
-penanda dari **masing-masing** benar-benar diterima dari server:
+Runner menjalankan seluruh berkas uji di `DEFAULT_TEST_FILES` secara berurutan, dan hanya melaporkan
+lulus bila notice penanda dari **masing-masing** benar-benar diterima dari server. Contoh dua berkas
+pertama:
 
 | Berkas | Isi | Notice |
 | --- | --- | --- |
 | `supabase/tests/rls_profiles_test.sql` | Izin/penolakan per tabel, RPC, dan Storage | `UJI RLS PROFIL LULUS` |
 | `supabase/tests/rls_policy_guard_test.sql` | Pagar katalog: policy wadah yang memberi akses lewat kolom kepemilikan tanpa penjaga keanggotaan (ADR-060) | `UJI POLICY OWNER-GUARD LULUS` |
 
+**Satu putaran uji menunjukkan semua masalah (ADR-070).** Kegagalan satu berkas uji **tidak**
+menghentikan berkas lain: seluruh berkas tetap dijalankan, lalu ringkasan berisi jumlah berkas
+lulus/gagal/tidak dijalankan beserta daftar setiap kegagalannya dicetak sekaligus sebelum runner keluar
+dengan kode non-nol. Jadi tidak perlu satu putaran per berkas untuk melihat semua yang rusak.
+
+| Keluaran | Arti |
+| --- | --- |
+| `Ringkasan: 7 berkas uji — 5 lulus, 1 gagal, 1 tidak dijalankan` | Angka seluruh berkas uji pada putaran itu |
+| `Berkas uji yang gagal (1):` + daftar per berkas | Berkas yang **memang** gagal; perbaikannya ada di isi berkas itu |
+| `Berkas uji yang tidak dijalankan (1):` + daftar per berkas | Berkas yang **tidak pernah** diuji karena koneksi database terputus di tengah jalan — bukan berarti berkasnya rusak; jalankan ulang setelah koneksi pulih |
+
+Koneksi yang terputus membuat sambungan tidak berguna lagi, jadi sisa berkas ditandai "tidak
+dijalankan", bukan "gagal" — dibedakan karena yang pertama berarti ada masalah pada isi berkasnya.
+Pemeriksaan statis (berkas hilang, literal UUID, berkas tanpa direktif notice) juga melapor **seluruh**
+masalah sekaligus, bukan berhenti di masalah pertama, dan tidak membuka satu pun koneksi.
+
 Password tidak pernah dicetak; hanya `user@host:port/database` yang ditampilkan. Untuk menjalankan
 satu berkas saja saat mengembangkan (mis. yang sedang Anda ubah):
 
 ```powershell
 npm run db:test -- --file supabase/tests/rls_policy_guard_test.sql
+```
+
+Opsi `--file` boleh diulang untuk menjalankan beberapa berkas sekaligus (berguna saat ingin melihat
+kegagalan beberapa berkas dalam satu putaran):
+
+```powershell
+npm run db:test -- --file supabase/tests/rls_profiles_test.sql --file supabase/tests/rls_chat_test.sql
 ```
 
 **Menambah berkas uji baru:** letakkan di `supabase/tests/`, tulis asersinya dalam satu transaksi dan
@@ -269,6 +301,17 @@ berkas tanpa direktif notice ditolak runner sebelum satu perintah pun dijalankan
 workflow `database-rls.yml` memeriksa kedua notice yang ada saat ini.
 
 `npm run db:test -- --help` menampilkan daftar berkas dan opsinya.
+
+**Literal UUID harus benar-benar UUID.** Parameter bertipe `uuid` hanya menerima nilai UUID; string
+teks seperti `'a-client-001'` ditolak PostgreSQL dengan SQLSTATE 22P02 (`invalid input syntax for
+type uuid`) tepat saat pemanggilan, jadi satu literal salah menghentikan seluruh berkas uji.
+Pemeriksaan statis `npm run db:test:lint` (**tanpa** database) membaca tanda tangan fungsi dari
+`supabase/migrations/*.sql` dan menandai literal yang diberikan ke parameter `uuid`; perintah yang
+sama berjalan sebagai pra-syarat `npm run db:test` sebelum satu koneksi pun dibuka, dan sebagai
+langkah CI di job `quality` yang tidak memakai secret sama sekali (ADR-069). Jadi kelas galat ini
+tertangkap di pull request, bukan setelah runner masuk ke database development. Gunakan literal UUID
+kanonis (8-4-4-4-12 heksadesimal); untuk uji idempotensi pakai UUID **tetap** yang sama di semua
+pemanggilan, bukan UUID acak.
 
 **Uji jalur HTTP Storage — `npm run storage:test`.** Runner ini melengkapi `db:test` dengan alur yang
 benar-benar dipakai aplikasi, dan memakai `DATABASE_URL` yang sama plus URL/publishable key publik
@@ -315,6 +358,14 @@ Catatan penting:
 bentuk tabel, kolom, dan signature RPC. Jangan mengubah berkas itu dengan tangan;
 `src/lib/supabase/database.types.ts` hanya menambahkan union nilai yang dijaga `CHECK` constraint dan
 bentuk balik RPC yang dikurasi.
+
+Union yang dikurasi itu **tidak** bisa-cek basi oleh `npm run db:types:check`: perintah itu hanya
+membandingkan berkas *generated* dengan skema, bukan union yang ditulis tangan. Jadi setiap
+migration yang mengubah `CHECK` constraint pada kolom bersistem — misalnya `hazard_reports.category`,
+`hazard_reports.severity`, `hazard_reports.status`, `chat_messages.message_type`,
+`content_reports.target_type`/`reason`/`status`, atau `moderation_actions.target_type`/`action`/`reason`
+— wajib menyunting union di `database.types.ts` **dalam perubahan yang sama**, lalu jalankan
+`npm run typecheck` (ADR-073).
 
 Setelah migration diterapkan ke project development (4.3), jalankan:
 

@@ -30,7 +30,12 @@ import {
   type ContentReportRow,
 } from '@/features/moderation/api';
 import { mapModerationError } from '@/features/moderation/errors';
-import type { Database } from '@/lib/supabase/database.types';
+import type {
+  ChatMessageRow,
+  Database,
+  HazardRow,
+  ModerationActionRow,
+} from '@/lib/supabase/database.types';
 
 export type ModerationClient = SupabaseClient<Database>;
 
@@ -47,7 +52,8 @@ export type ModerationReport = Pick<
   | 'details'
   | 'status'
   | 'created_at'
-> & { reviewed_at: string | null };
+  | 'reviewed_at'
+>;
 
 export type ModerationSubjectKind = 'hazard' | 'chat_message';
 
@@ -81,16 +87,8 @@ export type ModerationQueue = {
   people: ModerationPeople;
 };
 
-export type ModerationActionRow = {
-  id: string;
-  actor_id: string;
-  target_type: string;
-  target_id: string;
-  action: string;
-  reason: string;
-  note: string | null;
-  created_at: string;
-};
+/** Bentuk baris `public.moderation_actions` (union sesuai CHECK constraint). */
+export type { ModerationActionRow };
 
 /** Jejak audit beserta label pelaku; `people` juga memuat moderator lain. */
 export type ModerationAudit = {
@@ -111,26 +109,22 @@ const HAZARD_COLUMNS =
   'id, reporter_id, ride_id, category, description, severity, status, created_at';
 const MESSAGE_COLUMNS = 'id, sender_id, ride_id, content, message_type, created_at, deleted_at';
 
-type HazardSelectRow = {
-  id: string;
-  reporter_id: string;
-  ride_id: string | null;
-  category: string;
-  description: string | null;
-  severity: string;
-  status: string;
-  created_at: string;
-};
+type HazardSelectRow = Pick<
+  HazardRow,
+  | 'id'
+  | 'reporter_id'
+  | 'ride_id'
+  | 'category'
+  | 'description'
+  | 'severity'
+  | 'status'
+  | 'created_at'
+>;
 
-type MessageSelectRow = {
-  id: string;
-  sender_id: string;
-  ride_id: string;
-  content: string;
-  message_type: string;
-  created_at: string;
-  deleted_at: string | null;
-};
+type MessageSelectRow = Pick<
+  ChatMessageRow,
+  'id' | 'sender_id' | 'ride_id' | 'content' | 'message_type' | 'created_at' | 'deleted_at'
+>;
 
 function unique(values: string[]): string[] {
   return [...new Set(values)];
@@ -235,7 +229,7 @@ async function fetchHazards(
 
     if (error) return { ok: false, error: mapModerationError(error) };
 
-    const rows = (data ?? []) as unknown as HazardSelectRow[];
+    const rows = data ?? [];
     return { ok: true, data: rows.map(subjectFromHazard) };
   } catch (error) {
     return { ok: false, error: mapModerationError(error) };
@@ -254,7 +248,7 @@ async function fetchMessages(
 
     if (error) return { ok: false, error: mapModerationError(error) };
 
-    const rows = (data ?? []) as unknown as MessageSelectRow[];
+    const rows = data ?? [];
     return { ok: true, data: rows.map(subjectFromMessage) };
   } catch (error) {
     return { ok: false, error: mapModerationError(error) };
@@ -347,7 +341,7 @@ export async function loadModerationQueue(
 
     if (error) return { ok: false, error: mapModerationError(error) };
 
-    const reports = ((data ?? []) as unknown as ModerationReport[]).filter(
+    const reports = (data ?? []).filter(
       (row) => row.target_type === 'hazard' || row.target_type === 'chat_message',
     );
 

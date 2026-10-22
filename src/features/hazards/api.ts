@@ -24,27 +24,14 @@ import {
   type HazardCategory,
   type HazardSeverity,
 } from '@/features/hazards/labels';
-import type { Database } from '@/lib/supabase/database.types';
+import type { Database, HazardRow } from '@/lib/supabase/database.types';
 
 export type HazardClient = SupabaseClient<Database>;
 
 export type HazardResult<T> = { ok: true; data: T } | { ok: false; error: AppError };
 
-export type HazardRow = {
-  id: string;
-  reporter_id: string;
-  ride_id: string | null;
-  category: string;
-  description: string | null;
-  severity: string;
-  latitude: number;
-  longitude: number;
-  status: string;
-  expires_at: string;
-  created_at: string;
-  updated_at: string | null;
-  client_report_id: string | null;
-};
+/** Bentuk baris `public.hazard_reports` (union sesuai CHECK constraint). */
+export type { HazardRow };
 
 export type HazardCreateInput = {
   category: HazardCategory;
@@ -137,7 +124,7 @@ export async function getActiveHazards(
     const { data, error } = await query;
     if (error) return { ok: false, error: mapHazardError(error) };
 
-    const rows = ((data ?? []) as unknown as HazardRow[]).filter((row) => isHazardActive(row));
+    const rows = (data ?? []).filter((row) => isHazardActive(row));
     return { ok: true, data: rows };
   } catch (error) {
     return { ok: false, error: mapHazardError(error) };

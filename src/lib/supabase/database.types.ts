@@ -12,6 +12,10 @@
  * - `club_role_audit` yang tidak punya jalur tulis klien, sehingga `Insert`/`Update`
  *   sengaja dibuat `never` walau generator menghasilkan bentuk tabel biasa.
  *
+ * Tabel laporan bahaya (`hazard_reports`), chat konvoi (`chat_messages`), dan
+ * moderasi (`content_reports`, `moderation_actions`) ikut dipersempit di sini
+ * memakai union yang sama persis dengan `CHECK` constraint-nya.
+ *
  * Setelah mengubah skema (`supabase/migrations/**`):
  *
  *   npm run db:types          # tulis ulang database.generated.ts
@@ -170,6 +174,157 @@ export type RideMemberRow = Omit<
 
 export type RideLocationRow = GeneratedTables['ride_locations']['Row'];
 
+/* ------------------------------------------------------------- laporan bahaya */
+
+/**
+ * Nilai yang sebenarnya dijaga `CHECK` constraint di database.
+ *
+ * `supabase gen types` hanya melihat kolom `text`, jadi daftar yang sah ditulis
+ * di sini; sumbernya `supabase/migrations/20261013022938_initial_schema.sql`
+ * (CHECK `category`, `severity`, dan `status` pada `public.hazard_reports`).
+ */
+export type HazardCategory =
+  | 'pothole'
+  | 'crash'
+  | 'traffic'
+  | 'weather'
+  | 'flood'
+  | 'road_block'
+  | 'traffic_enforcement'
+  | 'other';
+
+export type HazardSeverity = 'info' | 'moderate' | 'high' | 'critical';
+
+export type HazardStatus = 'active' | 'expired' | 'dismissed' | 'removed' | 'resolved';
+
+/** Baris `public.hazard_reports` dengan union yang dijaga CHECK constraint. */
+export type HazardRow = Omit<
+  GeneratedTables['hazard_reports']['Row'],
+  'category' | 'severity' | 'status'
+> & {
+  category: HazardCategory;
+  severity: HazardSeverity;
+  status: HazardStatus;
+};
+
+export type HazardInsert = Omit<
+  GeneratedTables['hazard_reports']['Insert'],
+  'category' | 'severity' | 'status'
+> & {
+  category: HazardCategory;
+  severity?: HazardSeverity;
+  status?: HazardStatus;
+};
+
+export type HazardUpdate = Omit<
+  GeneratedTables['hazard_reports']['Update'],
+  'category' | 'severity' | 'status'
+> & {
+  category?: HazardCategory;
+  severity?: HazardSeverity;
+  status?: HazardStatus;
+};
+
+/* --------------------------------------------------------------- chat konvoi */
+
+/** CHECK `message_type` pada `public.chat_messages` (`text` atau `system`). */
+export type ChatMessageType = 'text' | 'system';
+
+export type ChatMessageRow = Omit<
+  GeneratedTables['chat_messages']['Row'],
+  'message_type'
+> & {
+  message_type: ChatMessageType;
+};
+
+export type ChatMessageInsert = Omit<
+  GeneratedTables['chat_messages']['Insert'],
+  'message_type'
+> & {
+  message_type?: ChatMessageType;
+};
+
+export type ChatMessageUpdate = Omit<
+  GeneratedTables['chat_messages']['Update'],
+  'message_type'
+> & {
+  message_type?: ChatMessageType;
+};
+
+/* ------------------------------------------------------------------ moderasi */
+
+/**
+ * Semua jenis konten yang boleh dilaporkan menurut CHECK `content_reports.target_type`.
+ *
+ * Aplikasi hanya melaporkan dua jenis terakhir; sisanya tetap sah menurut
+ * database dan deshalb tidak boleh disempitkan di sini.
+ */
+export type ContentReportTargetType =
+  | 'user'
+  | 'club'
+  | 'post'
+  | 'comment'
+  | 'hazard'
+  | 'chat_message';
+
+/**
+ * Alasan penyalahgunaan.
+ *
+ * CHECK yang sama dipakai dua kolom: `content_reports.reason` dan
+ * `moderation_actions.reason`.
+ */
+export type ModerationReason =
+  | 'spam'
+  | 'harassment'
+  | 'false_information'
+  | 'unsafe_content'
+  | 'privacy'
+  | 'other';
+
+export type ContentReportStatus = 'open' | 'reviewed' | 'removed' | 'dismissed';
+
+export type ContentReportRow = Omit<
+  GeneratedTables['content_reports']['Row'],
+  'target_type' | 'reason' | 'status'
+> & {
+  target_type: ContentReportTargetType;
+  reason: ModerationReason;
+  status: ContentReportStatus;
+};
+
+export type ContentReportInsert = Omit<
+  GeneratedTables['content_reports']['Insert'],
+  'target_type' | 'reason' | 'status'
+> & {
+  target_type: ContentReportTargetType;
+  reason: ModerationReason;
+  status?: ContentReportStatus;
+};
+
+export type ContentReportUpdate = Omit<
+  GeneratedTables['content_reports']['Update'],
+  'target_type' | 'reason' | 'status'
+> & {
+  target_type?: ContentReportTargetType;
+  reason?: ModerationReason;
+  status?: ContentReportStatus;
+};
+
+/** CHECK `target_type` pada `public.moderation_actions`. */
+export type ModerationTargetType = 'hazard' | 'chat_message' | 'content_report';
+
+/** CHECK `action` pada `public.moderation_actions`. */
+export type ModerationAction = 'remove' | 'dismiss' | 'review';
+
+export type ModerationActionRow = Omit<
+  GeneratedTables['moderation_actions']['Row'],
+  'target_type' | 'action' | 'reason'
+> & {
+  target_type: ModerationTargetType;
+  action: ModerationAction;
+  reason: ModerationReason;
+};
+
 /* ------------------------------------------------------------------ database */
 
 type ClubsTable = {
@@ -193,6 +348,42 @@ type ClubRoleAuditTable = {
   Relationships: GeneratedTables['club_role_audit']['Relationships'];
 };
 
+type HazardReportsTable = {
+  Row: HazardRow;
+  Insert: HazardInsert;
+  Update: HazardUpdate;
+  Relationships: GeneratedTables['hazard_reports']['Relationships'];
+};
+
+type ChatMessagesTable = {
+  Row: ChatMessageRow;
+  Insert: ChatMessageInsert;
+  Update: ChatMessageUpdate;
+  Relationships: GeneratedTables['chat_messages']['Relationships'];
+};
+
+type ContentReportsTable = {
+  Row: ContentReportRow;
+  Insert: ContentReportInsert;
+  Update: ContentReportUpdate;
+  Relationships: GeneratedTables['content_reports']['Relationships'];
+};
+
+/**
+ * Jejak audit moderasi.
+ *
+ * Tabel ini **tidak** punya policy INSERT/UPDATE/DELETE: barisnya hanya ditulis
+ * RPC keamanan-definer (`moderate_hazard`, `moderate_chat_message`,
+ * `review_content_report`), dan satu-satunya jalan membacanya adalah RPC
+ * `list_moderation_actions`. Karena itu `Insert`/`Update` sengaja `never`.
+ */
+type ModerationActionsTable = {
+  Row: ModerationActionRow;
+  Insert: never;
+  Update: never;
+  Relationships: GeneratedTables['moderation_actions']['Relationships'];
+};
+
 type RidesTable = {
   Row: RideRow;
   Insert: GeneratedTables['rides']['Insert'];
@@ -209,13 +400,25 @@ type RideMembersTable = {
 
 type Tables = Omit<
   GeneratedTables,
-  'clubs' | 'club_members' | 'club_role_audit' | 'rides' | 'ride_members'
+  | 'clubs'
+  | 'club_members'
+  | 'club_role_audit'
+  | 'rides'
+  | 'ride_members'
+  | 'hazard_reports'
+  | 'chat_messages'
+  | 'content_reports'
+  | 'moderation_actions'
 > & {
   clubs: ClubsTable;
   club_members: ClubMembersTable;
   club_role_audit: ClubRoleAuditTable;
   rides: RidesTable;
   ride_members: RideMembersTable;
+  hazard_reports: HazardReportsTable;
+  chat_messages: ChatMessagesTable;
+  content_reports: ContentReportsTable;
+  moderation_actions: ModerationActionsTable;
 };
 
 /**

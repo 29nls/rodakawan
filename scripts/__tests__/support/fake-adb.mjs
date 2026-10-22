@@ -19,6 +19,7 @@
  *     "install": "Success\n",             // teks jawaban
  *     "pidof": [\"\", \"12345\\n\"],           // daftar jawaban berurutan
  *     "exit": { "install": 1 },           // status keluar per perintah
+ *     "delayMs": { "pidof": 500 }         // penundaan buatan per perintah
  *   }
  *
  * Kunci yang tidak disebut memakai jawaban bawaan yang masuk akal (lihat
@@ -27,6 +28,12 @@
  * pertama, pemanggilan berikutnya maju satu langkah, dan pemanggilan terakhir
  * mengulang isi terakhir — dipakai untuk `airplane_state`, yang nilainya harus
  * berubah setelah mode pesawat dimatikan.
+ *
+ * `delayMs` menunda jawaban sebuah perintah (dalam milidetik) untuk
+ * mensimulasikan perangkat yang lambat: nilainya berupa angka (semua
+ * perintah) atau objek per nama perintah. Test memakainya untuk menimbulkan
+ * keadaan yang biasanya hanya muncul saat mesinnya sedang sibuk — tanpa
+ * bergantung pada beban mesin sungguhan.
  *
  * Awalan `-s <serial>` yang dipakai `device-checklist.mjs` dilewati saat
  * menentukan jawaban, tetapi **tetap dicatat** apa adanya di log, supaya test
@@ -98,6 +105,30 @@ const DEFAULTS = {
   svc: '',
   exitSmoke: 0,
 };
+
+/** Menahan proses selama `ms` tanpa bergantung pada versi Node. */
+function sleep(ms) {
+  if (ms <= 0) return;
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+
+/**
+ * Penundaan buatan (ms) untuk sebuah perintah.
+ *
+ * `delayMs` berupa angka menunda semua perintah; berupa objek, hanya perintah
+ * yang namanya disebut yang ditunda (nama yang sama dengan yang dipakai
+ * `commandName`).
+ */
+function delayFor(name) {
+  const configured = scenario.delayMs;
+  if (configured === undefined || configured === null) return 0;
+  if (typeof configured === 'number') return configured;
+  if (typeof configured === 'object') {
+    const value = configured[name];
+    return typeof value === 'number' ? value : 0;
+  }
+  return 0;
+}
 
 /** Nama perintah yang dikenali dari sebuah pemanggilan adb, atau `null`. */
 function commandName(argv) {
@@ -177,6 +208,7 @@ function answer(name, argv) {
 }
 
 const name = commandName(args);
+sleep(delayFor(name));
 const output = answer(name, args);
 const status = scenario.exit?.[name] ?? 0;
 

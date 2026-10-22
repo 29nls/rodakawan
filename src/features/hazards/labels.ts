@@ -6,18 +6,14 @@
  */
 
 import type { BadgeTone } from '@/components/ui/Badge';
+import type { HazardCategory, HazardSeverity } from '@/lib/supabase/database.types';
 
-export type HazardCategory =
-  | 'pothole'
-  | 'crash'
-  | 'traffic'
-  | 'weather'
-  | 'flood'
-  | 'road_block'
-  | 'traffic_enforcement'
-  | 'other';
-
-export type HazardSeverity = 'info' | 'moderate' | 'high' | 'critical';
+/**
+ * Tipe kategori dan tingkat keparahan bukan definisi terpisah: keduanya berasal
+ * dari `@/lib/supabase/database.types`, yang memakai union yang sama persis dengan
+ * `CHECK` constraint di database. Modul ini hanya membuka labelnya.
+ */
+export type { HazardCategory, HazardSeverity };
 
 export const HAZARD_CATEGORIES: readonly { value: HazardCategory; label: string }[] = [
   { value: 'pothole', label: 'Lubang jalan' },

@@ -7,6 +7,9 @@ name: CI
 #                 tidak memakai satu pun secret Supabase, dan justru membuktikan
 #                 aplikasi tetap bisa di-typecheck, di-test, dan dibundel ketika
 #                 konfigurasi backend belum ada (docs/QA_TEST_PLAN.md AUTH-13).
+#                 Termasuk pemeriksaan statis berkas uji SQL, sehingga kelas
+#                 galat yang hanya muncul saat runtime database tertangkap di
+#                 pull request.
 # - `workflows-lint`: pemeriksaan file workflow miliknya sendiri. File di
 #                 `.github/workflows/` tidak dijangkau tsc/eslint/prettier, dan
 #                 kesalahan YAML atau `${{ }}` yang salah baru terlihat saat
@@ -66,12 +69,30 @@ jobs:
       - name: Format
         run: npm run format:check
 
+      # Pemeriksaan statis literal UUID pada berkas uji SQL. Sengaja berada di
+      # job TANPA backend: galat kelas ini (literal teks yang diberikan ke
+      # parameter `uuid`) ditolak PostgreSQL dengan SQLSTATE 22P02, jadi bisa
+      # ditemukan tanpa membuka koneksi database sama sekali — dan hanya di
+      # sini, bukan di workflow RLS yang memakai secret.
+      - name: Pemeriksaan literal UUID pada berkas uji SQL
+        run: npm run db:test:lint
+
       - name: Unit & komponen test
         run: npm test -- --ci
 
       # Test script rilis (pengelompokan catatan rilis dan pemilihan rentang
       # commit) memakai runner bawaan Node, bukan Jest: berkasnya .mjs dan
       # sengaja menjalankan git sungguhan di repo sementara.
+      #
+      # Flag runner-nya ada di `package.json` (`test:scripts`), bukan di sini:
+      # `--test-concurrency=1` (berkas uji satu per satu, jadi hasilnya tidak
+      # bergantung jumlah CPU runner) dan `--test-timeout=180000` (setiap test
+      # punya batas waktu, jadi yang menggantung menggagalkan run, bukan
+      # menggantungkan pipeline). CI memakai perintah yang sama dengan mesin
+      # devs, jadi kegagalan di sini bisa direproduksi persis di lokal
+      # (ADR-072). Flag itu **wajib** ditulis sebelum glob berkas uji: Node
+      # mengabaikan opsi yang diletakkan setelah argumen berkas — tanpa pesan
+      # apa pun, jadi timeout yang terlewat terlihat sebagai "lulus".
       - name: Unit test script rilis (node:test)
         run: npm run test:scripts
 

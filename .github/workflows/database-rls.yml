@@ -18,6 +18,9 @@ name: Database RLS
 #
 #   - `supabase/**`           — migration dan berkas uji RLS (`supabase/tests/`)
 #   - `scripts/db-test.mjs`   — runner yang membaca dan menafsirkan hasilnya
+#   - `scripts/check-test-uuid-literals.mjs` dan `scripts/lib/sql-uuid-literals.mjs`
+#                             — pemeriksaan statis literal UUID yang dijalankan
+#                               runner sebagai pra-syarat
 #   - `scripts/db-types.mjs` dan `src/lib/supabase/database.*.ts`
 #                             — sumber dan hasil generate tipe database
 #   - workflow ini sendiri    — perubahan aturannya harus teruji
@@ -46,6 +49,8 @@ on:
     paths:
       - 'supabase/**'
       - 'scripts/db-test.mjs'
+      - 'scripts/check-test-uuid-literals.mjs'
+      - 'scripts/lib/sql-uuid-literals.mjs'
       - 'scripts/db-types.mjs'
       - 'src/lib/supabase/database.generated.ts'
       - 'src/lib/supabase/database.types.ts'
@@ -54,6 +59,8 @@ on:
     paths:
       - 'supabase/**'
       - 'scripts/db-test.mjs'
+      - 'scripts/check-test-uuid-literals.mjs'
+      - 'scripts/lib/sql-uuid-literals.mjs'
       - 'scripts/db-types.mjs'
       - 'src/lib/supabase/database.generated.ts'
       - 'src/lib/supabase/database.types.ts'

@@ -132,6 +132,13 @@
   `owner_id`, `user_id`, `sender_id`, …) tanpa penjaga keanggotaan. Pengecualian harus tertulis
   beserta alasannya dan ikut diperiksa anti-usang. Berjalan di CI `database-rls` setiap kali
   `supabase/**`, `scripts/db-test.mjs`, atau tipe database berubah.
+- **Pagar literal UUID (SEC-02):** `npm run db:test:lint` memindai berkas uji SQL untuk
+  literal teks yang diberikan ke parameter bertipe `uuid` — kelas galat yang ditolak
+  PostgreSQL dengan SQLSTATE 22P02 tepat saat pemanggilan, jadi satu ketiksepele bisa
+  menghentikan seluruh berkas uji. Pemeriksaan ini **statis**: membaca tanda tangan fungsi
+  dari `supabase/migrations/*.sql` tanpa membuka koneksi, sehingga bisa berjalan di job CI
+  yang tanpa secret dan juga sebagai pra-syarat `npm run db:test` sebelum transaksi
+  pertama dibuka (ADR-069).
 - Tes access lintas user/club/ride.
 - Coba direct REST query, Realtime subscribe, direct storage URL, IDOR dengan mengganti UUID, dan token expired.
 - Cek build bundle/JS source map untuk service role/API secrets.
