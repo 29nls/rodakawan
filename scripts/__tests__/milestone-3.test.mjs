@@ -11,6 +11,10 @@
  *   2. uji RLS-nya benar-benar terdaftar di daftar default runner, sehingga CI
  *      tidak kembali hijau tanpa pernah menjalankan uji perjalanan.
  *
+ * Sejak M5, `supabase/drafts/` boleh berisi draf **baru** — dengan syarat draf
+ * itu terdaftar di sini dan dirujuk dokumen rencananya. Draf yang sudah menjadi
+ * migration harus dihapus dari folder itu; draf tak terdaftar menggagalkan test.
+ *
  * Jalankan: `npm run test:scripts`.
  */
 import assert from 'node:assert/strict';
@@ -78,8 +82,40 @@ describe('Milestone 3', () => {
     }
   });
 
-  it('tidak ada lagi draf perjalanan yang bisa lolos tanpa terlihat', () => {
-    assert.equal(fs.existsSync(path.join(ROOT, 'supabase', 'drafts')), false);
+  it('hanya draf terdaftar dan terdokumentasi yang boleh tertinggal', () => {
+    // Draf M3 dulu dihapus setelah menjadi migration. Draf M5 (preferensi
+    // notifikasi) sengaja ada, tetapi hanya boleh lolos bila disebut di dokumen
+    // rencananya — supaya ia tidak menjadi berkas yatim yang suatu hari
+    // diterapkan tanpa keputusan produk (ADR-075).
+    const draftsDir = path.join(ROOT, 'supabase', 'drafts');
+    const drafts = [
+      {
+        file: 'm5_notification_preferences.sql',
+        documentedIn: path.join(ROOT, 'docs', 'MILESTONE_5_PLAN.md'),
+      },
+    ];
+
+    const present = fs.existsSync(draftsDir) ? fs.readdirSync(draftsDir).sort() : [];
+    assert.deepEqual(
+      present,
+      drafts.map((draft) => draft.file).sort(),
+      'draf tak terdaftar (atau draf yang sudah menjadi migration) harus dihapus dari supabase/drafts',
+    );
+
+    for (const draft of drafts) {
+      const plan = read(draft.documentedIn);
+      assert.equal(
+        plan.includes(`supabase/drafts/${draft.file}`),
+        true,
+        `${draft.file} harus dirujuk ${path.relative(ROOT, draft.documentedIn)}`,
+      );
+      assert.equal(
+        fs.existsSync(path.join(ROOT, 'supabase', 'migrations', draft.file)),
+        false,
+        `${draft.file} sudah ada di migrations; hapus drafnya`,
+      );
+    }
+
     assert.equal(fs.existsSync(path.join(ROOT, 'supabase', 'tests', 'drafts')), false);
   });
 });
