@@ -26,19 +26,52 @@ const USAGE = 'Pemakaian: node scripts/should-release.mjs [--from <ref>] [--to <
 /**
  * Berkas yang tidak mengubah isi aplikasi. Urutan tidak penting; yang pertama
  * cocok dipakai sebagai alasan di log.
+ *
+ * Setiap pengecualian harus spesifik dan bisa dipertanggungjawabkan: berkas yang
+ * tidak dikenali tetap dihitung "perlu build" (lihat `needsBuild`). Karena itu
+ * `supabase/tests/**` dan `supabase/migrations/**` disebut eksplisit — keduanya
+ * berjalan di server dan tidak pernah masuk bundel aplikasi — bukan lewat pola
+ * longgar seperti "semua isi supabase" atau "semua yang mengandung kata test".
+ *
+ * `src/lib/supabase/database.generated.ts` sengaja **tidak** ada di sini walau
+ * dihasilkan mesin: berkas itu berada di `src/` dan diimpor kode aplikasi, jadi
+ * perubahannya tetap dinilai lewat jalur sebenarnya, bukan diabaikan karena
+ * "generated".
  */
 const IGNORABLE = [
   { reason: 'dokumentasi', pattern: /^docs\// },
   { reason: 'markdown', pattern: /\.md$/i },
   { reason: 'test', pattern: /(^|\/)__tests__\// },
   { reason: 'test', pattern: /\.test\.tsx?$/ },
+  // Uji SQL berjalan terhadap database development, bukan bagian dari APK.
+  { reason: 'uji SQL', pattern: /^supabase\/tests\// },
+  // Migration mengubah isi database, dan APK tidak membawa berkas migration.
+  { reason: 'migrasi database', pattern: /^supabase\/migrations\// },
+  { reason: 'draf SQL', pattern: /^supabase\/drafts\// },
+  // Tooling database: hanya dipakai `npm run db:*`, tidak diimpor kode aplikasi.
+  {
+    reason: 'tooling database',
+    pattern: /^scripts\/(db-test|db-types|storage-test|check-test-uuid-literals)\.mjs$/,
+  },
+  { reason: 'tooling database', pattern: /^scripts\/lib\/sql-uuid-literals\.mjs$/ },
   { reason: 'CI', pattern: /^\.github\// },
   { reason: 'konfigurasi test', pattern: /^jest\.config\.js$/ },
 ];
 
-function ignorableReason(file) {
+/** Alasan sebuah berkas diabaikan, atau `null` bila berkas itu memengaruhi aplikasi. */
+export function ignorableReason(file) {
   const match = IGNORABLE.find((entry) => entry.pattern.test(file));
   return match === undefined ? null : match.reason;
+}
+
+/** Ringkas alasan pengecualian menjadi mis. `uji SQL (2), migrasi database (1)`. */
+export function summarizeReasons(files) {
+  const counts = new Map();
+  for (const file of files) {
+    const reason = ignorableReason(file);
+    counts.set(reason, (counts.get(reason) ?? 0) + 1);
+  }
+  return [...counts].map(([reason, count]) => `${reason} (${count})`).join(', ');
 }
 
 /** `true` bila ada minimal satu berkas yang benar-benar memengaruhi aplikasi. */
@@ -79,7 +112,9 @@ function main() {
   if (build) {
     console.error(`::notice::Berkas yang memicu build: ${describe(decisive)}`);
   } else if (files.length > 0) {
-    console.error(`::notice::Dilewati karena hanya dokumentasi/test/CI: ${describe(ignored)}`);
+    console.error(
+      `::notice::Dilewati karena tidak ada berkas yang mengubah isi aplikasi: ${summarizeReasons(ignored)} — ${describe(ignored)}`,
+    );
   }
 
   process.stdout.write(`${build ? 'true' : 'false'}\n`);
