@@ -525,12 +525,16 @@ tanpa filter).
   tidak ikut muncul sebagai “perubahan” di catatan rilis maupun entri berikutnya. Rinciannya di
   [`docs/SETUP_GUIDE.md`](docs/SETUP_GUIDE.md) bagian 6.8.
 
-Status per 22 Oktober 2026: `origin/main` adalah **`d352551`** (merge PR #6). Rilis pratinjau terbaru
-adalah `v0.1.0-build36` dari commit sumber `5a45a2e` (Release APK **#36** hijau); CI **#50** dan
-Database RLS **#19** pada `1aa1480` hijau, dan hasil RLS itulah bukti “Dev backend” hazard, chat, dan
-moderasi di tabel atas. Release #37 untuk `1aa1480` **dibatalkan** di tengah build, jadi build36 tetap
-APK terakhir yang terbit. Release APK run **39736309698** untuk `d352551` masih berjalan saat catatan
-ini ditulis. Riwayat sebelumnya: pada `b0c8361`, CI dan Release APK #26 hijau (tag `v0.1.0-build26`),
+Status per 22 Oktober 2026: `origin/main` adalah **`cc5834d`**. Rilis pratinjau terbaru adalah
+`v0.1.0-build38` dari commit sumber `d352551` (Release APK run **39736309698** hijau). Build38 terbit
+**sebelum** gate rilis diperbaiki, dari commit yang isinya hanya dokumentasi dan satu berkas uji SQL;
+setelah perbaikan itu, push yang hanya menyentuh dokumentasi, test, atau tooling tidak lagi membangun
+APK — Release APK run **39741347027** pada `cc5834d` selesai dengan gate `Perlu build APK?` hijau dan
+seluruh job build, uji nyala, tag, serta pencatatan changelog **skipped**. CI **39741076495** pada
+`cc5834d` hijau, dan Database RLS **39739351279** pada `5a38695` hijau — hasil RLS itulah bukti “Dev
+backend” hazard, chat, dan moderasi di tabel atas. Release #37 untuk `1aa1480` **dibatalkan** di tengah
+build, jadi build36 sempat menjadi APK terakhir sebelum build38 terbit. Riwayat sebelumnya: pada
+`b0c8361`, CI dan Release APK #26 hijau (tag `v0.1.0-build26`),
 dan pada `df75ba1`, Release APK #23 hijau (tag `v0.1.0-build23`).
 
 Uji RLS berjalan **di GitHub Actions**, bukan hanya lokal: workflow `database-rls` memverifikasi
@@ -540,15 +544,17 @@ terakhir (`gen types` tanpa target, ADR-061); perbaikannya ada di `ca2461c` dan 
 Workflow `ci.yml` tetap bebas secret Supabase.
 
 Kedua alur rilis **sudah berjalan di GitHub**. APK preview terbaru adalah
-[v0.1.0-build36](https://github.com/29nls/rodakawan/releases/tag/v0.1.0-build36) (22 Oktober 2026,
-commit `5a45a2e`): `app-preview.apk`, **106.619.775** byte, SHA-256
-`6a92bd6a84e1ac0255a5d7ca4f8db79af1febb59ec44dd6d88f94022739f8d92` (dibaca dari metadata aset
-GitHub Releases), dari Release APK **#36** yang hijau. Build35 pada `40d50f0` berukuran byte yang
-sama (**106.619.775**) dengan SHA-256
-`b00ef60cd1c090e36b000e475d798611e2f0136bf7f2c0ae41103ae6af0720be` — keduanya hanya berbeda
-`versionCode`, karena build36 dibangun dari commit yang mengubah dua berkas uji SQL, bukan kode
-aplikasi. APK build36 **belum** diunduh ulang di mesin ini, jadi byte-nya tidak diverifikasi lokal.
-Sebelumnya,
+[v0.1.0-build38](https://github.com/29nls/rodakawan/releases/tag/v0.1.0-build38) (22 Oktober 2026,
+commit `d352551`): `app-preview.apk`, **106.619.775** byte, SHA-256
+`8a36631dfb4178a90978e9629781f7ec4809bb37adc4c8ab3755dbb695e3cd11` (dibaca dari badan rilis GitHub),
+sertifikat `3ea8bb4745b638be8fddf71e15edd9786d45aac65c0384b87be8fa2c32b3b14d`, dari Release APK run
+**39736309698** yang hijau. Sebelumnya,
+[v0.1.0-build36](https://github.com/29nls/rodakawan/releases/tag/v0.1.0-build36) pada `5a45a2e`
+(SHA-256 `6a92bd6a84e1ac0255a5d7ca4f8db79af1febb59ec44dd6d88f94022739f8d92`) dan build35 pada
+`40d50f0` (SHA-256 `b00ef60cd1c090e36b000e475d798611e2f0136bf7f2c0ae41103ae6af0720be`) berukuran
+byte yang sama (**106.619.775**) — ketiganya hanya berbeda `versionCode`, karena build36 dan build38
+dibangun dari commit yang mengubah dokumentasi atau berkas uji SQL, bukan kode aplikasi. APK build38
+**belum** diunduh ulang di mesin ini, jadi byte-nya tidak diverifikasi lokal. Lebih lama lagi,
 [v0.1.0-build26](https://github.com/29nls/rodakawan/releases/tag/v0.1.0-build26) dari `b0c8361`:
 `app-preview.apk`, 106.524.231 byte, SHA-256
 `97e702628109fed3c4d38e93c103c33cde713f423ceff9fc35f642348b6c2432`, sertifikat
