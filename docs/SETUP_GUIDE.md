@@ -782,7 +782,10 @@ Aturan yang berlaku di kedua jalur:
 - **Pencatatan itu tidak bisa memicu rilis berantai** walau workflow-nya sampai berjalan:
   `scripts/should-release.mjs` melewati build APK bila seluruh perubahan sejak tag terakhir hanya
   dokumentasi/markdown, uji (Jest dan SQL `supabase/tests/**`), migration `supabase/migrations/**`,
-  tooling database, atau berkas CI, dan `CHANGELOG.md` termasuk di dalamnya.
+  draf SQL, tooling repo di `scripts/` — kecuali tiga skrip yang menjadi input build
+  (`write-app-env.mjs`, `configure-android-release.mjs`, `generate-assets.mjs`) — atau berkas CI, dan
+  `CHANGELOG.md` termasuk di dalamnya. Berkas yang tidak dikenali selalu dihitung perlu build
+  (ADR-074).
 - Build EAS hanya dipanggil sekali per rilis: `concurrency: release-on-push` membuat dispatch manual
   yang datang saat rilis lain berjalan ikut mengantre, bukan berjalan bersamaan.
 - Rilis preview tidak pernah mengunggah apa pun ke Google Play; rilis produksi tetap lewat

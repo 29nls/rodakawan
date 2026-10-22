@@ -224,7 +224,7 @@ Jalur baca dan tulis:
 
 **Batas:** dashboard menampilkan 50 laporan terbuka tertua tanpa paginasi; penghapusan bersifat soft
 delete sehingga isi tetap ada di database untuk peninjauan; pelapor tidak menerima notifikasi hasil
-tinjauan; dan uji SQL-nya belum dieksekusi terhadap project development.
+tinjauan; dan uji SQL-nya (`rls_moderation_m4_test.sql`) sudah lulus di Database RLS #19 (22 Oktober 2026), sedangkan alurnya dengan tiga akun nyata di perangkat belum diuji.
 
 ### 8.3 Pesan dari pengguna yang diblokir disaring di server (21 Oktober 2026)
 

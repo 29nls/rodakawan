@@ -48,18 +48,33 @@ const IGNORABLE = [
   // Migration mengubah isi database, dan APK tidak membawa berkas migration.
   { reason: 'migrasi database', pattern: /^supabase\/migrations\// },
   { reason: 'draf SQL', pattern: /^supabase\/drafts\// },
-  // Tooling database: hanya dipakai `npm run db:*`, tidak diimpor kode aplikasi.
-  {
-    reason: 'tooling database',
-    pattern: /^scripts\/(db-test|db-types|storage-test|check-test-uuid-literals)\.mjs$/,
-  },
-  { reason: 'tooling database', pattern: /^scripts\/lib\/sql-uuid-literals\.mjs$/ },
+  // Tooling repo: dipanggil `npm run …` atau workflow, tidak pernah diimpor kode
+  // aplikasi. Skrip yang justru menjadi **input** build disebut terpisah di
+  // `BUILD_INPUT_SCRIPTS`, yang diperiksa lebih dulu.
+  { reason: 'tooling repo', pattern: /^scripts\// },
   { reason: 'CI', pattern: /^\.github\// },
   { reason: 'konfigurasi test', pattern: /^jest\.config\.js$/ },
 ];
 
+/**
+ * Skrip di `scripts/` yang ikut menentukan isi atau berkas APK. Seluruh skrip
+ * lain di direktori itu hanya alat bantu (rilis, uji, database), tetapi tiga ini
+ * dijalankan **di dalam** build: perubahannya harus tetap memicu build.
+ */
+const BUILD_INPUT_SCRIPTS = [
+  // Menulis `EXPO_PUBLIC_*` ke `.env.local`; nilainya masuk bundel aplikasi.
+  /^scripts\/write-app-env\.mjs$/,
+  // Menetapkan signingConfig rilis, versionCode, dan versionName APK.
+  /^scripts\/configure-android-release\.mjs$/,
+  // Sumber aset yang dipaketkan (ikon, adaptive icon, splash).
+  /^scripts\/generate-assets\.mjs$/,
+];
+
 /** Alasan sebuah berkas diabaikan, atau `null` bila berkas itu memengaruhi aplikasi. */
 export function ignorableReason(file) {
+  if (BUILD_INPUT_SCRIPTS.some((pattern) => pattern.test(file))) {
+    return null;
+  }
   const match = IGNORABLE.find((entry) => entry.pattern.test(file));
   return match === undefined ? null : match.reason;
 }

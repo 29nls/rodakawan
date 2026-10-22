@@ -34,7 +34,7 @@ Prinsip: aplikasi mobile tidak menyimpan secret layanan. Perubahan yang melibatk
 | Media foto | Supabase Storage | Tiga bucket privat (`vehicle-photos`, `club-logos`, `avatars`); perkecil + kompres di perangkat sebelum unggah, validasi ukuran/tipe, ownership lewat path + policy, signed URL berumur pendek, dan hapus file yatim. |
 | Voice PTT | LiveKit React Native / Expo quickstart | Fase P2; token room dibuat backend. Jalankan development build karena native WebRTC. |
 | Musik lokal | `expo-audio` + API media yang sesuai | Fase P2; uji audio focus, izin file, background playback dan konflik dengan PTT. |
-| Build/test Android | Expo EAS Build di cloud | Menghindari kebutuhan Android Studio untuk kompilasi lokal. Akun/kredit/limit EAS perlu dicek pada saat build. |
+| Build/test Android | Runner GitHub sendiri: `expo prebuild` + Gradle (ADR-051) | `eas.json` tetap ada sebagai profil, tetapi rilis APK tidak memakai EAS Cloud: `.github/workflows/release-on-push.yml` dan `android-release.yml` membangun di runner, lalu menjalankan `verify-apk` dan smoke test emulator. Konsekuensinya tidak ada kuota build pihak ketiga, tetapi waktu build memakai menit runner. |
 
 ### Peraturan memilih peta
 
@@ -48,6 +48,8 @@ Jangan memakai demo tiles untuk produksi. Pilih provider yang secara jelas mengi
 - Pin versi melalui lockfile dan lakukan upgrade secara terencana; jangan mengupdate semua dependency di tengah pengerjaan fitur.
 
 ## 3. Layer aplikasi
+
+Target struktur (folder bertanda P1/P2 belum ada):
 
 ```text
 src/
@@ -81,6 +83,11 @@ supabase/
   functions/
 docs/
 ```
+
+Keadaan sebenarnya per 22 Oktober 2026 (`ls src/features`): `auth`, `chat`, `clubs`, `garage`,
+`hazards`, `map`, `media`, `moderation`, `profile`, `rides`. Tidak ada `services/` terpisah —
+wrapper API tinggal di `features/<domain>/api.ts` — dan `supabase/functions/` **belum ada**; Edge
+Function pertama yang direncanakan adalah pengirim notifikasi M5 (ADR-075).
 
 Aturan dependency: screen memanggil feature hook/service, service memanggil Supabase/client/native API. Komponen presentasional tidak memuat query database atau aturan akses. Tipe database dihasilkan dari schema/migration bila workflow Supabase CLI digunakan.
 
@@ -118,7 +125,7 @@ Jangan menampilkan marker diam tanpa indikator waktu, sebab pengguna bisa menyim
 
 ## 5. Pola Supabase Realtime
 
-- Gunakan private channel berbasis ride, contohnya `ride:<ride_uuid>:locations` dan `ride:<ride_uuid>:chat`.
+- Gunakan private channel berbasis ride, contohnya `ride:<ride_uuid>:locations` dan `ride:<ride_uuid>:chat`. **Keadaan sekarang:** implementasi M3/M4 memakai **Postgres Changes** (`chat_messages`, `ride_locations`) karena setiap baris tetap melewati RLS dan policy `realtime.messages` tidak bisa dibuat dari koneksi migration (ADR-065/ADR-066). Broadcast tetap target untuk frekuensi tinggi (lokasi) setelah policy realtime tersedia.
 - Channel join harus diotorisasi berdasarkan membership ride yang aktif. Validasi ini harus dilakukan lewat RLS authorization Realtime dan diuji dengan token non-member.
 - Supabase merekomendasikan Broadcast untuk pola yang lebih scalable dibandingkan mengirim setiap sample melalui Postgres Changes. Simpan payload minimal.
 - Pesan chat disimpan di tabel sebagai source of truth; Realtime dipakai untuk memberi notifikasi data baru. Untuk lokasi, Broadcast membawa update cepat; tabel `ride_locations` dapat menyimpan posisi terakhir yang diperlukan untuk initial state/reconnect.
@@ -182,9 +189,13 @@ Setiap perubahan sebaiknya menjalankan:
 1. formatter/linter;
 2. TypeScript `tsc --noEmit`;
 3. unit tests untuk domain/service penting;
-4. test SQL/RLS di test project — `npm run db:test` menjalankan dua berkas: izin/penolakan per tabel
-   dan Storage (`rls_profiles_test.sql`), lalu pagar katalog policy wadah
-   (`rls_policy_guard_test.sql`: kepemilikan tanpa penjaga keanggotaan ⇒ CI gagal, ADR-060);
+4. test SQL/RLS di test project — `npm run db:test` menjalankan **tujuh** berkas dari
+   `DEFAULT_TEST_FILES`: profil & Storage (`rls_profiles_test.sql`), pagar katalog policy wadah
+   (`rls_policy_guard_test.sql`: kepemilikan tanpa penjaga keanggotaan ⇒ CI gagal, ADR-060),
+   perjalanan (`rls_rides_test.sql`), lalu empat berkas M4 (`rls_hazards_test.sql`,
+   `rls_chat_test.sql`, `rls_moderation_m4_test.sql`, `rls_blocked_chat_test.sql`); setiap berkas
+   harus memancarkan notice penandanya sendiri. `npm run db:types:check` membandingkan tipe hasil
+   generate dengan skema yang sama;
 5. smoke test pada development build Android;
 6. EAS preview APK untuk milestone yang melibatkan native config.
 

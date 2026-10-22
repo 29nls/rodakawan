@@ -103,7 +103,31 @@ Rekomendasi: **A**, karena laporan bahaya adalah data keselamatan bersama dan `c
 
 **Yang belum termasuk irisan ini:** push notification, crash monitoring, dan seluruh M6.
 
-## 5. Definisi "M5 selesai"
+## 5. Rancangan data notifikasi (desain saja, belum diterapkan)
+
+Ditulis 22 Oktober 2026 setelah memeriksa skema yang **sudah ada**, karena prasangka awalnya salah:
+tabel notifikasi tidak perlu dibuat.
+
+| Objek | Keadaan sebenarnya |
+| --- | --- |
+| `public.notifications` | **Sudah ada** sejak `20261013022938_initial_schema.sql`: `recipient_id`, `actor_id`, `kind` (sudah memuat `ride_invite`, `ride_started`, `ride_ended`, `club_join_request`, `club_join_approved`, `like`, `comment`, `follow`, `follow_back`, `system`), `entity_type`/`entity_id`, `payload`, `read_at`. RLS: penerima boleh SELECT dan menandai dibaca; **tidak ada** policy INSERT karena penulisan hanya lewat backend tepercaya |
+| `public.push_tokens` | **Sudah ada** di migration yang sama: `user_id`, `token` unik, `platform` (`android`/`ios`/`other`), `device_label`, `last_seen_at`. RLS penuh untuk pemilik baris (`select/insert/update/delete ... = auth.uid()`), jadi pendaftaran token tidak butuh RPC baru |
+| `public.notification_preferences` | **Belum ada.** Inilah satu-satunya tabel yang benar-benar hilang: tanpa ia, "matikan notifikasi" hanya bisa berarti mencabut token |
+| Pengirim | **Belum ada.** Rencana: Edge Function ber-service-role, karena kunci FCM tidak boleh masuk bundel dan penerima harus diturunkan dari `ride_members`, bukan dari payload klien |
+| Klien | **Belum ada.** `expo-notifications` belum menjadi dependency; menambahkannya berarti modul native baru → APK baru + izin Android |
+
+Draf badan migration ada di [`supabase/drafts/m5_notification_preferences.sql`](../supabase/drafts/m5_notification_preferences.sql).
+Ia **bukan** migration: tidak dijalankan `npm run db:test`, tidak dibaca `db:types`, dan tidak memicu build
+APK (ADR-074). Isinya: tabel preferensi (tiga kategori + jam tenang), RLS pemilik saja, trigger
+`touch_updated_at`, dan daftar keputusan yang harus diambil sebelum ia menjadi migration — idempotensi
+pengiriman, penanda token mati, dan zona waktu jam tenang. Keputusan strateginya ada di ADR-075
+(status **Proposed**).
+
+**Urutan yang disarankan saat M5 dikerjakan:** preferensi + layar pengaturan (tanpa dependency baru) →
+Edge Function pengirim + token nyata (butuh kredensial FCM) → pengujian dua perangkat dengan
+`expo-notifications` di development build, karena Expo Go tidak mendukung push penuh.
+
+## 6. Definisi "M5 selesai"
 
 M5 baru boleh ditutup bila seluruh butir P0 di §2 selesai **dan** M4 sudah punya bukti perangkat
 (QA_TEST_PLAN 8d), **dan** job Database RLS tetap hijau dengan berkas uji baru. Status yang dipakai

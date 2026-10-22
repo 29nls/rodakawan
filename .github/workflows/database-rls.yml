@@ -33,10 +33,11 @@ name: Database RLS
 # - Setiap berkas uji di `supabase/tests/` membungkus seluruh asersinya dalam
 #   transaksi yang di-ROLLBACK, sehingga menjalankannya ulang tidak menghapus atau
 #   meninggalkan data apa pun.
-# - Berkas kedua adalah pagar katalog policy: gagal bila ada policy pada tabel wadah
-#   yang memberi akses lewat kolom kepemilikan (created_by/author_id/owner_id/…) tanpa
-#   penjaga keanggotaan. Detektornya diuji-diri di dalam berkas itu, dan daftar
-#   pengecualiannya diperiksa anti-usang (lihat ADR-060).
+# - `npm run db:test` menjalankan tujuh berkas (daftar di `DEFAULT_TEST_FILES`), dan setiap
+#   berkas harus memancarkan notice penandanya sendiri. Berkas kedua adalah pagar katalog
+#   policy: gagal bila ada policy pada tabel wadah yang memberi akses lewat kolom kepemilikan
+#   (created_by/author_id/owner_id/…) tanpa penjaga keanggotaan. Detektornya diuji-diri di
+#   dalam berkas itu, dan daftar pengecualiannya diperiksa anti-usang (lihat ADR-060).
 # - Tipe database (`database.generated.ts`) diperiksa terhadap skema yang sama:
 #   bila migration sudah diterapkan tetapi tipe belum diregenerasi, langkah
 #   `db:types:check` gagal dan menampilkan perbedaan pertama.

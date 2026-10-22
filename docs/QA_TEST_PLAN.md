@@ -184,6 +184,9 @@ Diperbarui 22 Oktober 2026: `npm run db:test` di mesin lokal **masih** gagal (`E
 `.env.db` menunjuk `localhost`; 0 lulus, 7 tidak dijalankan), jadi jalur lokal tetap **bukan** lulus.
 Yang lulus adalah **Database RLS run #19** di GitHub Actions terhadap backend development (7/7 berkas,
 termasuk keempat berkas M4). Bukti perangkat tetap terpisah dan belum ada — lihat bagian 8d.
+Pada 22 Oktober 2026 juga dijalankan ulang penuh: `npm test -- --ci` **0** (43 suite / 483 test),
+`npm run test:scripts` **0** (71 suite / 318 test), `typecheck`/`lint`/`format:check` **0**,
+`export:android` **0**; `db:test`, `db:types:check`, dan `storage:test` tetap **1** karena lokal.
 
 Uji manual yang **belum** dilakukan dan tidak boleh dianggap lulus: dua perangkat pada chat yang sama,
 realtime saat koneksi putus/nyambung ulang, izin lokasi ditolak saat melapor, GPS mati, laporan
@@ -308,7 +311,9 @@ melaporkan 228/229 (lalu 234/235) karena asersi baris pertama `CHANGELOG.md` mem
 disk (`core.autocrlf=true`) dengan `HEADER` ber-LF. Perbaikannya **bukan** menonaktifkan asersi atau
 mengubah `core.autocrlf`, melainkan menyeragamkan akhir baris di batas perbandingan
 (`normalizeLineEndings`), ditambah test regresi untuk input LF/CRLF/CR dan test bahwa judul yang
-diubah tetap ditolak (ADR-063). Versi sekarang: **240/240 lulus** (empat di antaranya penjaga
+diubah tetap ditolak (ADR-063). Versi sekarang (22 Oktober 2026): **318/318 lulus, 71 suite**
+(termasuk 24 test gate rilis `should-release` di `scripts/__tests__/should-release.test.mjs` dan
+empat penjaga
 Milestone 3 di `scripts/__tests__/milestone-3.test.mjs`).
 
 Yang **sudah diverifikasi terhadap dev backend** (13 Oktober 2026, project development khusus

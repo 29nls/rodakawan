@@ -7,9 +7,9 @@
  * `supabase/tests/rls_hazards_test.sql`). Berkas uji berjalan terhadap database
  * development dan tidak pernah masuk bundel aplikasi, jadi build itu murni
  * pemborosan. Test di sini mengunci kedua sisi keputusan itu: yang **tidak**
- * boleh memicu build (uji SQL, migration, dokumentasi, tooling database) dan
+ * boleh memicu build (uji SQL, migration, dokumentasi, tooling repo) dan
  * yang **harus** tetap memicunya (kode aplikasi, konfigurasi native, aset,
- * dependency).
+ * dependency, serta skrip yang menjadi input build).
  *
  * Dua lapis pengujian, sengaja:
  *   1. `needsBuild` dipanggil langsung — matriks jalur yang cepat dan terbaca.
@@ -93,13 +93,33 @@ describe('needsBuild — berkas yang tidak mengubah isi aplikasi', () => {
     assert.equal(needsBuild(['README.md', 'CHANGELOG.md', 'docs/MILESTONE_4_PLAN.md']), false);
   });
 
-  it('tooling uji database tidak memicu build', () => {
+  it('tooling repo tidak memicu build', () => {
     assert.equal(needsBuild(['scripts/db-test.mjs']), false);
     assert.equal(needsBuild(['scripts/db-types.mjs']), false);
     assert.equal(needsBuild(['scripts/storage-test.mjs']), false);
     assert.equal(needsBuild(['scripts/check-test-uuid-literals.mjs']), false);
     assert.equal(needsBuild(['scripts/lib/sql-uuid-literals.mjs']), false);
     assert.equal(needsBuild(['scripts/__tests__/db-test.test.mjs']), false);
+    // Perubahan pada classifier dan pencatat rilis adalah pekerjaan CI, bukan
+    // isi aplikasi: keduanya pernah memicu build APK yang tidak perlu.
+    assert.equal(needsBuild(['scripts/should-release.mjs']), false);
+    assert.equal(needsBuild(['scripts/__tests__/should-release.test.mjs']), false);
+    assert.equal(needsBuild(['scripts/release-notes.mjs']), false);
+    assert.equal(needsBuild(['scripts/update-changelog.mjs']), false);
+    assert.equal(needsBuild(['scripts/prune-preview-releases.mjs']), false);
+    assert.equal(needsBuild(['scripts/verify-apk.mjs']), false);
+    assert.equal(needsBuild(['scripts/smoke-test-apk.mjs']), false);
+    assert.equal(needsBuild(['scripts/device-checklist.mjs']), false);
+    assert.equal(needsBuild(['scripts/lib/gh.mjs']), false);
+  });
+
+  it('skrip yang menjadi input build tetap memicu build', () => {
+    // Ketiganya dijalankan di dalam build: env publik yang masuk bundel,
+    // signing + nomor versi, dan sumber aset yang dipaketkan.
+    assert.equal(needsBuild(['scripts/write-app-env.mjs']), true);
+    assert.equal(needsBuild(['scripts/configure-android-release.mjs']), true);
+    assert.equal(needsBuild(['scripts/generate-assets.mjs']), true);
+    assert.equal(ignorableReason('scripts/write-app-env.mjs'), null);
   });
 
   it('berkas CI dan konfigurasi test tidak memicu build', () => {
@@ -192,6 +212,22 @@ describe('CLI should-release.mjs', () => {
 
     assert.equal(result.stdout.trim(), 'false', result.stderr);
     assert.match(result.stderr, /migrasi database \(1\)/);
+  });
+
+  it('commit yang hanya mengubah dokumentasi dan tooling rilis dilewati', (t) => {
+    // Bentuk push yang memicu Release APK run #39736309698: dokumentasi M4/M5
+    // plus perbaikan classifier itu sendiri. Isi aplikasi tidak berubah.
+    const repo = repoWith(t, {
+      'docs/MILESTONE_5_PLAN.md': '# rencana\n',
+      'scripts/should-release.mjs': 'export const x = 1;\n',
+    });
+
+    const result = runScript(repo.dir, 'should-release.mjs', ['--to', 'HEAD']);
+
+    assert.equal(result.code, 0, result.stderr);
+    assert.equal(result.stdout.trim(), 'false');
+    assert.match(result.stderr, /tooling repo \(1\)/);
+    assert.match(result.stderr, /dokumentasi \(1\)/);
   });
 
   it('commit yang menyentuh kode aplikasi tetap membangun APK', (t) => {
