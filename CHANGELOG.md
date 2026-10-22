@@ -8,6 +8,27 @@ sedangkan build preview (`v<versi>-build<N>`) diringkas di dalam blok yang bisa 
 versi adalah tautan ke halaman rilisnya di GitHub, sehingga riwayat ini bisa dinavigasi langsung
 dari berkas.
 
+## [v0.1.0-build43](https://github.com/29nls/rodakawan/releases/tag/v0.1.0-build43) — 2026-10-22 · pratinjau
+
+<details>
+<summary>Catatan rilis pratinjau</summary>
+
+### Fitur
+
+- hapus akun M5 dengan anonimisasi dan uji RLS sendiri (`afe908e`)
+
+### Perbaikan
+
+- lewati build APK untuk perubahan tooling rilis (`5a38695`)
+
+### Perubahan lain
+
+- catat uji RLS lokal yang kini lulus 7/7 (`5d0d677`)
+- catat build38 dan bukti gate rilis melewati build (`161e59d`)
+- izinkan draf M5 yang terdaftar dan terdokumentasi (`cc5834d`)
+
+</details>
+
 ## [v0.1.0-build38](https://github.com/29nls/rodakawan/releases/tag/v0.1.0-build38) — 2026-10-22 · pratinjau
 
 <details>
