@@ -154,7 +154,7 @@ begin
     perform public.send_chat_message(v_ride, 'Pesan dari orang luar', null);
     raise exception 'UJI GAGAL: non-anggota mengirim pesan';
   exception when others then
-    get stacked diag v_state = RETURNED_SQLSTATE, v_detail = PG_EXCEPTION_DETAIL;
+    get stacked diagnostics v_state = RETURNED_SQLSTATE, v_detail = PG_EXCEPTION_DETAIL;
   end;
 
   if v_state is distinct from '42501' or v_detail is distinct from 'chat_not_member' then
@@ -242,7 +242,7 @@ begin
     perform public.edit_chat_message(v_id, 'Diubah oleh bukan pengirim');
     raise exception 'UJI GAGAL: pengguna lain mengubah pesan orang';
   exception when others then
-    get stacked diag v_state = RETURNED_SQLSTATE, v_detail = PG_EXCEPTION_DETAIL;
+    get stacked diagnostics v_state = RETURNED_SQLSTATE, v_detail = PG_EXCEPTION_DETAIL;
   end;
 
   if v_state is distinct from '42501' or v_detail is distinct from 'chat_not_sender' then
@@ -290,7 +290,7 @@ begin
     perform public.edit_chat_message(v_id, 'Sistem diubah');
     raise exception 'UJI GAGAL: pesan sistem dapat diubah';
   exception when others then
-    get stacked diag v_state = RETURNED_SQLSTATE, v_detail = PG_EXCEPTION_DETAIL;
+    get stacked diagnostics v_state = RETURNED_SQLSTATE, v_detail = PG_EXCEPTION_DETAIL;
   end;
 
   if v_state is distinct from '42501' or v_detail is distinct from 'chat_system_message' then
@@ -335,7 +335,7 @@ begin
     perform public.delete_chat_message(v_id);
     raise exception 'UJI GAGAL: pengguna lain menghapus pesan orang';
   exception when others then
-    get stacked diag v_state = RETURNED_SQLSTATE, v_detail = PG_EXCEPTION_DETAIL;
+    get stacked diagnostics v_state = RETURNED_SQLSTATE, v_detail = PG_EXCEPTION_DETAIL;
   end;
 
   if v_state is distinct from '42501' or v_detail is distinct from 'chat_not_sender' then
@@ -378,7 +378,7 @@ begin
     perform public.edit_chat_message(v_id, 'Terlambat mengubah');
     raise exception 'UJI GAGAL: edit setelah jendela 15 menit diterima';
   exception when others then
-    get stacked diag v_state = RETURNED_SQLSTATE, v_detail = PG_EXCEPTION_DETAIL;
+    get stacked diagnostics v_state = RETURNED_SQLSTATE, v_detail = PG_EXCEPTION_DETAIL;
   end;
 
   if v_state is distinct from '23514' or v_detail is distinct from 'chat_edit_window' then
@@ -443,7 +443,7 @@ begin
     begin
       perform public.send_chat_message(v_ride, 'Pesan rate limit ' || v_i, null);
     exception when others then
-      get stacked diag v_state = RETURNED_SQLSTATE, v_detail = PG_EXCEPTION_DETAIL;
+      get stacked diagnostics v_state = RETURNED_SQLSTATE, v_detail = PG_EXCEPTION_DETAIL;
       exit when v_state = 'P0001';
     end;
   end loop;
@@ -515,7 +515,7 @@ begin
     perform public.send_chat_message(v_ride, 'Pesan setelah selesai', null);
     raise exception 'UJI GAGAL: pesan diterima pada ride yang sudah selesai';
   exception when others then
-    get stacked diag v_state = RETURNED_SQLSTATE, v_detail = PG_EXCEPTION_DETAIL;
+    get stacked diagnostics v_state = RETURNED_SQLSTATE, v_detail = PG_EXCEPTION_DETAIL;
   end;
 
   if v_state is distinct from '23514' or v_detail is distinct from 'chat_ride_final' then

@@ -168,7 +168,7 @@ begin
     begin
       perform public.create_hazard('pothole','moderate', -5.0 + (v_i * 0.02), 107.0, 'Rate limit', null, null);
     exception when others then
-      get stacked diag v_state = RETURNED_SQLSTATE, v_detail = PG_EXCEPTION_DETAIL;
+      get stacked diagnostics v_state = RETURNED_SQLSTATE, v_detail = PG_EXCEPTION_DETAIL;
       exit when v_state = 'P0001';
     end;
   end loop;
@@ -194,7 +194,7 @@ begin
     perform public.create_hazard('crash','high',-7.0001,108.0001,'Duplikat dekat',null,null);
     raise exception 'UJI GAGAL: duplikat terdekat diterima';
   exception when others then
-    get stacked diag v_state = RETURNED_SQLSTATE, v_detail = PG_EXCEPTION_DETAIL;
+    get stacked diagnostics v_state = RETURNED_SQLSTATE, v_detail = PG_EXCEPTION_DETAIL;
   end;
 
   if v_state is distinct from '23505' or v_detail is distinct from 'hazard_duplicate_nearby' then
@@ -213,7 +213,7 @@ begin
     perform public.create_hazard('pothole','moderate',99.0,106.8,'Lintang salah',null,null);
     raise exception 'UJI GAGAL: koordinat di luar rentang diterima';
   exception when others then
-    get stacked diag v_state = RETURNED_SQLSTATE, v_detail = PG_EXCEPTION_DETAIL;
+    get stacked diagnostics v_state = RETURNED_SQLSTATE, v_detail = PG_EXCEPTION_DETAIL;
   end;
 
   if v_state is distinct from '22023' or v_detail is distinct from 'hazard_invalid_coordinates' then
@@ -237,7 +237,7 @@ begin
     perform public.create_hazard('pothole','moderate',-6.9,107.9,'Taut ride', v_ride, null);
     raise exception 'UJI GAGAL: non-peserta ride menautkan laporan ke ride';
   exception when others then
-    get stacked diag v_state = RETURNED_SQLSTATE, v_detail = PG_EXCEPTION_DETAIL;
+    get stacked diagnostics v_state = RETURNED_SQLSTATE, v_detail = PG_EXCEPTION_DETAIL;
   end;
 
   if v_state is distinct from '42501' or v_detail is distinct from 'hazard_ride_not_member' then
@@ -285,7 +285,7 @@ begin
     perform public.update_hazard(v_h, 'high', 'Dicoba orang lain');
     raise exception 'UJI GAGAL: pengguna lain mengubah laporan orang';
   exception when others then
-    get stacked diag v_state = RETURNED_SQLSTATE, v_detail = PG_EXCEPTION_DETAIL;
+    get stacked diagnostics v_state = RETURNED_SQLSTATE, v_detail = PG_EXCEPTION_DETAIL;
   end;
 
   if v_state is distinct from '42501' or v_detail is distinct from 'hazard_not_reporter' then
@@ -340,7 +340,7 @@ begin
     perform public.update_hazard(v_h, 'high', 'Terlambat');
     raise exception 'UJI GAGAL: update setelah jendela 15 menit diterima';
   exception when others then
-    get stacked diag v_state = RETURNED_SQLSTATE, v_detail = PG_EXCEPTION_DETAIL;
+    get stacked diagnostics v_state = RETURNED_SQLSTATE, v_detail = PG_EXCEPTION_DETAIL;
   end;
 
   if v_state is distinct from '23514' or v_detail is distinct from 'hazard_edit_window' then
@@ -372,7 +372,7 @@ begin
     perform public.remove_hazard(v_h);
     raise exception 'UJI GAGAL: pengguna lain menghapus laporan orang';
   exception when others then
-    get stacked diag v_state = RETURNED_SQLSTATE, v_detail = PG_EXCEPTION_DETAIL;
+    get stacked diagnostics v_state = RETURNED_SQLSTATE, v_detail = PG_EXCEPTION_DETAIL;
   end;
 
   if v_state is distinct from '42501' or v_detail is distinct from 'hazard_not_reporter' then
@@ -458,7 +458,7 @@ begin
     perform public.confirm_hazard(v_id);
     raise exception 'UJI GAGAL: konfirmasi laporan kedaluwarsa diterima';
   exception when others then
-    get stacked diag v_state = RETURNED_SQLSTATE, v_detail = PG_EXCEPTION_DETAIL;
+    get stacked diagnostics v_state = RETURNED_SQLSTATE, v_detail = PG_EXCEPTION_DETAIL;
   end;
 
   if v_state is distinct from '23514' or v_detail is distinct from 'hazard_expired' then
@@ -487,7 +487,7 @@ begin
     perform public.confirm_hazard(v_id);
     raise exception 'UJI GAGAL: konfirmasi duplikat diterima';
   exception when others then
-    get stacked diag v_state = RETURNED_SQLSTATE, v_detail = PG_EXCEPTION_DETAIL;
+    get stacked diagnostics v_state = RETURNED_SQLSTATE, v_detail = PG_EXCEPTION_DETAIL;
   end;
 
   if v_state is distinct from '23505' or v_detail is distinct from 'hazard_already_confirmed' then
@@ -527,7 +527,7 @@ begin
     perform public.create_hazard('pothole','moderate',-6.0,106.0,'Anon',null,null);
     raise exception 'UJI GAGAL: anon membuat laporan hazard';
   exception when others then
-    get stacked diag v_state = RETURNED_SQLSTATE;
+    get stacked diagnostics v_state = RETURNED_SQLSTATE;
   end;
 
   if v_state is distinct from '42501' then
