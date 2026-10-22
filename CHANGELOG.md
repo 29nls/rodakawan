@@ -8,6 +8,27 @@ sedangkan build preview (`v<versi>-build<N>`) diringkas di dalam blok yang bisa 
 versi adalah tautan ke halaman rilisnya di GitHub, sehingga riwayat ini bisa dinavigasi langsung
 dari berkas.
 
+## [v0.1.0-build35](https://github.com/29nls/rodakawan/releases/tag/v0.1.0-build35) — 2026-10-22 · pratinjau
+
+<details>
+<summary>Catatan rilis pratinjau</summary>
+
+### Fitur
+
+- add static check for UUID literals in SQL test files (`12171aa`)
+
+### Perbaikan
+
+- update create_hazard calls to use valid UUIDs for client_report_id (`18bc03c`)
+
+### Perubahan lain
+
+- Persempit tipe tabel M4 sesuai CHECK constraint di database (`04ecdea`)
+- Perbaiki runner uji RLS dan kunci konfigurasi test script (`8d1e264`)
+- Regenerate tipe database dari skema development (`258bee2`)
+
+</details>
+
 ## [v0.1.0-build34](https://github.com/29nls/rodakawan/releases/tag/v0.1.0-build34) — 2026-10-21 · pratinjau
 
 <details>
