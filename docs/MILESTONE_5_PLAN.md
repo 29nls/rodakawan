@@ -112,32 +112,38 @@ oleh anonimisasi saja: pengguna masih bisa login dan `auth.uid()` masih cocok de
 
 **Yang belum termasuk irisan ini:** push notification, crash monitoring, dan seluruh M6.
 
-### 4a. Status implementasi (23 Oktober 2026)
+### 4a. Status implementasi (23–24 Oktober 2026)
 
 Irisan ini **selesai dan diuji end-to-end terhadap project development** untuk jalur aplikasi dan web
-(dengan satu blocker deployment web).
+(dengan satu blocker deployment web). Reliabilitas orkestrasi ADR-078 sudah **Implemented** dan lulus
+lokal; penerapan migration + redeploy Edge Function ke development masih **Blocked**.
 
 | Bagian | Berkas | Bukti |
 | --- | --- | --- |
-| Pemisahan identitas + tombstone + purge | `supabase/migrations/20261023004946_account_deletion_identity.sql` | diterapkan ke development (20 migration; `db:types:check` lulus) |
-| Orkestrasi server + retry | `supabase/functions/delete-account/index.ts`, `orchestrator.mjs` | di-deploy ke project development; 10 test Node untuk urutan/retry/gagal-parsial |
-| Uji SQL | `supabase/tests/rls_account_delete_test.sql` (48 perintah) | `npm run db:test` **8/8 lulus**, notice `UJI HAPUS AKUN LULUS`; mencakup JWT lama, Auth deletion, tombstone, transfer kepemilikan |
-| Layanan klien | `src/features/account/api.ts`, `errors.ts` | 7 test di `src/features/account/__tests__/api.test.ts` |
+| Pemisahan identitas + tombstone + purge | `supabase/migrations/20261023004946_account_deletion_identity.sql` | diterapkan ke project development; `db:types:check` lulus untuk skema yang diterapkan (21 dari 22 migration) |
+| Orkestrasi server + retry | `supabase/functions/delete-account/index.ts`, `orchestrator.mjs` | di-deploy untuk alur ADR-077; 19 test Node untuk urutan/retry/gagal-parsial/lease; redeploy ADR-078 **Blocked** |
+| Reliabilitas orkestrasi (lease/checkpoint) | `supabase/migrations/20261023120000_account_deletion_reliability.sql`, `orchestrator.mjs`, `index.ts` | **Implemented** dan **Passed locally**; uji SQL lease lulus terhadap development di dalam transaksi `ROLLBACK`; migration belum diterapkan dan function belum di-redeploy |
+| Uji SQL | `supabase/tests/rls_account_delete_test.sql` | ADR-077 lulus pada `db:test` 8/8 (23 Oktober 2026); uji lease ADR-078 lulus di transaksi `ROLLBACK`; `db:test` terbaru **7/8** karena migration ADR-078 belum diterapkan |
+| Layanan klien | `src/features/account/api.ts`, `errors.ts` | 13 test di `src/features/account/__tests__/api.test.ts` |
 | Layar | `src/app/account-delete.tsx`, `src/app/privacy.tsx` | 4 test layar di `src/__tests__/account-delete.test.tsx` |
 | Web publik | `web/account-deletion/`, `web/privacy/` | halaman statis + prosedur deploy; **belum live** |
 | Uji E2E Auth/Storage | skrip sementara (tidak di-commit) dijalankan terhadap development | Auth user A hilang, profil hilang, laporan bahaya tetap, media pribadi hilang, logo klub pindah, JWT lama ditolak, login ulang gagal, akun B tidak tersentuh |
 
-Perintah yang benar-benar dijalankan (23 Oktober 2026): `npm test -- --ci` **0** (45 suite / 494 test),
-`npm run test:scripts` **0** (73 suite / 328 test), `npm run db:test` **0** (8/8 berkas),
-`npm run db:types:check` **0**, `npm run storage:test` **0** (27 langkah), `npm run db:test:lint` **0**
-(8 berkas uji, 20 migration), `typecheck`/`lint`/`format:check` **0**, `npm run export:android` **0**.
+Perintah yang benar-benar dijalankan (24 Oktober 2026): `npm test -- --ci` **0** (45 suite / 500 test),
+`npm run test:scripts` **0** (74 suite / 339 test), `npm run db:test` **1** (7/8 berkas;
+`rls_account_delete_test.sql` gagal karena migration ADR-078 belum diterapkan), `npm run db:types:check`
+**0**, `npm run storage:test` **0** (27 langkah), `npm run db:test:lint` **0** (8 berkas uji, 22
+migration), `typecheck`/`lint`/`format:check` **0**. `npm run export:android` terakhir **0** pada
+23 Oktober 2026 dan tidak diulang hari ini.
 
-**Yang tetap terbuka dan tidak boleh dicatat lulus:** halaman web belum punya URL publik (blocker
-deployment); alur ini belum dicoba di perangkat fisik; metadata job (`account_deletion_jobs`) belum
-dibersihkan otomatis; keputusan retensi untuk laporan bahaya/audit/pesan yang diredaksi masih perlu
-pengesahan produk/legal; dan CI/RLS untuk commit perubahan ini baru berjalan setelah branch di-push.
-Retensi data yang dipertahankan didokumentasikan di ADR-077, bukan disembunyikan sebagai “semua
-data dihapus”.
+**Yang tetap terbuka dan tidak boleh dicatat lulus:** migration `20261023120000_account_deletion_reliability.sql`
+belum diterapkan ke development (22 lokal vs 21 remote) dan Edge Function `delete-account` belum
+di-redeploy dengan RPC lease, jadi jalur lease belum aktif di backend mana pun; halaman web belum punya
+URL publik (blocker deployment); alur ini belum dicoba di perangkat fisik; metadata job
+(`account_deletion_jobs`) belum dibersihkan otomatis; keputusan retensi untuk laporan bahaya/audit/pesan
+yang diredaksi masih perlu pengesahan produk/legal; dan CI/RLS untuk commit perubahan ini baru berjalan
+setelah branch di-push. Retensi data yang dipertahankan didokumentasikan di ADR-077, bukan
+disembunyikan sebagai “semua data dihapus”.
 
 ## 5. Rancangan data notifikasi (desain saja, belum diterapkan)
 

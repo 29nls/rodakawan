@@ -283,9 +283,12 @@ Rencana terperinci, urutan prioritas, dan irisan vertikal pertama: [`docs/MILEST
 - [x] Privacy policy, delete account flow, support contact — **Implemented** dan **Passed against dev
       backend** (23 Oktober 2026): Edge Function `delete-account` menghapus Storage → database →
       `auth.users`, tombstone mempertahankan laporan bahaya/audit, layar `/account-delete`, halaman
-      `/privacy`, tautan dukungan ke issue GitHub. Uji SQL 48 perintah lulus (`npm run db:test` 8/8)
-      dan E2E development membuktikan Auth user hilang, media bersih, logo klub pindah, JWT lama
-      ditolak, serta login ulang gagal (ADR-077). **Blocked:** uji perangkat fisik dan URL web publik
+      `/privacy`, tautan dukungan ke issue GitHub. Uji SQL ADR-077 lulus dan E2E development
+      membuktikan Auth user hilang, media bersih, logo klub pindah, JWT lama ditolak, serta login ulang
+      gagal (ADR-077). **ADR-078 (lease/checkpoint) Implemented dan Passed locally**; uji SQL lease lulus di dalam
+      transaksi `ROLLBACK` terhadap development, sedangkan `npm run db:test` terbaru **7/8** karena
+      migration `20261023120000_account_deletion_reliability.sql` belum diterapkan (22 lokal vs 21
+      remote). **Blocked:** `db push` + redeploy Edge Function, uji perangkat fisik, dan URL web publik
       (`web/` belum di-deploy).
 - [x] Jalur hapus akun web eksternal — halaman statis `web/account-deletion/` dan kebijakan
       `web/privacy/` dibuat; **URL publik belum ada (blocker deployment)** sehingga syarat Play Console
