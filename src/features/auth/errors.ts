@@ -37,7 +37,11 @@ export type AppErrorCode =
   | 'chat_system_message'
   /** Moderasi: isi konten tak terbaca lagi, atau langkah kedua gagal setelah yang pertama. */
   | 'content_unavailable'
-  | 'partial';
+  | 'partial'
+  /** Hapus akun: build lama, kegagalan server yang bisa diulang, dan gagal umum. */
+  | 'app_outdated'
+  | 'deletion_incomplete'
+  | 'deletion_failed';
 
 export type AppError = {
   code: AppErrorCode;

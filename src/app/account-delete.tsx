@@ -11,7 +11,7 @@ import { ScreenHeader } from '@/components/ui/ScreenHeader';
 import { SectionHeader } from '@/components/ui/SectionHeader';
 import { TextField } from '@/components/ui/TextField';
 import { spacing } from '@/constants/theme';
-import { deleteMyAccount, collectOwnMedia, removeOwnMedia } from '@/features/account/api';
+import { deleteMyAccount } from '@/features/account/api';
 import { BackendUnavailableBanner } from '@/features/auth/components/BackendUnavailableBanner';
 import type { AppError } from '@/features/auth/errors';
 import { useAuthSession } from '@/features/auth/session';
@@ -20,12 +20,13 @@ import { useProfile } from '@/features/profile/useProfile';
 const SUPPORT_URL = 'https://github.com/29nls/rodakawan/issues';
 
 /**
- * Hapus akun (anonimisasi).
+ * Hapus akun (penghapusan penuh di server).
  *
  * Layar ini sengaja tidak menawarkan tombol sekali tekan: konsekuensinya tidak
- * bisa dibatalkan, jadi pengguna harus mengetik username-nya sendiri. Yang
- * ditampilkan sebagai "berhasil" hanya setelah server menerima RPC — kegagalan
- * Storage dilaporkan terpisah dan tidak dipalsukan menjadi sukses.
+ * bisa dibatalkan, jadi pengguna harus mengetik username-nya sendiri. Klien
+ * hanya memanggil Edge Function; server yang memindahkan/menghapus media,
+ * memurnikan database, dan menghapus identitas login. "Berhasil" hanya
+ * ditampilkan setelah server mengonfirmasi seluruh langkah selesai.
  */
 export default function AccountDeleteScreen() {
   const router = useRouter();
@@ -50,13 +51,6 @@ export default function AccountDeleteScreen() {
     setError(null);
     setNotice(null);
 
-    // 1. Kumpulkan rujukan media sebelum baris database hilang.
-    const media = await collectOwnMedia(backend.client, userId);
-
-    // 2. Hapus objek Storage lewat Storage API (best effort, tidak memblokir).
-    const cleanup = media.length > 0 ? await removeOwnMedia(backend.client, media) : null;
-
-    // 3. Anonimkan akun di server.
     const result = await deleteMyAccount(backend.client);
 
     if (!result.ok) {
@@ -66,9 +60,7 @@ export default function AccountDeleteScreen() {
     }
 
     setNotice(
-      cleanup && cleanup.failed > 0
-        ? 'Akun Anda sudah dianonimkan. Sebagian foto tidak dapat dihapus otomatis dan akan dibersihkan oleh pengelola; foto itu tidak lagi dapat dibuka siapa pun karena tidak ada sesi yang memiliki foldernya.'
-        : 'Akun Anda sudah dianonimkan dan Anda telah keluar dari perangkat ini.',
+      'Akun Anda dan identitas login sudah dihapus. Anda tidak bisa masuk lagi dengan akun ini, dan sesi di perangkat ini telah berakhir.',
     );
 
     await signOut();
@@ -91,16 +83,18 @@ export default function AccountDeleteScreen() {
             • Username, nama tampilan, foto profil, bio, dan kota dihapus atau diganti anonim.
           </AppText>
           <AppText variant="callout">
-            • Kendaraan, nomor polisi, catatan privat, token notifikasi, relasi follow, dan blokir
-            dihapus.
+            • Kendaraan, nomor polisi, catatan privat, token notifikasi, lokasi terakhir, relasi
+            follow, dan blokir dihapus. Identitas login juga dihapus permanen.
           </AppText>
           <AppText variant="callout">
-            • Anda keluar dari klub dan perjalanan. Perjalanan yang pernah Anda ikuti tetap ada
-            untuk peserta lain.
+            • Anda keluar dari klub dan perjalanan. Kepemilikan klub/perjalanan dialihkan ke
+            pengelola lain; perjalanan tanpa penerus dibatalkan. Perjalanan tetap ada untuk peserta
+            lain.
           </AppText>
           <AppText variant="callout">
-            • Laporan bahaya dan pesan konvoi tetap tersimpan untuk keselamatan peserta lain, tetapi
-            tanpa identitas Anda.
+            • Laporan bahaya tetap tersimpan untuk keselamatan peserta lain, tanpa identitas Anda.
+            Pesan konvoi serta postingan/komentar Anda diredaksi dan diatribusikan ke “Akun
+            dihapus”. Jejak audit moderasi tetap ada tanpa identitas Anda.
           </AppText>
         </View>
       </Card>

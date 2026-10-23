@@ -15,5 +15,8 @@ CHANGELOG.md
 
 assets/*.png
 
+# Skill agent pihak ketiga (di luar kode aplikasi).
+.agents/
+
 # Hasil `supabase gen types`; bentuknya ditentukan CLI, bukan Prettier.
 src/lib/supabase/database.generated.ts

@@ -41,7 +41,7 @@ Istilah status dipakai konsisten di seluruh dokumentasi:
 | Milestone 4: laporan bahaya jalan (buat, filter, ubah/lepas, konfirmasi, laporkan) | Ya — RPC transaksional, expiry dihitung server, idempotensi + rate limit + deteksi duplikat di database; tanpa peta, daftar memakai label area perkiraan | Ya (29 test fitur + 6 test layar) | **Ya** (uji RLS LULUS — Database RLS #19) | **Blocked** (belum ada build perangkat) |
 | Milestone 4: chat konvoi (teks, ubah/hapus 15 menit, pesan sistem, realtime, laporkan, blokir) | Ya — Postgres Changes pada `chat_messages`, keyset pagination, idempotensi `client_message_id`, panel chat di detail perjalanan; pesan teks dari pengguna yang diblokir disaring **di server** (policy, ADR-068), bukan di UI | Ya (24 test API + 9 test panel) | **Ya** (uji RLS LULUS — Database RLS #19) | **Blocked** |
 | Milestone 4: moderasi (`content_reports`, `moderation_actions`, `user_blocks`) | Ya — pelaporan lewat RPC `report_content`, dashboard `/moderation` untuk host perjalanan/admin klub dengan aksi hapus konten (soft delete), abaikan, dan tandai ditinjau, jejak audit yang hanya bisa dibaca lewat RPC; **tanpa** peran moderator global (ADR-067) | Ya (16 test layanan + 8 test layar) | **Ya** (uji RLS LULUS — Database RLS #19) | — |
-| Milestone 5: hapus akun (anonimisasi) + kebijakan privasi | Ya — RPC `delete_my_account()` idempoten, layar `/account-delete` dengan konfirmasi ketik username, halaman `/privacy`; foto dihapus lewat Storage API sebelum RPC karena Supabase menolak DELETE SQL pada `storage.objects` | Ya (10 test layanan + 4 test layar) | **Ya** (uji RLS LULUS — `db:test` 8/8, 23 Okt 2026) | **Blocked** (belum ada build perangkat) |
+| Milestone 5: hapus akun penuh + kebijakan privasi | Ya — Edge Function `delete-account` memverifikasi JWT, memindahkan logo klub/menghapus media lewat Storage API, memanggil `purge_account_data()` (satu transaksi), lalu menghapus `auth.users`; tombstone bersama mempertahankan laporan bahaya/audit; layar `/account-delete` dan halaman statis `web/privacy` + `web/account-deletion` | Ya (7 test layanan + 4 test layar + 10 test orkestrasi Node) | **Ya** (uji RLS LULUS — `db:test` 8/8; E2E Auth/Storage lulus 23 Okt 2026) | **Blocked** (belum ada build perangkat; URL web belum live) |
 | Milestone 5: push notification, crash monitoring, device matrix | **Belum** — rencana di `docs/MILESTONE_5_PLAN.md`; push butuh modul native + kredensial FCM | — | — | — |
 | Milestone 6+: feed, musik, voice PTT | **Belum** | — | — | — |
 
@@ -49,22 +49,25 @@ Istilah status dipakai konsisten di seluruh dokumentasi:
 HP fisik. Status **Ya** pada kolom perangkat Milestone 2 berasal dari laporan pemilik aplikasi
 (owner-reported) bahwa build sudah dicoba di HP tanpa error yang teramati; tidak ada log, rekaman,
 atau tag rilis per kasus yang disertakan. Project Supabase development **sudah ada**
-sejak 13 Oktober 2026, **tiga belas** migration (sampai `20261019120000_ride_workflow.sql`) sudah
-diterapkan, uji RLS sudah lulus (ADR-035), dan lubang privasi follow serta integritas detail privat
-kendaraan sudah diperbaiki dengan uji allow/deny (ADR-039, ADR-040). Empat migration Milestone 4 —
+sejak 13 Oktober 2026. Seluruh **dua puluh** migration (sampai
+`20261023004946_account_deletion_identity.sql`) sudah diterapkan, uji RLS sudah lulus (ADR-035), dan
+lubang privasi follow serta integritas detail privat kendaraan sudah diperbaiki dengan uji allow/deny
+(ADR-039, ADR-040). Empat migration Milestone 4 —
 `20261020090000_hazard_reports_m4.sql`, `20261020100000_convoy_chat_m4.sql`,
 `20261021120000_moderation_dashboard.sql`, dan
 `20261021130000_blocked_chat_server_filter.sql` — **sudah diterapkan** ke project development
-(terverifikasi lewat `npx supabase migration list --linked`: 17 migration local = remote, tanpa
-selisih). Uji SQL RLS Milestone 4 (`rls_hazards_test.sql`, `rls_chat_test.sql`,
+(terverifikasi lewat `npx supabase migration list --linked`; saat itu 17 migration local = remote,
+sekarang 20 setelah migration M5). Uji SQL RLS Milestone 4 (`rls_hazards_test.sql`, `rls_chat_test.sql`,
 `rls_moderation_m4_test.sql`, `rls_blocked_chat_test.sql`) **sudah dijalankan dan lulus** terhadap
 project development lewat GitHub Actions **Database RLS #19** (commit `1aa1480`, 22 Oktober 2026):
 tujuh berkas uji lulus dan semua notice penanda diterima. Sejak 22 Oktober 2026 sore `npm run db:test`
 di mesin ini juga **lulus** setelah `.env.db` diarahkan ke Session Pooler dan password development
 dirotasi; pada 23 Oktober 2026 hasilnya **8/8 berkas** karena sudah termasuk `rls_account_delete_test.sql`.
-Dua migration Milestone 5 — `20261022190000_account_deletion_m5.sql` dan
-`20261022193000_account_deletion_storage_api.sql` — juga **sudah diterapkan** ke project development
-(19 migration; `npm run db:types:check` lulus, yang berarti skema remote sama dengan tipe generated).
+Tiga migration Milestone 5 — `20261022190000_account_deletion_m5.sql`,
+`20261022193000_account_deletion_storage_api.sql`, dan `20261023004946_account_deletion_identity.sql` —
+juga **sudah diterapkan** ke project development (20 migration; `npm run db:types:check` lulus, yang
+berarti skema remote sama dengan tipe generated), dan Edge Function `delete-account` sudah di-deploy
+ke project development.
 Itu tidak berarti fitur M4/M5 sudah diuji di HP fisik; daftar uji manualnya ada di
 [`docs/QA_TEST_PLAN.md`](docs/QA_TEST_PLAN.md) bagian 8d. Langkah penerapannya ada di
 [`docs/SETUP_GUIDE.md`](docs/SETUP_GUIDE.md#4-menerapkan-migration). Semua langkah yang dapat
@@ -89,18 +92,19 @@ atau menutup laporan sebagai diabaikan/ditinjau — setiap tindakan tercatat di 
 Karena ADR-064 belum disetujui, laporan bahaya **tidak** digambar di peta: setiap laporan menampilkan
 label area perkiraan (±1 km) dari koordinatnya, tanpa tile, marker, atau koordinat contoh.
 
-**Hapus akun sudah berfungsi dan memakai anonimisasi, bukan hard delete** (ADR-076). Dari tab Profil,
+**Hapus akun sudah berfungsi sebagai penghapusan penuh di server** (ADR-077). Dari tab Profil,
 **Hapus akun** membuka `/account-delete`: konsekuensinya dijelaskan lebih dulu, tombol baru aktif
-setelah username diketik ulang, lalu aplikasi menghapus avatar dan foto kendaraan lewat Storage API,
-memanggil RPC `delete_my_account()`, dan keluar dari perangkat. RPC itu menghapus token push, posisi
-terakhir, notifikasi pribadi, follow/blokir, dan kendaraan; mengubah keanggotaan klub/perjalanan
-menjadi `left`; serta mengganti username/nama/avatar/bio/kota dengan nilai anonim — sementara laporan
-bahaya dan jejak audit tetap ada tanpa identitas, karena keduanya data keselamatan bersama.
-Kegagalan Storage **tidak** dipalsukan menjadi sukses: layar memberi tahu bahwa sebagian foto akan
-dibersihkan pengelola. `auth.users` sengaja tidak dihapus dari SQL, jadi penghapusan identitas login
-masih tugas operator. Kebijakan privasi (retensi per jenis data, apa yang tidak dibagikan, kontak
-dukungan) tersedia di `/privacy` dan juga di [`docs/SECURITY_PRIVACY.md`](docs/SECURITY_PRIVACY.md)
-bagian 8.4.
+setelah username diketik ulang, lalu aplikasi memanggil Edge Function `delete-account`. Server
+memverifikasi JWT, memindahkan logo klub yang masih dipakai lalu menghapus avatar/foto kendaraan/logo
+yatim lewat Storage API, memanggil `purge_account_data()` (satu transaksi: data pribadi dihapus,
+konten keselamatan/audit dialihkan ke tombstone, kepemilikan klub/perjalanan dialihkan), dan baru
+setelah itu menghapus `auth.users` lewat Auth Admin API. Layar hanya menampilkan sukses setelah
+server menyatakan seluruh langkah selesai; kegagalan sebagian disimpan di `account_deletion_jobs`
+untuk retry. Access token lama tidak menemukan profil/baris miliknya (diuji), dan login ulang dengan
+akun yang sudah dihapus gagal. Kebijakan privasi (retensi per jenis data, apa yang sengaja
+dipertahankan, kontak dukungan) tersedia di `/privacy`, `web/privacy/`, dan
+[`docs/SECURITY_PRIVACY.md`](docs/SECURITY_PRIVACY.md) bagian 8.4. Halaman web hapus akun sudah ada
+di `web/account-deletion/`, tetapi **belum ter-deploy** sehingga URL publiknya masih blocker.
 
 **Unggah foto kendaraan, logo klub, dan foto profil sudah berfungsi.** `vehicle-photos`,
 `club-logos`, dan `avatars` adalah bucket privat: foto kendaraan dan foto profil hanya bisa dibaca
@@ -300,14 +304,16 @@ runner test script (ADR-072) + perbaikan lokal yang belum di-commit saat tabel i
 
 Hasil historis pada commit `749424c` (19 Oktober 2026, Node 24.18.1, npm 12.0.2):
 
-**Diperbarui 23 Oktober 2026:** `npm test -- --ci` **45 suite / 497 test lulus**, `npm run test:scripts`
-**71 suite / 318 test lulus**, `typecheck`/`lint`/`format:check` exit 0, `npm run db:test` **8/8 berkas**,
+**Diperbarui 23 Oktober 2026 (setelah ADR-077):** `npm test -- --ci` **45 suite / 494 test lulus**,
+`npm run test:scripts` **73 suite / 328 test lulus**, `typecheck`/`lint`/`format:check` exit 0,
+`npm run db:test` **8/8 berkas**, `npm run db:test:lint` **8 berkas uji / 20 migration**,
 `npm run db:types:check` exit 0, `npm run storage:test` **27 langkah**, `npm run export:android` exit 0
 (bundel Hermes 4.1 MB, tanpa string mirip JWT di dalamnya), dan `npm run doctor` **20 dari 21**
 pemeriksaan — satu yang gagal adalah pemeriksaan skema `app.json` yang butuh `exp.host` (DNS lingkungan
 ini, `ENOTFOUND`), bukan temuan proyek. Angka yang lebih lama di tabel ini adalah hasil saat perintah
-itu dijalankan, bukan status terkini. Uji RLS terakhir yang tercatat di GitHub Actions adalah
-**Database RLS #19** (7/7 berkas, commit `1aa1480`); berkas kedelapan baru terbukti lewat jalur lokal.
+itu dijalankan, bukan status terkini. Uji RLS terakhir yang tercatat di GitHub Actions untuk commit
+`afe908e` adalah **Database RLS #22** (run `39850754772`, 8 berkas lulus) dan **CI #57** (run
+`39850755047`); commit perubahan ADR-077 belum di-push, jadi run untuknya belum ada.
 
 | Perintah               | Hasil                                                        |
 | ---------------------- | ------------------------------------------------------------ |
@@ -548,17 +554,14 @@ tanpa filter).
   tidak ikut muncul sebagai “perubahan” di catatan rilis maupun entri berikutnya. Rinciannya di
   [`docs/SETUP_GUIDE.md`](docs/SETUP_GUIDE.md) bagian 6.8.
 
-Status per 22 Oktober 2026: `origin/main` adalah **`cc5834d`**. Rilis pratinjau terbaru adalah
-`v0.1.0-build38` dari commit sumber `d352551` (Release APK run **39736309698** hijau). Build38 terbit
-**sebelum** gate rilis diperbaiki, dari commit yang isinya hanya dokumentasi dan satu berkas uji SQL;
-setelah perbaikan itu, push yang hanya menyentuh dokumentasi, test, atau tooling tidak lagi membangun
-APK — Release APK run **39741347027** pada `cc5834d` selesai dengan gate `Perlu build APK?` hijau dan
-seluruh job build, uji nyala, tag, serta pencatatan changelog **skipped**. CI **39741076495** pada
-`cc5834d` hijau, dan Database RLS **39739351279** pada `5a38695` hijau — hasil RLS itulah bukti “Dev
-backend” hazard, chat, dan moderasi di tabel atas. Release #37 untuk `1aa1480` **dibatalkan** di tengah
-build, jadi build36 sempat menjadi APK terakhir sebelum build38 terbit. Riwayat sebelumnya: pada
-`b0c8361`, CI dan Release APK #26 hijau (tag `v0.1.0-build26`),
-dan pada `df75ba1`, Release APK #23 hijau (tag `v0.1.0-build23`).
+Status per 23 Oktober 2026: `origin/main` adalah **`df919f7`** (setelah tag `v0.1.0-build43` pada
+`afe908e`). Rilis pratinjau terbaru adalah `v0.1.0-build43` dari commit sumber `afe908e`; Release APK
+run **39851068851** hijau, seluruh job (gate, build Gradle, uji nyala emulator, tag, changelog) selesai
+sukses. Build43 memuat fitur hapus akun versi ADR-076 (anonimisasi), **bukan** alur ADR-077; APK baru
+masih diperlukan untuk menguji alur penghapusan penuh. CI **39850755047** dan Database RLS
+**39850754772** pada `afe908e` sama-sama hijau. Sebelumnya, build38 terbit sebelum gate rilis
+diperbaiki; Release APK **39741347027** pada `cc5834d` selesai dengan gate hijau dan job build
+**skipped**, dan Database RLS **39739351279** pada `5a38695` hijau.
 
 Uji RLS berjalan **di GitHub Actions**, bukan hanya lokal: workflow `database-rls` memverifikasi
 connection string menunjuk project development sebelum menyentuh database, lalu menolak lulus bila
@@ -567,11 +570,15 @@ terakhir (`gen types` tanpa target, ADR-061); perbaikannya ada di `ca2461c` dan 
 Workflow `ci.yml` tetap bebas secret Supabase.
 
 Kedua alur rilis **sudah berjalan di GitHub**. APK preview terbaru adalah
-[v0.1.0-build38](https://github.com/29nls/rodakawan/releases/tag/v0.1.0-build38) (22 Oktober 2026,
-commit `d352551`): `app-preview.apk`, **106.619.775** byte, SHA-256
-`8a36631dfb4178a90978e9629781f7ec4809bb37adc4c8ab3755dbb695e3cd11` (dibaca dari badan rilis GitHub),
-sertifikat `3ea8bb4745b638be8fddf71e15edd9786d45aac65c0384b87be8fa2c32b3b14d`, dari Release APK run
-**39736309698** yang hijau. Sebelumnya,
+[v0.1.0-build43](https://github.com/29nls/rodakawan/releases/tag/v0.1.0-build43) (22 Oktober 2026,
+commit `afe908e`): `app-preview.apk`, **106.633.263** byte, SHA-256
+`fbc95e51a880d43993a935fc51de3d743db894c1bca5f5a3963f456b3f464279` (dibaca dari aset rilis GitHub dan
+dicocokkan dengan log `sha256sum --check` workflow), sertifikat
+`3ea8bb4745b638be8fddf71e15edd9786d45aac65c0384b87be8fa2c32b3b14d`, dari Release APK run
+**39851068851** yang hijau dan memverifikasi tanda tangan lewat `scripts/verify-apk.mjs`. Sebelumnya,
+[v0.1.0-build38](https://github.com/29nls/rodakawan/releases/tag/v0.1.0-build38) pada `d352551`
+(106.619.775 byte, SHA-256
+`8a36631dfb4178a90978e9629781f7ec4809bb37adc4c8ab3755dbb695e3cd11`) dan
 [v0.1.0-build36](https://github.com/29nls/rodakawan/releases/tag/v0.1.0-build36) pada `5a45a2e`
 (SHA-256 `6a92bd6a84e1ac0255a5d7ca4f8db79af1febb59ec44dd6d88f94022739f8d92`) dan build35 pada
 `40d50f0` (SHA-256 `b00ef60cd1c090e36b000e475d798611e2f0136bf7f2c0ae41103ae6af0720be`) berukuran
@@ -721,11 +728,12 @@ scripts/        # generate-assets.mjs, db-test.mjs (runner uji RLS), verify-apk.
                 # preview lama)
 docs/           # sumber kebenaran produk
 supabase/
-  migrations/   # sembilan belas migration: dua berkas fondasi awal
+  migrations/   # dua puluh migration: dua berkas fondasi awal
                 # (20261013022938_initial_schema.sql, 20261013023038_auth_profile_bootstrap.sql)
-                # + lima belas migration aditif (privasi, klub, garasi, Storage, perjalanan M3,
+                # + delapan belas migration aditif (privasi, klub, garasi, Storage, perjalanan M3,
                 # empat migration M4: hazard, chat konvoi, dashboard moderasi, filter blokir)
-                # + dua migration M5: hapus akun (anonimisasi) dan perbaikan Storage untuknya
+                # + tiga migration M5: anonimisasi awal, perbaikan Storage, dan pemisahan identitas
+                #   login + tombstone + purge (20261023004946_account_deletion_identity.sql)
   tests/        # delapan berkas uji RLS/RPC; rls_profiles_test.sql (dua akun + kontrol positif),
                 # rls_policy_guard_test.sql (pagar policy wadah), rls_rides_test.sql, empat
                 # berkas M4 (hazard, chat, moderasi, filter blokir), dan rls_account_delete_test.sql

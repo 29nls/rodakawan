@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 
 import AccountDeleteScreen from '@/app/account-delete';
-import { collectOwnMedia, deleteMyAccount, removeOwnMedia } from '@/features/account/api';
+import { deleteMyAccount } from '@/features/account/api';
 
 const mockReplace = jest.fn();
 const mockSignOut = jest.fn(async () => ({ ok: true as const, data: { revokedRemotely: true } }));
@@ -36,6 +36,7 @@ jest.mock('@/features/profile/useProfile', () => {
       bio: null,
       city: null,
       is_private: false,
+      deleted_at: null,
       created_at: '2026-10-22T00:00:00Z',
       updated_at: '2026-10-22T00:00:00Z',
     },
@@ -45,26 +46,29 @@ jest.mock('@/features/profile/useProfile', () => {
 });
 
 jest.mock('@/features/account/api', () => ({
-  ...jest.requireActual('@/features/account/api'),
-  collectOwnMedia: jest.fn(),
-  removeOwnMedia: jest.fn(),
   deleteMyAccount: jest.fn(),
 }));
 
-const mockedCollect = jest.mocked(collectOwnMedia);
-const mockedRemove = jest.mocked(removeOwnMedia);
 const mockedDelete = jest.mocked(deleteMyAccount);
 
 beforeEach(() => {
-  mockedCollect.mockReset();
-  mockedRemove.mockReset();
   mockedDelete.mockReset();
   mockSignOut.mockClear();
   mockReplace.mockClear();
-  mockedCollect.mockResolvedValue([{ bucket: 'avatars', path: 'u1/avatar.jpg' }]);
-  mockedRemove.mockResolvedValue({ removed: 1, failed: 0 });
-  mockedDelete.mockResolvedValue({ ok: true, data: null });
+  mockReload.mockClear();
+  mockedDelete.mockResolvedValue({
+    ok: true,
+    data: { status: 'completed', alreadyCompleted: false },
+  });
 });
+
+async function confirmAndSubmit() {
+  await fireEvent.changeText(screen.getByTestId('account-delete-confirm'), 'rider_a');
+  await waitFor(() => {
+    expect(screen.getByTestId('account-delete-submit')).toBeEnabled();
+  });
+  await fireEvent.press(screen.getByTestId('account-delete-submit'));
+}
 
 describe('AccountDeleteScreen', () => {
   it('menjelaskan konsekuensi dan menonaktifkan tombol sampai username diketik benar', async () => {
@@ -82,37 +86,49 @@ describe('AccountDeleteScreen', () => {
     });
   });
 
-  it('menghapus media lebih dulu, memanggil RPC, lalu keluar dan mengalihkan ke halaman masuk', async () => {
+  it('memanggil server sekali, menampilkan konfirmasi penuh, lalu keluar dan mengalihkan', async () => {
     await render(<AccountDeleteScreen />);
-
-    await fireEvent.changeText(screen.getByTestId('account-delete-confirm'), 'rider_a');
-    await waitFor(() => {
-      expect(screen.getByTestId('account-delete-submit')).toBeEnabled();
-    });
-    await fireEvent.press(screen.getByTestId('account-delete-submit'));
+    await confirmAndSubmit();
 
     await waitFor(() => {
       expect(mockedDelete).toHaveBeenCalledTimes(1);
     });
 
     expect(await screen.findByTestId('account-delete-notice')).toBeTruthy();
+    expect(screen.getByText(/identitas login sudah dihapus/)).toBeTruthy();
 
-    const collectOrder = mockedCollect.mock.invocationCallOrder[0];
-    const removeOrder = mockedRemove.mock.invocationCallOrder[0];
-    const deleteOrder = mockedDelete.mock.invocationCallOrder[0];
-
-    expect(collectOrder).toBeLessThan(removeOrder);
-    expect(removeOrder).toBeLessThan(deleteOrder);
-    expect(mockedRemove).toHaveBeenCalledWith(expect.anything(), [
-      { bucket: 'avatars', path: 'u1/avatar.jpg' },
-    ]);
     await waitFor(() => {
       expect(mockSignOut).toHaveBeenCalledTimes(1);
       expect(mockReplace).toHaveBeenCalledWith('/sign-in');
     });
   });
 
-  it('menampilkan galat server dan tidak mengeluarkan pengguna bila RPC gagal', async () => {
+  it('menampilkan galat server dan tidak mengeluarkan pengguna bila server belum selesai', async () => {
+    mockedDelete.mockResolvedValue({
+      ok: false,
+      error: {
+        code: 'deletion_incomplete',
+        message:
+          'Penghapusan belum selesai sepenuhnya. Coba lagi; bila tetap gagal, hubungi dukungan sebelum menganggap akun sudah hilang.',
+        retryable: true,
+      },
+    });
+
+    await render(<AccountDeleteScreen />);
+    await confirmAndSubmit();
+
+    expect(await screen.findByTestId('account-delete-error')).toBeTruthy();
+    expect(screen.getByText(/belum selesai sepenuhnya/)).toBeTruthy();
+    expect(mockSignOut).not.toHaveBeenCalled();
+    expect(mockReplace).not.toHaveBeenCalled();
+
+    // Tombol kembali aktif supaya pengguna dapat mengulang langkah yang gagal.
+    await waitFor(() => {
+      expect(screen.getByTestId('account-delete-submit')).toBeEnabled();
+    });
+  });
+
+  it('tidak memalsukan sukses ketika sesi sudah berakhir', async () => {
     mockedDelete.mockResolvedValue({
       ok: false,
       error: {
@@ -123,32 +139,10 @@ describe('AccountDeleteScreen', () => {
     });
 
     await render(<AccountDeleteScreen />);
-
-    await fireEvent.changeText(screen.getByTestId('account-delete-confirm'), 'rider_a');
-    await waitFor(() => {
-      expect(screen.getByTestId('account-delete-submit')).toBeEnabled();
-    });
-    await fireEvent.press(screen.getByTestId('account-delete-submit'));
+    await confirmAndSubmit();
 
     expect(await screen.findByTestId('account-delete-error')).toBeTruthy();
+    expect(screen.queryByTestId('account-delete-notice')).toBeNull();
     expect(mockSignOut).not.toHaveBeenCalled();
-    expect(mockReplace).not.toHaveBeenCalled();
-  });
-
-  it('tidak memalsukan sukses ketika sebagian objek Storage gagal dihapus', async () => {
-    mockedRemove.mockResolvedValue({ removed: 0, failed: 1 });
-
-    await render(<AccountDeleteScreen />);
-
-    await fireEvent.changeText(screen.getByTestId('account-delete-confirm'), 'rider_a');
-    await waitFor(() => {
-      expect(screen.getByTestId('account-delete-submit')).toBeEnabled();
-    });
-    await fireEvent.press(screen.getByTestId('account-delete-submit'));
-
-    const notice = await screen.findByTestId('account-delete-notice');
-    expect(notice).toBeTruthy();
-    expect(screen.getByText(/tidak dapat dihapus otomatis/)).toBeTruthy();
-    expect(mockedDelete).toHaveBeenCalledTimes(1);
   });
 });

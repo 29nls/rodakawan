@@ -88,12 +88,14 @@
 | CHAT-01 | Anggota mengirim pesan | Pesan tersimpan dan diterima anggota yang berwenang. |
 | CHAT-02 | Non-member membaca/mengirim melalui API | Ditolak oleh RLS/server. |
 | CHAT-03 | Retry request yang sama | Tidak membuat duplicate bila idempotency tersedia. |
-| ACC-01 | Pemilik memanggil hapus akun | Profil dianonimkan (`deleted_at` terisi), username/nama/avatar/bio/kota kosong atau anonim; akun keluar dan diarahkan ke halaman masuk. |
-| ACC-02 | Panggilan hapus akun diulang | Tidak ada perubahan kedua dan tidak ada galat: RPC mengembalikan sukses tanpa menyentuh baris lagi (idempoten). |
-| ACC-03 | Pengguna B memanggil hapus akun untuk akun A | Tidak mungkin lewat RPC (identitas dari `auth.uid()`); `anon` ditolak. |
-| ACC-04 | Setelah akun dihapus | Profil tidak lagi terbaca (termasuk oleh dirinya), follow/blokir/kendaraan/token push/posisi terakhir hilang, laporan bahaya dan pesan konvoi tetap ada tanpa identitas. |
-| ACC-05 | Sebagian objek Storage gagal dihapus | Layar menyatakan sebagian foto akan dibersihkan pengelola; akun tetap terhapus dan tidak ada klaim "semua foto terhapus". |
-| ACC-06 | Buka `/privacy` tanpa sesi | Retensi per jenis data, apa yang tidak dibagikan, dan kontak dukungan terbaca; tidak ada data pribadi atau kredensial di halaman. |
+| ACC-01 | Pemilik menghapus akun dari aplikasi | Server menyelesaikan Storage + database + Auth; profil hilang, identitas login tidak bisa dipakai lagi, pengguna keluar dan diarahkan ke halaman masuk. Sukses hanya tampil setelah server mengonfirmasi. |
+| ACC-02 | Panggilan hapus akun diulang | Tidak ada penghapusan kedua dan tidak ada galat: job `completed` dikembalikan idempoten; retry setelah kegagalan melanjutkan langkah yang belum selesai. |
+| ACC-03 | Pengguna B memanggil hapus akun untuk akun A | Tidak mungkin: target selalu `auth.uid()` dari JWT yang diverifikasi server; `anon` ditolak. |
+| ACC-04 | Setelah akun dihapus | Profil dan data pribadi hilang; laporan bahaya/audit tetap ada sebagai tombstone; pesan/postingan diredaksi; kepemilikan klub/perjalanan dialihkan atau perjalanan dibatalkan. |
+| ACC-05 | Storage gagal dihapus/dipindahkan | Server **tidak** menghapus Auth dan layar tidak menampilkan sukses; pengguna bisa mengulang. Logo klub yang masih dipakai tetap dapat diakses anggota lain. |
+| ACC-06 | Buka `/privacy` tanpa sesi | Retensi per jenis data (termasuk yang sengaja dipertahankan), apa yang tidak dibagikan, dan kontak dukungan terbaca; tidak ada data pribadi atau kredensial di halaman. |
+| ACC-07 | Hapus akun dari halaman web tanpa aplikasi | Login web berhasil, konfirmasi `HAPUS AKUN`, server menyelesaikan proses yang sama; kata sandi/token tidak disimpan di browser; login dengan email tidak terdaftar dan kata sandi salah memberi pesan identik. |
+| ACC-08 | JWT lama setelah akun dihapus | Token yang belum kedaluwarsa tidak membaca profil dan tidak bisa membuat kendaraan/token push (ditolak FK); login ulang dengan kredensial lama gagal. |
 | NOTIF-01 | Device token berubah | Token diperbarui; token lama bisa dibersihkan. |
 | NOTIF-02 | User menolak push permission | App tetap usable; preferensi/state ditangani dengan baik. |
 | VOICE-01 | Non-member meminta token PTT | Backend menolak. (P2) |
@@ -282,26 +284,28 @@ backend (RLS/RPC) jangan mengulang pengujian yang sudah dicakup Database RLS #19
 
 ### 8e. Status otomatisasi dan verifikasi (Milestone 5 — hapus akun)
 
-Ditambahkan 23 Oktober 2026. Keputusan dan batas retensinya di ADR-076 dan
+Diperbarui 23 Oktober 2026 setelah ADR-077. Keputusan retensi ada di ADR-077 dan
 `docs/SECURITY_PRIVACY.md` bagian 8.4.
 
 | Area | Implemented | Passed locally | Dev backend | Perangkat fisik |
 | --- | --- | --- | --- | --- |
-| RPC `delete_my_account()` (anonimisasi, idempoten, `security definer`, `search_path = ''`) | Ya | — | **Lulus** — `rls_account_delete_test.sql` (34 perintah, notice `UJI HAPUS AKUN LULUS`) | — |
-| Uji RLS hapus akun di runner + workflow | Ya — `DEFAULT_TEST_FILES` dan pemeriksaan notice `database-rls.yml` | `db:test:lint` lulus (8 berkas uji, 19 migration) | **Lulus** — `npm run db:test` 8/8, exit 0 (23 Okt 2026) | — |
-| Layanan klien (kumpulkan media, Storage API, RPC, pemetaan galat) | Ya (10 test) | Ya | **Tidak diuji HTTP dari perangkat** | — |
-| Layar `/account-delete` + halaman `/privacy` | Ya (4 test layar) | Ya | **Blocked** | **Blocked** |
-| Penghapusan `auth.users` dan pembersihan berkas yatim | **Belum** — tindakan operator, bukan SQL aplikasi | — | — | — |
+| Pemisahan identitas + tombstone + `purge_account_data()` | Ya — `20261023004946_account_deletion_identity.sql` | `db:test:lint` lulus (8 berkas, 20 migration) | **Lulus** — `rls_account_delete_test.sql` (48 perintah, notice `UJI HAPUS AKUN LULUS`) | — |
+| Orkestrasi server (Storage → DB → Auth) + retry | Ya — `supabase/functions/delete-account/` | **Lulus** — 10 test Node (urutan, retry, gagal-parsial) | **Lulus E2E** — fungsi di-deploy; Auth user hilang, media bersih, logo klub pindah, JWT lama ditolak, login ulang gagal | — |
+| Layanan klien (Edge Function + pemetaan galat) | Ya (7 test) | Ya | **Lulus** lewat E2E | — |
+| Layar `/account-delete` + `/privacy` | Ya (4 test layar) | Ya | **Blocked** (belum ada build) | **Blocked** |
+| Halaman web `web/account-deletion/` dan `web/privacy/` | Ya | Ya (statis, tanpa build) | **Blocked** — belum ada URL deployment | — |
+| Pembersihan metadata job | **Belum otomatis** — perlu tindakan operator/kebijakan retensi | — | — | — |
 
-Perintah yang dijalankan pada 23 Oktober 2026: `npm test -- --ci` **0** (45 suite / 497 test),
-`npm run test:scripts` **0** (71 suite / 318 test), `npm run db:test` **0** (8/8 berkas),
+Perintah yang dijalankan pada 23 Oktober 2026: `npm test -- --ci` **0** (45 suite / 494 test),
+`npm run test:scripts` **0** (73 suite / 328 test), `npm run db:test` **0** (8/8 berkas),
 `npm run db:types:check` **0** (skema development sama dengan tipe generated), `npm run storage:test`
 **0** (27 langkah), `npm run db:test:lint` **0**, `typecheck`/`lint`/`format:check` **0**.
 
 Uji manual yang **belum** dilakukan dan tidak boleh dianggap lulus: menekan tombol hapus di perangkat
-nyata (termasuk saat jaringan putus di tengah proses), memastikan signed URL foto benar-benar mati
-setelah akun dihapus, dan menghapus `auth.users` sebagai operator. Butir ACC-01..ACC-06 di bagian 3
-adalah daftar periksa untuk itu.
+nyata (termasuk saat jaringan putus di tengah proses dan retry), memastikan signed URL foto benar-benar
+mati setelah akun dihapus, serta membuka halaman web dari URL publik. Butir ACC-01..ACC-08 di bagian 3
+adalah daftar periksa untuk itu. Uji E2E di atas memakai akun uji sintetis di project development,
+bukan perangkat atau akun nyata.
 
 ## 9. Status otomatisasi dan verifikasi (Milestone 1–3)
 

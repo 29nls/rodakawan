@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="referrer" content="no-referrer" />
+    <title>Kebijakan privasi RodaKawan</title>
+    <link rel="stylesheet" href="../styles.css" />
+  </head>
+  <body>
+    <main class="card document" aria-labelledby="judul">
+      <p class="eyebrow">RodaKawan</p>
+      <h1 id="judul">Kebijakan privasi</h1>
+      <p class="small">
+        Berlaku untuk aplikasi Android RodaKawan. Terakhir diperbarui: 23 Oktober 2026.
+      </p>
+
+      <p class="lead">
+        RodaKawan adalah aplikasi komunitas motor untuk berkendara bersama. Kebijakan ini
+        menjelaskan data apa yang disimpan, mengapa, siapa yang dapat melihatnya, dan bagaimana Anda
+        menghapusnya.
+      </p>
+
+      <h2>1. Data yang kami simpan</h2>
+      <ul>
+        <li>
+          <strong>Akun:</strong> email (dikelola Supabase Auth), username, nama tampilan, bio, kota,
+          dan foto profil privat.
+        </li>
+        <li>
+          <strong>Kendaraan:</strong> merek, model, tahun, foto, serta nomor polisi dan catatan
+          privat yang hanya dapat dibaca pemilik.
+        </li>
+        <li><strong>Klub:</strong> keanggotaan, peran, dan logo klub yang Anda unggah.</li>
+        <li>
+          <strong>Perjalanan:</strong> keanggotaan, pesan konvoi, laporan bahaya, dan posisi
+          terakhir selama Anda mengaktifkan berbagi lokasi.
+        </li>
+        <li>
+          <strong>Keselamatan dan moderasi:</strong> laporan bahaya, konfirmasi “masih ada”, laporan
+          konten, serta catatan tindakan moderasi.
+        </li>
+        <li>
+          <strong>Perangkat:</strong> token notifikasi hanya bila fitur notifikasi diaktifkan pada
+          versi yang mendukungnya.
+        </li>
+      </ul>
+      <p>
+        Aplikasi tidak menyimpan lokasi presisi di log aplikasi. Lokasi konvoi hanya disimpan selama
+        Anda mengaktifkan berbagi lokasi dan dihapus saat Anda mematikannya, keluar dari perjalanan,
+        atau perjalanan berakhir.
+      </p>
+
+      <h2>2. Cara data digunakan</h2>
+      <ul>
+        <li>Menjalankan akun, profil, garasi, klub, dan perjalanan yang Anda minta.</li>
+        <li>
+          Menampilkan peserta konvoi dan posisi terakhir kepada anggota perjalanan yang berhak.
+        </li>
+        <li>Menampilkan peringatan bahaya kepada peserta di sekitar lokasi laporan.</li>
+        <li>
+          Menegakkan aturan komunitas, memblokir pengguna, dan menangani laporan penyalahgunaan.
+        </li>
+      </ul>
+      <p>
+        Kami tidak menjual data, tidak menampilkan iklan, dan tidak memakai data untuk profiling
+        iklan.
+      </p>
+
+      <h2>3. Siapa yang dapat melihat data</h2>
+      <ul>
+        <li>
+          Profil publik (username, nama tampilan, bio, kota, kendaraan publik) dapat dilihat
+          pengguna lain sesuai pengaturan privasi Anda.
+        </li>
+        <li>
+          Nomor polisi, catatan privat, foto kendaraan, dan foto profil disimpan di bucket privat;
+          akses memakai URL bertanda tangan berumur pendek dan policy kepemilikan.
+        </li>
+        <li>
+          Pesan konvoi hanya dapat dibaca anggota perjalanan. Laporan bahaya aktif dapat dibaca
+          pengguna yang masuk.
+        </li>
+        <li>
+          Laporan konten dan audit moderasi hanya dapat dibaca pengelola konteks (host perjalanan
+          atau owner/admin klub) melalui aplikasi, atau operator tepercaya untuk kebutuhan
+          peninjauan.
+        </li>
+      </ul>
+
+      <h2>4. Layanan pihak ketiga</h2>
+      <p>
+        RodaKawan memakai Supabase untuk autentikasi, database PostgreSQL, penyimpanan berkas, dan
+        fungsi server. Bila notifikasi diaktifkan pada versi mendatang, token perangkat akan
+        diproses oleh penyedia push yang dipilih saat itu. Penyedia tersebut hanya menerima data
+        yang diperlukan untuk mengirim notifikasi.
+      </p>
+
+      <h2>5. Retensi</h2>
+      <ul>
+        <li>
+          Posisi terakhir dihapus saat berbagi lokasi dimatikan, anggota keluar, atau perjalanan
+          selesai/dibatalkan.
+        </li>
+        <li>
+          Pesan konvoi, laporan bahaya, dan konten klub disimpan selama diperlukan untuk fungsi
+          komunitas dan keselamatan.
+        </li>
+        <li>
+          Setelah penghapusan akun: profil, kendaraan, nomor polisi, catatan privat, foto, token
+          notifikasi, lokasi terakhir, follow, blokir, dan identitas login dihapus.
+        </li>
+        <li>
+          Laporan bahaya tetap ada tanpa identitas untuk keselamatan pengguna lain. Pesan konvoi
+          serta postingan/komentar diredaksi menjadi “[Pesan dihapus]”/“[Konten dihapus]” dan
+          diatribusikan ke “Akun dihapus”. Jejak audit moderasi tetap ada tanpa identitas.
+        </li>
+        <li>
+          Kepemilikan klub/perjalanan dialihkan ke pengelola lain; perjalanan tanpa penerus
+          dibatalkan. Data klub/perjalanan milik anggota lain tidak dihapus.
+        </li>
+        <li>
+          Metadata status penghapusan (tanpa isi konten pribadi) disimpan terbatas untuk mencegah
+          proses ganda dan keperluan audit, lalu ditinjau pengelola.
+        </li>
+      </ul>
+      <p>
+        Kami tidak menjanjikan bahwa konten yang sengaja dipertahankan untuk keselamatan dan audit
+        ikut terhapus. Konten tersebut tidak lagi menunjuk identitas Anda.
+      </p>
+
+      <h2>6. Menghapus akun</h2>
+      <p>
+        Anda dapat menghapus akun dari aplikasi melalui <strong>Profil → Hapus akun</strong>, atau
+        dari halaman web <a href="../account-deletion/">Hapus akun RodaKawan</a> tanpa memasang
+        aplikasi. Kedua jalur meminta Anda masuk untuk membuktikan kepemilikan akun, lalu
+        menjalankan proses yang sama di server. Penghapusan tidak dapat dibatalkan.
+      </p>
+
+      <h2>7. Keamanan</h2>
+      <p>
+        Data disimpan dengan Row Level Security, bucket privat, dan akses server yang dibatasi. Kata
+        sandi dikelola Supabase Auth dan tidak pernah disimpan oleh aplikasi. Bila Anda menemukan
+        masalah keamanan, laporkan lewat halaman dukungan tanpa menyertakan kata sandi atau token.
+      </p>
+
+      <h2>8. Kontak</h2>
+      <p>
+        Pertanyaan privasi, permintaan penjelasan, atau laporan penyalahgunaan:
+        <a href="https://github.com/29nls/rodakawan/issues">halaman dukungan RodaKawan</a>. Jangan
+        pernah mengirim kata sandi, token sesi, atau data pribadi orang lain ke issue publik.
+      </p>
+
+      <p class="small"><a href="../account-deletion/">Hapus akun</a> · <a href="../">Beranda</a></p>
+    </main>
+  </body>
+</html>

@@ -90,7 +90,7 @@ Bagian ini adalah urutan yang sudah disesuaikan dengan kode di repo. Project dev
 
 ### 4.3 Jalankan migration
 
-Repository ini sekarang memuat **sembilan belas** migration. Dua yang pertama adalah **sejarah penyiapan
+Repository ini sekarang memuat **dua puluh** migration. Dua yang pertama adalah **sejarah penyiapan
 awal** dan urutannya penting:
 
 1. `supabase/migrations/20261013022938_initial_schema.sql` — skema fondasi (migration awal).
@@ -98,18 +98,20 @@ awal** dan urutannya penting:
    username, dan trigger `updated_at`. Migration ini idempotent (`create or replace`,
    `drop trigger if exists`) sehingga aman dijalankan ulang dan tidak menghapus data.
 
-Lima belas migration berikutnya bersifat aditif (privasi follow, detail privat kendaraan, keanggotaan
-klub, kendaraan utama, akses perjalanan, tiga bucket Storage, pagar policy, alur perjalanan M3 di
-`20261019120000_ride_workflow.sql`, lalu Milestone 4:
+Delapan belas migration berikutnya bersifat aditif (privasi follow, detail privat kendaraan,
+keanggotaan klub, kendaraan utama, akses perjalanan, tiga bucket Storage, pagar policy, alur
+perjalanan M3 di `20261019120000_ride_workflow.sql`, lalu Milestone 4:
 `20261020090000_hazard_reports_m4.sql`, `20261020100000_convoy_chat_m4.sql`,
 `20261021120000_moderation_dashboard.sql`, dan
-`20261021130000_blocked_chat_server_filter.sql`), serta dua migration Milestone 5:
-`20261022190000_account_deletion_m5.sql` (kolom `profiles.deleted_at` + RPC `delete_my_account()`)
-dan `20261022193000_account_deletion_storage_api.sql` (mengganti badan fungsi itu supaya tidak
-menghapus `storage.objects` dari SQL — lihat ADR-076).
+`20261021130000_blocked_chat_server_filter.sql`), serta tiga migration Milestone 5:
+`20261022190000_account_deletion_m5.sql` (kolom `profiles.deleted_at`),
+`20261022193000_account_deletion_storage_api.sql` (berhenti menghapus `storage.objects` dari SQL — ADR-076),
+dan `20261023004946_account_deletion_identity.sql` (melepas FK `profiles.id → auth.users`, trigger
+integritas profil, tombstone, `purge_account_data()`, `account_media_manifest()`, job retry, dan
+penonaktifan RPC lama — ADR-077).
 
 > **Status Milestone 4 (21 Oktober 2026): keempat migration terakhir SUDAH diterapkan ke project
-> development** (terverifikasi `npx supabase migration list --linked`: 17 local = remote). Pada project
+> development** (terverifikasi `npx supabase migration list --linked`; saat itu 17 local = remote). Pada project
 > baru atau project lain yang belum dimigrasikan, aplikasi sudah memanggil RPC-nya sehingga tab
 > Peringatan, chat, dan dashboard moderasi menampilkan galat `PGRST202`/`42883` ("Backend belum
 > memuat fungsi yang dibutuhkan"), bukan data kosong yang menyesatkan. Terapkan keempat berkas itu
@@ -132,22 +134,29 @@ menghapus `storage.objects` dari SQL — lihat ADR-076).
 > run #19 (commit `1aa1480`, 22 Oktober 2026 — 7 berkas, 7 lulus). Perintah `--file` di atas tinggal
 > cara menjalankan satu berkas saat sedang mengembangkan uji; tidak ada yang perlu dipindahkan lagi.
 >
-> **Status Milestone 5 (23 Oktober 2026): kedua migration hapus akun SUDAH diterapkan ke project
-> development** (19 local = remote; `npm run db:types:check` lulus). Pada project yang belum
-> dimigrasikan, layar `/account-delete` menampilkan galat backend, bukan klaim sukses. Terapkan dan
-> uji dengan urutan yang sama seperti M4:
+> **Status Milestone 5 (23 Oktober 2026): ketiga migration hapus akun SUDAH diterapkan ke project
+> development** (20 local = remote; `npm run db:types:check` lulus). Pada project yang belum
+> dimigrasikan, `/account-delete` menampilkan galat backend, bukan klaim sukses. Terapkan dan uji:
 >
 > ```powershell
 > npx supabase db push --dry-run
 > npx supabase db push --yes
 > npm run db:types
 > npm run db:test -- --file supabase/tests/rls_account_delete_test.sql
+> npx supabase functions deploy delete-account --project-ref <project-ref-development>
 > ```
 >
 > Berkas uji itu sudah ada di `DEFAULT_TEST_FILES` dan notice `UJI HAPUS AKUN LULUS` diperiksa
-> workflow, jadi `npm run db:test` menjalankan **delapan** berkas sekaligus. Satu catatan yang mahal
+> workflow, jadi `npm run db:test` menjalankan **delapan** berkas sekaligus. RPC lama
+> `delete_my_account()` kini **selalu gagal** dengan `account_deletion_requires_server`; build sebelum
+> ADR-077 harus diperbarui, bukan dianggap masih bisa menghapus akun. Satu catatan yang mahal
 > dipelajari: `delete from storage.objects` **ditolak** Supabase ("Direct deletion from storage tables
-> is not allowed") — objek Storage harus dihapus lewat Storage API di klien atau service role.
+> is not allowed") — objek Storage hanya bisa dihapus lewat Storage API (Edge Function/service role).
+>
+> Setelah migration ini, `auth.users` **boleh** dihapus tanpa cascade ke profil (FK sudah dilepas),
+> tetapi jangan menghapusnya manual untuk pengguna nyata: gunakan Edge Function agar Storage, data
+> pribadi, dan retensi ditangani dalam urutan yang benar. Trigger `enforce_profile_identity` menolak
+> pembuatan profil untuk auth user yang tidak ada dan untuk akun yang sudah dihapus.
 >
 > Jangan menyunting migration yang sudah diterapkan ke remote; tambahkan migration baru. Jumlah
 > pastinya bisa diperiksa dengan `ls supabase/migrations` atau `npx supabase migration list` — jangan
@@ -157,6 +166,27 @@ menghapus `storage.objects` dari SQL — lihat ADR-076).
 database dengan bentuk yang berbeda, tabel itu **dilewati diam-diam** lalu migration gagal di policy
 yang menyebut `is_private` — dan database berakhir setengah jadi. Pastikan database benar-benar bersih
 (tidak ada `public.profiles`) sebelum menjalankan migration awal.
+
+### 4.3a Deploy Edge Function hapus akun
+
+`delete-account` adalah satu-satunya jalur hapus akun penuh; klien tidak memegang service role.
+Supabase menyuntikkan `SUPABASE_URL`, `SUPABASE_ANON_KEY`, dan `SUPABASE_SERVICE_ROLE_KEY` ke fungsi
+secara otomatis, jadi tidak ada secret yang perlu ditulis ke repo atau `.env`.
+
+```powershell
+npx supabase functions deploy delete-account --project-ref <project-ref-development>
+```
+
+Verifikasi setelah deploy (jangan pakai akun nyata): buat dua akun uji, unggah avatar/foto/logo klub,
+panggil fungsi dengan access token akun A, lalu periksa: `auth.users` A hilang, profil A hilang,
+media pribadi hilang, logo klub masih ada di path baru, laporan bahaya tetap ada sebagai tombstone,
+dan JWT lama tidak bisa membaca/menulis. Skrip E2E yang dipakai pada 23 Oktober 2026 bersifat
+sementara (tidak di-commit) karena membuat/menghapus akun di project development; langkah manualnya
+ada di `web/README.md` bagian verifikasi.
+
+Halaman web publik ada di `web/` (statis, tanpa build). Ikuti `web/README.md` untuk mengisi URL +
+publishable key, memilih hosting, dan mencatat URL di Play Console. **URL publik belum ada** sampai
+halaman benar-benar diterbitkan; jangan menuliskan URL contoh sebagai bukti.
 
 **Cara 1 — Supabase CLI (disarankan, otomatis dan dapat diulang).** Simpan connection string project
 di berkas `.env.db` di root repo (berkas ini diabaikan Git dan **tidak** dibaca Expo, jadi password
