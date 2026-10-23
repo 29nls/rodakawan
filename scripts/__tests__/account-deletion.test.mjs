@@ -478,7 +478,10 @@ describe('runAccountDeletion — reliabilitas (ADR-078)', () => {
         return true;
       },
     );
-    assert.deepEqual(callsB.map((call) => call[0]), ['begin']); // B tidak menjalankan apa pun
+    assert.deepEqual(
+      callsB.map((call) => call[0]),
+      ['begin'],
+    ); // B tidak menjalankan apa pun
 
     releasePurge({ profileDeleted: true });
     const resultA = await pA;
@@ -561,7 +564,10 @@ describe('runAccountDeletion — reliabilitas (ADR-078)', () => {
 
     assert.equal(result.status, 'completed');
     assert.equal(result.alreadyCompleted, true);
-    assert.deepEqual(calls2.map((call) => call[0]), ['begin']); // tidak ada operasi ulang
+    assert.deepEqual(
+      calls2.map((call) => call[0]),
+      ['begin'],
+    ); // tidak ada operasi ulang
     assert.equal(db.get('u1').status, 'completed');
   });
 
@@ -703,6 +709,9 @@ describe('runAccountDeletion — reliabilitas (ADR-078)', () => {
     const result = await runAccountDeletion({ userId: 'u1', lease: 'L2', deps: deps2 });
 
     assert.equal(result.alreadyCompleted, true);
-    assert.deepEqual(calls2.map((call) => call[0]), ['begin']);
+    assert.deepEqual(
+      calls2.map((call) => call[0]),
+      ['begin'],
+    );
   });
 });

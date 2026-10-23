@@ -46,14 +46,17 @@ export const ACCOUNT_ERROR_TAGS: Record<string, AppError> = {
 };
 
 /** Pemetaan tag Edge Function → `AppError`. */
-export const ACCOUNT_FUNCTION_ERROR_TAGS: Record<string, AppError> = {  account_deletion_rate_limited: {
+export const ACCOUNT_FUNCTION_ERROR_TAGS: Record<string, AppError> = {
+  account_deletion_rate_limited: {
     code: 'rate_limited',
-    message: 'Terlalu banyak percobaan penghapusan. Tunggu beberapa menit, lalu coba lagi tanpa mengulang berkali-kali.',
+    message:
+      'Terlalu banyak percobaan penghapusan. Tunggu beberapa menit, lalu coba lagi tanpa mengulang berkali-kali.',
     retryable: true,
   },
   account_deletion_in_progress: {
     code: 'deletion_in_progress',
-    message: 'Penghapusan akun Anda sedang diproses server. Tunggu sebentar lalu coba lagi; jangan ulang berkali-kali.',
+    message:
+      'Penghapusan akun Anda sedang diproses server. Tunggu sebentar lalu coba lagi; jangan ulang berkali-kali.',
     retryable: true,
   },
   account_deletion_incomplete: {
