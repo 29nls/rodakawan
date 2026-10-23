@@ -130,11 +130,12 @@ lokal; penerapan migration + redeploy Edge Function ke development masih **Block
 | Uji E2E Auth/Storage | skrip sementara (tidak di-commit) dijalankan terhadap development | Auth user A hilang, profil hilang, laporan bahaya tetap, media pribadi hilang, logo klub pindah, JWT lama ditolak, login ulang gagal, akun B tidak tersentuh |
 
 Perintah yang benar-benar dijalankan (24 Oktober 2026): `npm test -- --ci` **0** (45 suite / 500 test),
-`npm run test:scripts` **0** (74 suite / 339 test), `npm run db:test` **1** (7/8 berkas;
+`npm run test:scripts` **0** (74 suite / 343 test), `npm run db:test` **1** (7/8 berkas;
 `rls_account_delete_test.sql` gagal karena migration ADR-078 belum diterapkan), `npm run db:types:check`
 **0**, `npm run storage:test` **0** (27 langkah), `npm run db:test:lint` **0** (8 berkas uji, 22
-migration), `typecheck`/`lint`/`format:check` **0**. `npm run export:android` terakhir **0** pada
-23 Oktober 2026 dan tidak diulang hari ini.
+migration), `typecheck`/`lint`/`format:check` **0**, `npm run export:android` **0** (bundel Hermes
+4.1 MB), dan `npm run doctor` **1** — 20 dari 21 pemeriksaan lulus, satu pemeriksaan skema `app.json`
+gagal `ENOTFOUND exp.host` (lingkungan, bukan temuan proyek).
 
 **Yang tetap terbuka dan tidak boleh dicatat lulus:** migration `20261023120000_account_deletion_reliability.sql`
 belum diterapkan ke development (22 lokal vs 21 remote) dan Edge Function `delete-account` belum

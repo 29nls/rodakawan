@@ -11,7 +11,7 @@
  * Argumen yang dipanggil script ini juga diperiksa: `install --check` — bukan
  * `install --fix` — supaya pemeriksaan tidak pernah mengubah `package.json`.
  *
- * Mode dari `FAKE_EXPO_MODE`: `ok` (bawaan) | `offline` | `drift` | `crash`.
+ * Mode dari `FAKE_EXPO_MODE`: `ok` (bawaan) | `offline` | `proxy` | `drift` | `crash`.
  */
 const args = process.argv.slice(2);
 
@@ -32,6 +32,20 @@ switch (mode) {
   case 'offline':
     process.stdout.write('Dependencies are up to date\n');
     process.stderr.write('Dependency validation is unreliable in offline-mode\n');
+    break;
+
+  // Proxy menolak permintaan daftar versi dengan HTTP 403. CLI asli melempar
+  // CommandError dengan statusText server dan keluar bukan-nol — bentuk yang
+  // dulu salah dilaporkan script sebagai drift.
+  case 'proxy':
+    process.stderr.write(
+      [
+        'CommandError: Unexpected response when fetching version info from Expo servers: Forbidden.',
+        '    at getVersionsAsync (node_modules/expo/node_modules/@expo/cli/build/src/api/getVersions.js:23:15)',
+        '',
+      ].join('\n'),
+    );
+    process.exit(1);
     break;
 
   case 'drift':

@@ -34,6 +34,13 @@
  * internet hanya akan dimatikan orang lain, seperti pemeriksaan `keytool` yang
  * dilewati dengan peringatan di `scripts/configure-android-release.mjs`.
  *
+ * Kegagalan mengambil daftar versi juga bisa berbentuk exit bukan-nol, bukan hanya
+ * mode offline: proxy yang menolak `exp.host` dengan HTTP 403 membuat CLI melempar
+ * `Unexpected response when fetching version info from Expo servers: Forbidden.`
+ * Tanpa pengenalan pola itu, script lama melaporkannya sebagai drift dan `::error::`
+ * padahal tidak ada satu pun paket yang diperiksa. Keluaran yang memuat penanda
+ * jaringan/HTTP karena itu diperlakukan sebagai hasil ketiga, bukan kegagalan versi.
+ *
  * Pemakaian:
  *   node scripts/check-expo-deps.mjs
  *
@@ -58,16 +65,57 @@ export const DEFAULT_EXPO_CLI = path.join('node_modules', 'expo', 'bin', 'cli');
  */
 export const OFFLINE_MARKER = 'unreliable in offline-mode';
 
+/** Penanda keluaran yang membuktikan versi benar-benar dibandingkan. */
+const DRIFT_MARKERS = [
+  /expected version:/i,
+  /found outdated dependencies/i,
+  /should be updated for best compatibility/i,
+];
+
+/**
+ * Penanda bahwa daftar versi resmi tidak terjangkau — offline, proxy, atau DNS.
+ *
+ * `Forbidden` dan `Unexpected response when fetching version info` adalah bentuk
+ * nyata ketika proxy menolak `exp.host` dengan HTTP 403; errno dan pesan fetch
+ * menangkap kasus jaringan lain. Semuanya berarti **tidak ada yang diperiksa**,
+ * bukan paket yang versinya salah.
+ */
+const UNREACHABLE_MARKERS = [
+  /unexpected response when fetching version info/i,
+  /\bforbidden\b/i,
+  /\bproxy\b/i,
+  /\b(?:econnrefused|enotfound|eai_again|etimedout|ehostunreach|enetunreach|eproto)\b/i,
+  /\bsocket hang up\b/i,
+  /\b(?:fetch failed|network request failed|network error)\b/i,
+  /\b(?:self[- ]signed certificate|certificate has expired|unable to verify the first certificate)\b/i,
+];
+
 /**
  * Menentukan hasil dari keluaran CLI: `ok`, `drift`, atau `unverified`.
+ *
+ * Keluaran drift diperiksa lebih dulu supaya daftar paket yang benar-benar usang
+ * tidak pernah turun menjadi sekadar peringatan hanya karena pesannya menyebut
+ * jaringan. Selebihnya, exit bukan-nol tanpa penanda drift berarti pemeriksaan
+ * tidak pernah berhasil dijalankan (offline/proxy/DNS) atau CLI gagal secara tak
+ * terduga; yang pertama tidak boleh menghukum orang yang sedang tanpa internet,
+ * sedangkan yang kedua tetap fail-closed seperti sebelumnya.
  *
  * Dipisah dari `main()` supaya bisa diuji tanpa menjalankan CLI sungguhan.
  */
 export function checkOutcome({ status, stdout = '', stderr = '' }) {
+  const output = `${stdout}${stderr}`;
+
+  if (DRIFT_MARKERS.some((marker) => marker.test(output))) return 'drift';
+
   if ((status ?? 1) === 0) {
-    return `${stdout}${stderr}`.toLowerCase().includes(OFFLINE_MARKER) ? 'unverified' : 'ok';
+    return output.toLowerCase().includes(OFFLINE_MARKER) ? 'unverified' : 'ok';
   }
-  return 'drift';
+
+  const unreachable =
+    output.toLowerCase().includes(OFFLINE_MARKER) ||
+    UNREACHABLE_MARKERS.some((marker) => marker.test(output));
+
+  return unreachable ? 'unverified' : 'drift';
 }
 
 /** Baris keluaran CLI yang berguna dibaca manusia: tanpa baris kosong dan tanpa echo env. */
@@ -125,7 +173,7 @@ function main() {
       ]);
     case 'unverified':
       console.error(
-        `::warning::Versi dependency tidak bisa dipastikan terhadap ${target}: daftar versi resmi Expo tidak terjangkau (mode offline). Pemeriksaan ini tidak menyatakan lulus maupun gagal.`,
+        `::warning::Versi dependency tidak bisa dipastikan terhadap ${target}: daftar versi resmi Expo tidak terjangkau (jaringan, proxy, atau mode offline). Pemeriksaan ini tidak menyatakan lulus maupun gagal.`,
       );
       for (const line of details) console.error(line);
       return;

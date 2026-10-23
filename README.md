@@ -297,7 +297,7 @@ runner test script (ADR-072) + perbaikan lokal yang belum di-commit saat tabel i
 | `npm run typecheck` | Exit 0. |
 | `npm run lint` | Exit 0 setelah memperbaiki 430 galat `prettier/prettier` (akhiran baris CRLF pada lima berkas) dan dua pelanggaran `react-hooks` di `ChatPanel.tsx`. |
 | `npm run format:check` | Exit 0. |
-| `npm run deps:check` | Exit 0 — versi dependency cocok dengan Expo SDK 57.0.31 (`expo` 57.0.31, `expo-location` 57.0.22, `expo-router` 57.0.29), ADR-071. |
+| `npm run deps:check` | Exit 0 — versi dependency cocok dengan Expo SDK 57.0.31 (`expo` 57.0.31, `expo-location` 57.0.22, `expo-router` 57.0.29), ADR-071. Bila daftar versi `exp.host` tidak terjangkau (offline/DNS/proxy HTTP 403), hasilnya `::warning::` “tidak bisa dipastikan”, bukan drift. |
 | `npm test -- --ci` | **43 suite, 483 test lulus**, exit 0 — termasuk 24 test API chat, 9 test panel chat, 29 test hazard (API + label area), 6 test layar Peringatan, serta 16 test layanan + 8 test layar moderasi. |
 | `npm run test:scripts` | **294 test lulus**, exit 0 — dijalankan dengan konkurensi tetap (`--test-concurrency=1`) dan batas waktu per test (`--test-timeout=180000`), ADR-072. |
 | `npm run doctor` | **Tidak dapat dipastikan**: pemeriksaan skema config gagal `TypeError: fetch failed` / `ENOTFOUND exp.host` (DNS lingkungan ini), 1 dari 21 pemeriksaan gagal (diperiksa ulang 23 Oktober 2026). Bukan temuan proyek. Pemeriksaan versi dependency **lulus** — tidak ada drift setelah ADR-071. |
@@ -309,7 +309,7 @@ runner test script (ADR-072) + perbaikan lokal yang belum di-commit saat tabel i
 Hasil historis pada commit `749424c` (19 Oktober 2026, Node 24.18.1, npm 12.0.2):
 
 **Diperbarui 24 Oktober 2026 (setelah ADR-078):** `npm test -- --ci` **45 suite / 500 test lulus**,
-`npm run test:scripts` **74 suite / 339 test lulus**, `typecheck`/`lint`/`format:check` exit 0,
+`npm run test:scripts` **74 suite / 343 test lulus**, `typecheck`/`lint`/`format:check` exit 0,
 `npm run db:test` **7/8 berkas** — `rls_account_delete_test.sql` gagal karena migration ADR-078 belum
 diterapkan ke development, dan lulus saat migration itu diterapkan sementara di dalam transaksi
 `ROLLBACK`; `npm run db:test:lint` **8 berkas uji / 22 migration**, `npm run db:types:check` exit 0,
