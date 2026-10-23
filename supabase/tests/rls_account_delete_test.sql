@@ -38,6 +38,18 @@ begin
   if to_regprocedure('public.begin_account_deletion(uuid)') is null then
     v_missing := v_missing || 'fungsi public.begin_account_deletion'::text;
   end if;
+  if to_regprocedure('public.begin_account_deletion_claim(uuid, uuid, interval)') is null then
+    v_missing := v_missing || 'fungsi public.begin_account_deletion_claim (ADR-078)'::text;
+  end if;
+  if to_regprocedure('public.checkpoint_account_deletion(uuid, uuid, text)') is null then
+    v_missing := v_missing || 'fungsi public.checkpoint_account_deletion (ADR-078)'::text;
+  end if;
+  if to_regprocedure('public.finish_account_deletion_claim(uuid, uuid, text, text, text)') is null then
+    v_missing := v_missing || 'fungsi public.finish_account_deletion_claim (ADR-078)'::text;
+  end if;
+  if to_regprocedure('public.reconcile_account_deletion_jobs(integer)') is null then
+    v_missing := v_missing || 'fungsi public.reconcile_account_deletion_jobs (ADR-078)'::text;
+  end if;
   if to_regclass('public.account_deletion_jobs') is null then
     v_missing := v_missing || 'tabel public.account_deletion_jobs'::text;
   end if;
@@ -55,7 +67,7 @@ begin
   end if;
 
   if array_length(v_missing, 1) is not null then
-    raise exception 'UJI GAGAL (migration ADR-077 belum diterapkan): %',
+    raise exception 'UJI GAGAL (migration ADR-077/ADR-078 belum diterapkan): %',
       array_to_string(v_missing, ', ');
   end if;
 end;
@@ -753,9 +765,198 @@ begin
 end;
 $$;
 
+-- 19. Lease eksklusif (ADR-078): klaim kedua saat lease aktif ditolak tanpa
+--     menghitung percobaan, hanya pemegang lease yang boleh checkpoint/menutup
+--     job, dan lease kedaluwarsa boleh diklaim ulang.
+do $$
+declare
+  c_b constant uuid := 'e2222222-2222-4222-8222-222222222222';
+  c_lease_a constant uuid := 'f1111111-1111-4111-8111-111111111111';
+  c_lease_b constant uuid := 'f2222222-2222-4222-8222-222222222222';
+  c_lease_c constant uuid := 'f3333333-3333-4333-8333-333333333333';
+  c_lease_d constant uuid := 'f4444444-4444-4444-8444-444444444444';
+  v_job record;
+  v_ulang record;
+  v_state public.account_deletion_jobs%rowtype;
+  v_detail text;
+begin
+  delete from public.account_deletion_jobs where user_id = c_b;
+
+  select * into v_job
+  from public.begin_account_deletion_claim(c_b, c_lease_a);
+
+  if v_job.status <> 'running' or v_job.attempts <> 1 then
+    raise exception 'UJI GAGAL: klaim awal tidak dibuat dengan benar: %', row_to_json(v_job);
+  end if;
+
+  -- 19a. Klaim kedua selama lease aktif ditolak sebagai "sedang diproses",
+  --      bukan rate-limit, dan tidak menambah percobaan.
+  begin
+    perform public.begin_account_deletion_claim(c_b, c_lease_b);
+    raise exception 'UJI GAGAL: klaim kedua diterima saat lease aktif';
+  exception
+    when sqlstate '55006' then
+      get stacked diagnostics v_detail = pg_exception_detail;
+      if v_detail <> 'account_deletion_in_progress' then
+        raise exception 'UJI GAGAL: penolakan klaim kedua beralasan %, bukan account_deletion_in_progress', v_detail;
+      end if;
+  end;
+
+  select * into v_state
+  from public.account_deletion_jobs
+  where user_id = c_b;
+
+  if v_state.attempts <> 1 or v_state.lease_token <> c_lease_a then
+    raise exception 'UJI GAGAL: klaim yang ditolak mengubah job: %', row_to_json(v_state);
+  end if;
+
+  -- 19b. Pemegang lease lain tidak bisa checkpoint.
+  begin
+    perform public.checkpoint_account_deletion(v_job.job_id, c_lease_b, 'media');
+    raise exception 'UJI GAGAL: lease lain bisa menulis checkpoint';
+  exception
+    when sqlstate '55006' then
+      get stacked diagnostics v_detail = pg_exception_detail;
+      if v_detail <> 'account_deletion_lease_lost' then
+        raise exception 'UJI GAGAL: penolakan checkpoint beralasan %, bukan account_deletion_lease_lost', v_detail;
+      end if;
+  end;
+
+  -- 19c. Pemegang lease yang sah bisa checkpoint.
+  perform public.checkpoint_account_deletion(v_job.job_id, c_lease_a, 'media');
+
+  select * into v_state
+  from public.account_deletion_jobs
+  where user_id = c_b;
+
+  if v_state.last_step <> 'media' then
+    raise exception 'UJI GAGAL: checkpoint pemegang lease tidak tersimpan: %', v_state.last_step;
+  end if;
+
+  -- 19d. Pemegang lease lain tidak bisa menutup job.
+  begin
+    perform public.finish_account_deletion_claim(
+      v_job.job_id, c_lease_b, 'completed', 'done', null
+    );
+    raise exception 'UJI GAGAL: lease lain bisa menutup job';
+  exception
+    when sqlstate '55006' then
+      get stacked diagnostics v_detail = pg_exception_detail;
+      if v_detail <> 'account_deletion_lease_lost' then
+        raise exception 'UJI GAGAL: penolakan penutupan beralasan %, bukan account_deletion_lease_lost', v_detail;
+      end if;
+  end;
+
+  select * into v_state
+  from public.account_deletion_jobs
+  where user_id = c_b;
+
+  if v_state.status <> 'running' or v_state.lease_token <> c_lease_a then
+    raise exception 'UJI GAGAL: penutupan oleh lease lain mengubah job: %', row_to_json(v_state);
+  end if;
+
+  perform public.finish_account_deletion_claim(
+    v_job.job_id, c_lease_a, 'failed', 'media', 'uji_lease'
+  );
+
+  -- 19e. Lease kedaluwarsa boleh diklaim ulang oleh worker berikutnya.
+  select * into v_job
+  from public.begin_account_deletion_claim(c_b, c_lease_c, interval '-1 minute');
+
+  if v_job.attempts <> 2 then
+    raise exception 'UJI GAGAL: percobaan kedua tidak dicatat: %', row_to_json(v_job);
+  end if;
+
+  select * into v_ulang
+  from public.begin_account_deletion_claim(c_b, c_lease_d);
+
+  if v_ulang.status <> 'running' or v_ulang.attempts <> 3 then
+    raise exception 'UJI GAGAL: lease kedaluwarsa tidak bisa diklaim ulang: %', row_to_json(v_ulang);
+  end if;
+
+  select * into v_state
+  from public.account_deletion_jobs
+  where user_id = c_b;
+
+  if v_state.lease_token <> c_lease_d then
+    raise exception 'UJI GAGAL: lease baru tidak tercatat setelah klaim ulang';
+  end if;
+end;
+$$;
+
+-- 20. Rate limit tetap berlaku bersama lease: percobaan keenam dalam 15 menit
+--     ditolak 54000, bukan diterima karena lease sebelumnya sudah dilepas.
+do $$
+declare
+  c_b constant uuid := 'e2222222-2222-4222-8222-222222222222';
+  v_lease uuid;
+  v_job record;
+  v_detail text;
+  v_attempt int;
+begin
+  -- Job B saat ini berada di percobaan ke-3 dengan lease aktif dari 19e.
+  perform public.finish_account_deletion_claim(
+    (select j.id from public.account_deletion_jobs j where j.user_id = c_b),
+    'f4444444-4444-4444-8444-444444444444',
+    'failed', 'start', 'uji_rate_limit'
+  );
+
+  for v_attempt in 4..5 loop
+    v_lease := gen_random_uuid();
+
+    select * into v_job
+    from public.begin_account_deletion_claim(c_b, v_lease, interval '-1 minute');
+
+    if v_job.attempts <> v_attempt then
+      raise exception 'UJI GAGAL: percobaan ke-% tidak tercatat (dapat %): %', v_attempt, v_job.attempts, row_to_json(v_job);
+    end if;
+
+    perform public.finish_account_deletion_claim(
+      v_job.job_id, v_lease, 'failed', 'start', 'uji_rate_limit'
+    );
+  end loop;
+
+  begin
+    perform public.begin_account_deletion_claim(c_b, gen_random_uuid());
+    raise exception 'UJI GAGAL: rate limit tidak berlaku setelah 5 percobaan';
+  exception
+    when sqlstate '54000' then
+      get stacked diagnostics v_detail = pg_exception_detail;
+      if v_detail <> 'account_deletion_rate_limited' then
+        raise exception 'UJI GAGAL: penolakan rate limit beralasan %, bukan account_deletion_rate_limited', v_detail;
+      end if;
+  end;
+end;
+$$;
+
+-- 21. Fungsi lease baru hanya boleh dieksekusi service_role.
+do $$
+declare
+  v_fungsi text[] := array[
+    'public.begin_account_deletion_claim(uuid, uuid, interval)',
+    'public.checkpoint_account_deletion(uuid, uuid, text)',
+    'public.finish_account_deletion_claim(uuid, uuid, text, text, text)',
+    'public.reconcile_account_deletion_jobs(integer)'
+  ];
+  v_fn text;
+begin
+  foreach v_fn in array v_fungsi loop
+    if has_function_privilege('anon', v_fn, 'execute') then
+      raise exception 'UJI GAGAL: anon bisa memanggil %', v_fn;
+    end if;
+    if has_function_privilege('authenticated', v_fn, 'execute') then
+      raise exception 'UJI GAGAL: authenticated bisa memanggil %', v_fn;
+    end if;
+    if not has_function_privilege('service_role', v_fn, 'execute') then
+      raise exception 'UJI GAGAL: service_role tidak bisa memanggil %', v_fn;
+    end if;
+  end loop;
+end;
+$$;
+
 do $$
 begin
-  raise notice 'UJI HAPUS AKUN LULUS: profil hilang, data pribadi terhapus, konten bersama anonim, kepemilikan dialihkan, JWT lama ditolak, Auth user bisa dihapus tanpa merusak data, dan penghapusan auth di luar fungsi tidak meninggalkan profil aktif';
+  raise notice 'UJI HAPUS AKUN LULUS: profil hilang, data pribadi terhapus, konten bersama anonim, kepemilikan dialihkan, JWT lama ditolak, Auth user bisa dihapus tanpa merusak data, penghapusan auth di luar fungsi tidak meninggalkan profil aktif, serta lease/checkpoint tepat';
 end;
 $$;
 

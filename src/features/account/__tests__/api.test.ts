@@ -76,6 +76,48 @@ describe('deleteMyAccount', () => {
     expect(result.error.message).toMatch(/Beberapa menit/i);
   });
 
+  it.each([
+    ['account_deletion_in_progress', 'deletion_in_progress'],
+    ['account_deletion_incomplete', 'deletion_incomplete'],
+    ['account_deletion_unavailable', 'backend_not_configured'],
+    ['account_deletion_rate_limited', 'rate_limited'],
+  ])('memetakan tag %s menjadi kode %s yang bisa diulang', async (tag, code) => {
+    const invoke = jest.fn(async () => ({ data: null, error: functionError(tag) }));
+
+    const result = await deleteMyAccount(clientWith(invoke));
+
+    if (result.ok) throw new Error('tidak mungkin');
+    expect(result.error.code).toBe(code);
+    expect(result.error.retryable).toBe(true);
+    expect(result.error.message.length).toBeGreaterThan(0);
+  });
+
+  it('menjelaskan bahwa penghapusan sedang berjalan tanpa menyarankan pengulangan cepat', async () => {
+    const invoke = jest.fn(async () => ({
+      data: null,
+      error: functionError('account_deletion_in_progress'),
+    }));
+
+    const result = await deleteMyAccount(clientWith(invoke));
+
+    if (result.ok) throw new Error('tidak mungkin');
+    expect(result.error.message).toMatch(/sedang diproses server/i);
+    expect(result.error.message).toMatch(/jangan ulang berkali-kali/i);
+  });
+
+  it('menyatakan layanan belum tersedia sebagai masalah server, bukan penghapusan gagal', async () => {
+    const invoke = jest.fn(async () => ({
+      data: null,
+      error: functionError('account_deletion_unavailable'),
+    }));
+
+    const result = await deleteMyAccount(clientWith(invoke));
+
+    if (result.ok) throw new Error('tidak mungkin');
+    expect(result.error.code).toBe('backend_not_configured');
+    expect(result.error.message).toMatch(/hubungi dukungan/i);
+  });
+
   it('menolak respons sukses yang tidak menyatakan status selesai', async () => {
     const invoke = jest.fn(async () => ({ data: { status: 'running' }, error: null }));
 
