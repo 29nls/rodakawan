@@ -139,6 +139,8 @@
 
       if (code === 'account_deletion_rate_limited') {
         showError('Terlalu banyak percobaan. Tunggu beberapa menit lalu coba lagi.');
+      } else if (code === 'account_deletion_in_progress') {
+        showError('Penghapusan sedang diproses di server. Tunggu sebentar lalu coba lagi.');
       } else if (code === 'account_deletion_unauthenticated') {
         showError('Sesi tidak valid. Masuk kembali lalu ulangi.');
       } else if (code === 'account_deletion_unavailable') {

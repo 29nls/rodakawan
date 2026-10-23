@@ -15,9 +15,15 @@
  *   3. `auth`   — hapus identitas login lewat Auth Admin API, setelah tidak ada
  *                 lagi kepemilikan Storage/database yang menghalanginya.
  *
- * `lastStep` yang disimpan adalah langkah terakhir yang **selesai**. Bila proses
- * berhenti di tengah, retry melanjutkan dari langkah berikutnya; langkah yang
- * belum selesai aman diulang.
+ * `lastStep` yang disimpan adalah langkah terakhir yang **selesai** dan
+ * ditulis secara **durable** (lewat `deps.checkpoint`) SEBELUM tahap
+ * berikutnya dimulai, sehingga worker yang crash tidak mengulang tahap yang
+ * sudah tuntas. Setiap pemanggilan membawa `lease` (token klaim eksklusif):
+ * hanya pemegang lease yang boleh mengecekpoint/menutup job, dan pemanggilan
+ * kedua untuk pengguna yang sama selama lease aktif ditolak
+ * `account_deletion_in_progress` — jadi purge/Auth tidak pernah berjalan ganda.
+ * Setelah Auth user terhapus, job yang belum sempat ditutup diselesaikan oleh
+ * `begin` (pemulihan) atau `reconcile_account_deletion_jobs` (operator).
  */
 
 export const STEPS = Object.freeze(['start', 'media', 'purge', 'auth', 'done']);
@@ -53,12 +59,14 @@ export class DeletionStepError extends Error {
  * }} DeletionJob
  *
  * @typedef {{
- *   begin: (userId: string) => Promise<DeletionJob>,
+ *   begin: (userId: string, lease: string) => Promise<DeletionJob>,
+ *   checkpoint: (jobId: string, step: string, lease: string) => Promise<void>,
  *   finish: (
  *     jobId: string,
  *     status: 'failed' | 'completed',
  *     step: string,
  *     error: string | null,
+ *     lease?: string,
  *   ) => Promise<void>,
  *   manifest: (userId: string) => Promise<MediaManifest>,
  *   transferClubLogo: (logo: { path: string, clubId: string }) => Promise<void>,
@@ -165,22 +173,47 @@ export async function cleanupMedia(manifest, deps) {
 }
 
 /**
+ * Catat kemajuan secara durable SEBELUM tahap berikutnya dimulai.
+ *
+ * Kegagalan menulis checkpoint tidak boleh dilanjutkan: tanpa tanda bahwa
+ * tahap sebelumnya tuntas, retry akan mengulanginya — dan pada langkah `auth`
+ * (setelah Auth user terhapus) penggunanya sudah tidak bisa login untuk meretry,
+ * jadi lebih baik berhenti dengan status yang bisa dipulihkan lewat
+ * `begin`/`reconcile` daripada melanjutkan tanpa jejak.
+ *
+ * @param {DeletionDeps} deps
+ * @param {string} jobId
+ * @param {string} step
+ * @param {string} lease
+ */
+async function checkpointOrThrow(deps, jobId, step, lease) {
+  if (typeof deps.checkpoint !== 'function') return;
+
+  try {
+    await deps.checkpoint(jobId, step, lease);
+  } catch (error) {
+    if (error instanceof DeletionStepError) throw error;
+    throw new DeletionStepError('account_deletion_status_failed', step);
+  }
+}
+
+/**
  * Jalankan (atau lanjutkan) penghapusan akun.
  *
- * @param {{ userId: string, deps: DeletionDeps }} input
+ * @param {{ userId: string, lease?: string, deps: DeletionDeps }} input
  * @returns {Promise<{
  *   status: 'completed',
  *   alreadyCompleted: boolean,
  *   media: Awaited<ReturnType<typeof cleanupMedia>> | null,
  *   purge: Record<string, unknown> | null,
- * }>}
+ *}>}
  */
-export async function runAccountDeletion({ userId, deps }) {
+export async function runAccountDeletion({ userId, lease = '', deps }) {
   if (typeof userId !== 'string' || userId.length === 0) {
     throw new DeletionStepError('account_deletion_invalid_user', 'start');
   }
 
-  const job = await deps.begin(userId);
+  const job = await deps.begin(userId, lease);
 
   if (job.status === 'completed') {
     return { status: 'completed', alreadyCompleted: true, media: null, purge: null };
@@ -194,11 +227,13 @@ export async function runAccountDeletion({ userId, deps }) {
     if (lastStep === 'start') {
       const manifest = parseManifest(await deps.manifest(userId));
       media = await cleanupMedia(manifest, deps);
+      await checkpointOrThrow(deps, job.id, 'media', lease);
       lastStep = 'media';
     }
 
     if (lastStep === 'media') {
       purge = await deps.purge(userId);
+      await checkpointOrThrow(deps, job.id, 'purge', lease);
       lastStep = 'purge';
     }
 
@@ -209,10 +244,11 @@ export async function runAccountDeletion({ userId, deps }) {
         if (error instanceof DeletionStepError) throw error;
         throw new DeletionStepError('auth_delete_failed', 'auth');
       }
+      await checkpointOrThrow(deps, job.id, 'auth', lease);
       lastStep = 'auth';
     }
 
-    await deps.finish(job.id, 'completed', 'done', null);
+    await deps.finish(job.id, 'completed', 'done', null, lease);
     return { status: 'completed', alreadyCompleted: false, media, purge };
   } catch (error) {
     const step = error instanceof DeletionStepError ? error.step : lastStep;
@@ -222,9 +258,10 @@ export async function runAccountDeletion({ userId, deps }) {
         : 'unexpected_failure';
 
     // Kegagalan mencatat status tidak boleh menutupi kegagalan aslinya; status
-    // yang tertinggal 'running' tetap bisa diklaim ulang lewat `begin`.
+    // yang tertinggal 'running' tetap bisa dipulihkan lewat `begin` (pemulihan)
+    // atau `reconcile_account_deletion_jobs` (operator).
     try {
-      await deps.finish(job.id, 'failed', lastStep, code);
+      await deps.finish(job.id, 'failed', lastStep, code, lease);
     } catch {
       // sengaja diabaikan
     }

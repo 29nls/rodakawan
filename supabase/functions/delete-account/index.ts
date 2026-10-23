@@ -55,6 +55,16 @@ function failure(error: unknown) {
     );
   }
 
+  if (code === 'account_deletion_in_progress') {
+    return json(
+      {
+        error: 'account_deletion_in_progress',
+        message: 'Penghapusan sedang diproses di server. Tunggu sebentar lalu coba lagi.',
+      },
+      409,
+    );
+  }
+
   if (code === 'account_deletion_invalid_user' || code === 'account_deletion_unauthenticated') {
     return json({ error: 'account_deletion_unauthenticated' }, 401);
   }
@@ -133,12 +143,23 @@ Deno.serve(async (request: Request) => {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
+  // Lease klaim eksklusif: setiap pemanggilan memperoleh token baru sehingga
+  // dua permintaan bersamaan untuk pengguna yang sama tidak bisa menjalankan
+  // tahap yang sama dua kali. Lihat ADR-078.
+  const lease = crypto.randomUUID();
+
   const deps = {
-    begin: async (target: string) => {
-      const { data, error } = await admin.rpc('begin_account_deletion', { p_user: target });
+    begin: async (target: string, leaseToken: string) => {
+      const { data, error } = await admin.rpc('begin_account_deletion_claim', {
+        p_user: target,
+        p_lease: leaseToken,
+      });
 
       if (error) {
         const detail = detailsOf(error);
+        if (detail.includes('account_deletion_in_progress')) {
+          throw new DeletionStepError('account_deletion_in_progress', 'start');
+        }
         if (detail.includes('account_deletion_rate_limited') || error.code === '54000') {
           throw new DeletionStepError('account_deletion_rate_limited', 'start');
         }
@@ -156,14 +177,28 @@ Deno.serve(async (request: Request) => {
       };
     },
 
+    checkpoint: async (jobId: string, step: string, leaseToken: string) => {
+      const { error } = await admin.rpc('checkpoint_account_deletion', {
+        p_job: jobId,
+        p_lease: leaseToken,
+        p_step: step,
+      });
+
+      if (error) {
+        throw new DeletionStepError('account_deletion_status_failed', step);
+      }
+    },
+
     finish: async (
       jobId: string,
       status: 'failed' | 'completed',
       step: string,
       error: string | null,
+      leaseToken: string,
     ) => {
-      const { error: finishError } = await admin.rpc('finish_account_deletion', {
+      const { error: finishError } = await admin.rpc('finish_account_deletion_claim', {
         p_job: jobId,
+        p_lease: leaseToken,
         p_status: status,
         p_step: step,
         p_error: error,
@@ -277,7 +312,7 @@ Deno.serve(async (request: Request) => {
   };
 
   try {
-    const result = await runAccountDeletion({ userId, deps });
+    const result = await runAccountDeletion({ userId, lease, deps });
     return json({ status: 'completed', alreadyCompleted: result.alreadyCompleted }, 200);
   } catch (error) {
     const jobId = (error as { jobId?: string }).jobId;
