@@ -12,5 +12,7 @@
     "types": ["jest"]
   },
   "include": ["**/*.ts", "**/*.tsx", ".expo/types/**/*.ts", "expo-env.d.ts"],
-  "exclude": ["node_modules", "dist", ".expo"]
+  // Edge Function berjalan di Deno (global `Deno`, impor npm:/URL); tipe-nya
+  // diperiksa terpisah dengan `deno check`, bukan `tsc` aplikasi React Native.
+  "exclude": ["node_modules", "dist", ".expo", "supabase/functions"]
 }

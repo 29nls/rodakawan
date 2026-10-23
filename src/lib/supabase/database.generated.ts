@@ -14,7 +14,21 @@ export type Database = {
 
   "public": {
           Tables: {
-            "chat_messages": {
+            "account_deletion_jobs": {
+                  Row: {
+                    "attempts": number,"completed_at": string | null,"id": string,"last_error": string | null,"last_step": string,"started_at": string,"status": string,"updated_at": string,"user_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "attempts"?: number,"completed_at"?: string | null,"id"?: string,"last_error"?: string | null,"last_step"?: string,"started_at"?: string,"status"?: string,"updated_at"?: string,"user_id": string
+                  }
+                  Update: {
+                    "attempts"?: number,"completed_at"?: string | null,"id"?: string,"last_error"?: string | null,"last_step"?: string,"started_at"?: string,"status"?: string,"updated_at"?: string,"user_id"?: string
+                  }
+                  Relationships: [
+
+                  ]
+                },"chat_messages": {
                   Row: {
                     "client_message_id": string | null,"content": string,"created_at": string,"deleted_at": string | null,"edited_at": string | null,"id": string,"message_type": string,"ride_id": string,"sender_id": string
                   }
@@ -542,6 +556,14 @@ isOneToOne: false
 "accept_ride_invite":
 { Args: { "p_ride_id": string }; Returns: string
                            },
+"account_media_manifest":
+{ Args: { "p_user": string }; Returns: Json
+                           },
+"begin_account_deletion":
+{ Args: { "p_user": string }; Returns: {
+              "attempts": number,"job_id": string,"last_step": string,"status": string
+            }[]
+                           },
 "can_moderate_chat_message":
 { Args: { "p_message_id": string }; Returns: boolean
                            },
@@ -655,6 +677,9 @@ isOneToOne: false
       } },
 "expire_hazard_reports":
 { Args: Record<PropertyKey, never>; Returns: number
+                           },
+"finish_account_deletion":
+{ Args: { "p_error"?: string,"p_job": string,"p_status": string,"p_step": string }; Returns: undefined
                            },
 "get_moderation_subject":
 { Args: { "p_target_id": string,"p_target_type": string }; Returns: Json
@@ -770,6 +795,9 @@ isOneToOne: false
         isOneToOne: true
         isSetofReturn: false
       } },
+"purge_account_data":
+{ Args: { "p_user": string }; Returns: Json
+                           },
 "remove_club_member":
 { Args: { "p_club_id": string,"p_user_id": string }; Returns: string
                            },

@@ -280,11 +280,16 @@ Rencana terperinci, urutan prioritas, dan irisan vertikal pertama: [`docs/MILEST
 - [ ] Loading/offline/error/empty states lengkap.
 - [ ] Android device matrix dan accessibility pass.
 - [ ] Crash/error monitoring tanpa lokasi presisi.
-- [x] Privacy policy, delete account flow, support contact — **Implemented** dan **Passed against dev backend**
-      (23 Oktober 2026): RPC `delete_my_account()` dengan anonimisasi, layar `/account-delete`, halaman
-      `/privacy`, tautan dukungan ke issue GitHub; uji SQL `rls_account_delete_test.sql` lulus di
-      `npm run db:test` 8/8. **Belum** diuji di perangkat fisik, dan `auth.users` masih harus dihapus
-      operator (ADR-076).
+- [x] Privacy policy, delete account flow, support contact — **Implemented** dan **Passed against dev
+      backend** (23 Oktober 2026): Edge Function `delete-account` menghapus Storage → database →
+      `auth.users`, tombstone mempertahankan laporan bahaya/audit, layar `/account-delete`, halaman
+      `/privacy`, tautan dukungan ke issue GitHub. Uji SQL 48 perintah lulus (`npm run db:test` 8/8)
+      dan E2E development membuktikan Auth user hilang, media bersih, logo klub pindah, JWT lama
+      ditolak, serta login ulang gagal (ADR-077). **Blocked:** uji perangkat fisik dan URL web publik
+      (`web/` belum di-deploy).
+- [x] Jalur hapus akun web eksternal — halaman statis `web/account-deletion/` dan kebijakan
+      `web/privacy/` dibuat; **URL publik belum ada (blocker deployment)** sehingga syarat Play Console
+      belum bisa dicentang.
 - [ ] Security and release checklist.
 
 **Exit criteria:** semua P0 acceptance test lulus dan tidak ada blocker severity tinggi.

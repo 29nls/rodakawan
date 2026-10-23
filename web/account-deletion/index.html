@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="referrer" content="no-referrer" />
+    <title>Hapus akun RodaKawan</title>
+    <link rel="stylesheet" href="../styles.css" />
+  </head>
+  <body>
+    <main class="card" aria-labelledby="judul">
+      <p class="eyebrow">RodaKawan</p>
+      <h1 id="judul">Hapus akun Anda</h1>
+      <p class="lead">
+        Halaman ini menghapus akun RodaKawan tanpa perlu memasang aplikasi. Anda harus masuk
+        terlebih dahulu agar kami yakin permintaan ini datang dari pemilik akun.
+      </p>
+
+      <section class="notice" aria-labelledby="konsekuensi">
+        <h2 id="konsekuensi">Yang terjadi setelah akun dihapus</h2>
+        <ul>
+          <li>
+            Identitas login, profil, foto profil, kendaraan, nomor polisi, catatan privat, token
+            notifikasi, lokasi terakhir, follow, dan blokir dihapus.
+          </li>
+          <li>
+            Anda tidak bisa masuk lagi dengan akun ini. Sesi di perangkat lain berakhir setelah
+            tokennya kedaluwarsa; data akun sudah tidak dapat diakses.
+          </li>
+          <li>
+            Laporan bahaya yang pernah Anda kirim tetap tersimpan untuk keselamatan peserta lain,
+            tanpa identitas Anda.
+          </li>
+          <li>
+            Pesan konvoi serta postingan/komentar Anda diredaksi dan diatribusikan ke “Akun
+            dihapus”. Jejak audit moderasi tetap ada tanpa identitas Anda.
+          </li>
+          <li>
+            Kepemilikan klub/perjalanan dialihkan ke pengelola lain. Perjalanan tanpa penerus
+            dibatalkan.
+          </li>
+          <li>Penghapusan tidak bisa dibatalkan.</li>
+        </ul>
+      </section>
+
+      <p class="small">
+        Rincian retensi ada di <a id="tautan-privasi" href="../privacy/">Kebijakan privasi</a>.
+        Butuh bantuan?
+        <a id="tautan-dukungan" href="https://github.com/29nls/rodakawan/issues">Halaman dukungan</a
+        >.
+      </p>
+
+      <div id="belum-dikonfigurasi" class="error" hidden>
+        Halaman ini belum dikonfigurasi untuk project Supabase. Hubungi pengelola aplikasi.
+      </div>
+
+      <form id="form-hapus" novalidate>
+        <label for="email">Email akun</label>
+        <input id="email" name="email" type="email" autocomplete="username" required />
+
+        <label for="kata-sandi">Kata sandi</label>
+        <input
+          id="kata-sandi"
+          name="password"
+          type="password"
+          autocomplete="current-password"
+          required
+        />
+
+        <label for="konfirmasi">Ketik <strong>HAPUS AKUN</strong> untuk mengonfirmasi</label>
+        <input
+          id="konfirmasi"
+          name="confirmation"
+          type="text"
+          inputmode="text"
+          autocomplete="off"
+          autocapitalize="characters"
+          required
+        />
+
+        <button id="tombol-hapus" type="submit">Hapus akun saya</button>
+      </form>
+
+      <p id="status" class="status" role="status" aria-live="polite"></p>
+      <p id="galat" class="error" role="alert" hidden></p>
+
+      <noscript>
+        <p class="error">Halaman ini memerlukan JavaScript untuk masuk dan menghapus akun.</p>
+      </noscript>
+    </main>
+
+    <script src="./config.js"></script>
+    <script src="./app.js"></script>
+  </body>
+</html>

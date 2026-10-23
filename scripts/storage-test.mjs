@@ -351,8 +351,13 @@ async function main() {
     await client.connect();
 
     /* 0. Akun sisa run sebelumnya (mis. proses terputus di tengah jalan) dibuang lebih
-          dulu; profil dan kendaraannya ikut lewat ON DELETE CASCADE. Objeknya baru bisa
-          disapu setelah akun pengganti dengan ID yang sama dibuat (langkah 2b). */
+          dulu. Sejak ADR-077 profil TIDAK lagi ikut ON DELETE CASCADE dari auth.users,
+          jadi profil dihapus eksplisit (kendaraan ikut cascade dari profil). Objeknya
+          baru bisa disapu setelah akun pengganti dengan ID yang sama dibuat (langkah 2b). */
+    await deleteRows(`delete from public.profiles where id in ($1, $2) returning 1`, [
+      USER_A_ID,
+      USER_B_ID,
+    ]);
     const sisaAkun = await deleteRows(`delete from auth.users where id in ($1, $2) returning 1`, [
       USER_A_ID,
       USER_B_ID,
@@ -653,8 +658,8 @@ async function main() {
 
   /* 7. Pembersihan SELALU berjalan, termasuk saat langkah uji gagal: objek yang
         mungkin tersisa dihapus lewat HTTP oleh pemiliknya (satu-satunya jalur yang
-        diizinkan Supabase), lalu akun uji dihapus; profiles dan motorcycles ikut
-        hilang lewat ON DELETE CASCADE. */
+        diizinkan Supabase), lalu profil dan akun uji dihapus. Sejak ADR-077 profil
+        harus dihapus eksplisit sebelum auth.users; kendaraan cascade dari profil. */
   try {
     if (tokenA) {
       await removeObjects(tokenA, [pathUtama, ...pathDitolak.slice(0, 2)]);
@@ -684,11 +689,15 @@ async function main() {
       );
     }
 
+    const profil = await deleteRows(
+      `delete from public.profiles where id in ($1, $2) returning 1`,
+      [USER_A_ID, USER_B_ID],
+    );
     const akun = await deleteRows(`delete from auth.users where id in ($1, $2) returning 1`, [
       USER_A_ID,
       USER_B_ID,
     ]);
-    ok(`${akun} akun uji dihapus (profil dan kendaraan ikut ON DELETE CASCADE)`);
+    ok(`${profil} profil dan ${akun} akun uji dihapus (kendaraan ikut cascade dari profil)`);
 
     const sisa = {
       akun: await scalar(`select count(*) as count from auth.users where id in ($1, $2)`, [

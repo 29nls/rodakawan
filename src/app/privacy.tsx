@@ -26,7 +26,7 @@ export default function PrivacyScreen() {
     >
       <Card>
         <SectionHeader
-          subtitle="Ringkasan Bahasa Indonesia; diperbarui 22 Oktober 2026."
+          subtitle="Ringkasan Bahasa Indonesia; diperbarui 23 Oktober 2026."
           title="Data yang disimpan"
         />
         <View style={styles.list}>
@@ -63,8 +63,9 @@ export default function PrivacyScreen() {
             termasuk untuk keselamatan peserta lain.
           </AppText>
           <AppText variant="callout">
-            • Setelah akun dihapus, profil dianonimkan dan data pribadi dihapus. Laporan bahaya dan
-            audit moderasi tetap ada tanpa identitas Anda.
+            • Setelah akun dihapus, identitas login, profil, dan data pribadi dihapus. Laporan
+            bahaya dan audit moderasi tetap ada tanpa identitas Anda; pesan konvoi serta
+            postingan/komentar diredaksi dan diatribusikan ke “Akun dihapus”.
           </AppText>
           <AppText variant="callout">
             • Data tidak dijual dan tidak dipakai untuk iklan. Layanan pihak ketiga hanya Supabase
@@ -90,8 +91,9 @@ export default function PrivacyScreen() {
           {SUPPORT_URL}
         </AppText>
         <AppText tone="muted" variant="caption">
-          Anda juga dapat menghapus akun sendiri dari Profil → Hapus akun; penghapusan berlaku
-          langsung setelah konfirmasi.
+          Anda juga dapat menghapus akun sendiri dari Profil → Hapus akun. Proses dijalankan di
+          server dan baru dinyatakan berhasil setelah seluruh langkah selesai; bila gagal di tengah
+          jalan, permintaan dapat diulang tanpa menghapus data dua kali.
         </AppText>
       </Card>
     </Screen>

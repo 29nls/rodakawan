@@ -48,6 +48,10 @@ const IGNORABLE = [
   // Migration mengubah isi database, dan APK tidak membawa berkas migration.
   { reason: 'migrasi database', pattern: /^supabase\/migrations\// },
   { reason: 'draf SQL', pattern: /^supabase\/drafts\// },
+  // Edge Function berjalan di server Supabase; APK hanya memanggilnya.
+  { reason: 'Edge Function', pattern: /^supabase\/functions\// },
+  // Halaman web publik (privasi/hapus akun) bukan bagian dari bundel Expo.
+  { reason: 'halaman web publik', pattern: /^web\// },
   // Tooling repo: dipanggil `npm run …` atau workflow, tidak pernah diimpor kode
   // aplikasi. Skrip yang justru menjadi **input** build disebut terpisah di
   // `BUILD_INPUT_SCRIPTS`, yang diperiksa lebih dulu.

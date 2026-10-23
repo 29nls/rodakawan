@@ -148,6 +148,14 @@ Jangan menampilkan marker diam tanpa indikator waktu, sebab pengguna bisa menyim
 
 Payload contoh; gunakan koordinat fiktif untuk dokumentasi dan log. Jangan tulis lokasi presisi ke analitik umum atau crash logs.
 
+## 5a. Pola hapus akun (ADR-077)
+
+- **Satu jalur tulis:** Edge Function `delete-account` adalah satu-satunya tempat yang boleh menghapus identitas login. Klien mengirim JWT; target diambil dari `auth.getUser(token)`, bukan body.
+- **Urutan tidak boleh ditukar:** manifest media → pindahkan logo klub yang masih dipakai → hapus media pribadi → `purge_account_data()` (satu transaksi database) → Auth Admin API → tandai job selesai. Auth tidak boleh dihapus selama objek Storage pengguna masih ada.
+- **Retry idempoten:** `account_deletion_jobs` menyimpan langkah terakhir yang selesai; kegagalan parsial mengembalikan error, bukan sukses. Job yang sudah `completed` dikembalikan tanpa menjalankan ulang.
+- **Konten bersama:** laporan bahaya dan audit dipertahankan dengan `reporter_id`/`actor_id` = tombstone; pesan/postingan diredaksi; kepemilikan klub/perjalanan dialihkan. Jangan menambah FK baru ke `auth.users` atau mengembalikan cascade ke profil.
+- **Batas:** access token lama tetap valid secara kriptografis sampai kedaluwarsa, tetapi tidak menemukan profil/baris miliknya; jangan menganggap `signOut()` klien sebagai pengganti penghapusan server.
+
 ## 6. Pola voice room PTT
 
 - Gunakan layanan WebRTC audio (proof-of-concept LiveKit direkomendasikan untuk dievaluasi), bukan tabel/database untuk mengirim audio.

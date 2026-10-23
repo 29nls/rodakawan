@@ -1,111 +1,120 @@
 /**
- * Layanan hapus akun (anonimisasi).
+ * Layanan hapus akun.
  *
- * Urutan yang benar, dan alasannya:
+ * Sejak ADR-077 penghapusan **tidak** lagi dilakukan bertahap dari aplikasi.
+ * Klien hanya memanggil Edge Function `delete-account` dengan access token
+ * sesinya; server memverifikasi token itu, menangani Storage (termasuk logo klub
+ * milik pengguna), memurnikan database dalam satu transaksi, lalu menghapus
+ * identitas login lewat Auth Admin API.
  *
- *   1. **Kumpulkan** rujukan media milik pengguna (avatar + foto kendaraan) dari
- *      database. Setelah RPC berjalan, baris kendaraan dan `avatar_url` sudah
- *      hilang, jadi daftar path tidak bisa disusun lagi.
- *   2. **Hapus objek Storage** lewat Storage API. RPC sengaja tidak melakukannya:
- *      Supabase menolak DELETE langsung ke `storage.objects` (ADR-076).
- *      Kegagalan langkah ini tidak menghalangi hak pengguna menghapus akunnya —
- *      hasilnya dilaporkan supaya UI bisa memberi tahu, bukan disembunyikan.
- *   3. **Panggil RPC** `delete_my_account()`, yang menganonimkan profil dan
- *      menghapus seluruh data pribadi lain dalam satu transaksi.
- *
- * RPC tidak menerima parameter: identitas selalu `auth.uid()`, jadi tidak ada
- * jalan untuk menghapus akun orang lain dari aplikasi.
+ * Pembagian ini penting:
+ *   * Klien tidak pernah mengirim `userId` — target selalu `auth.uid()` hasil
+ *     verifikasi server, jadi tidak ada jalur untuk menghapus akun orang lain.
+ *   * Klien tidak bisa melaporkan sukses sebelum server menyelesaikan seluruh
+ *     langkah. Kegagalan sebagian dikembalikan sebagai error yang bisa diulang,
+ *     bukan sebagai "akun dihapus" palsu.
+ *   * Service role tidak pernah masuk ke bundel aplikasi.
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 import type { ApiResult } from '@/features/auth/api';
-import { mapAccountError } from '@/features/account/errors';
-import { PROFILE_AVATAR_BUCKET, VEHICLE_PHOTO_BUCKET } from '@/features/media/photos';
+import { mapAccountError, mapAccountFunctionError } from '@/features/account/errors';
 import type { Database } from '@/lib/supabase/database.types';
 
 export type AccountClient = SupabaseClient<Database>;
 
-export type MediaObject = {
-  bucket: typeof PROFILE_AVATAR_BUCKET | typeof VEHICLE_PHOTO_BUCKET;
-  path: string;
+export type AccountDeletionResult = {
+  status: 'completed';
+  alreadyCompleted: boolean;
 };
 
-export type MediaCleanup = {
-  /** Objek yang benar-benar dihapus Storage API. */
-  removed: number;
-  /** Objek yang gagal dihapus; pembersihan operator diperlukan. */
-  failed: number;
+type FunctionInvokeResult = {
+  data: unknown;
+  error: unknown;
 };
 
 /**
- * Rujukan media milik pengguna. Kegagalan baca dikembalikan sebagai daftar
- * kosong: media yang tidak terbaca tidak boleh membatalkan penghapusan akun.
+ * Ekstrak kode galat dari `FunctionsHttpError`. Isi respons server adalah
+ * `{ error: '<tag>' }`; `context.json()` hanya bisa dibaca sekali, jadi jangan
+ * memanggilnya di tempat lain.
  */
-export async function collectOwnMedia(
-  client: AccountClient,
-  userId: string,
-): Promise<MediaObject[]> {
-  const objects: MediaObject[] = [];
+async function readFunctionErrorCode(error: unknown): Promise<string> {
+  if (typeof error !== 'object' || error === null) return '';
 
-  const profile = await client.from('profiles').select('avatar_url').eq('id', userId).maybeSingle();
+  const context = (error as { context?: unknown }).context;
 
-  if (!profile.error && profile.data?.avatar_url) {
-    objects.push({ bucket: PROFILE_AVATAR_BUCKET, path: profile.data.avatar_url });
-  }
+  if (typeof context === 'object' && context !== null) {
+    const json = (context as { json?: unknown }).json;
 
-  const bikes = await client.from('motorcycles').select('photo_path').eq('owner_id', userId);
-
-  if (!bikes.error) {
-    for (const bike of bikes.data ?? []) {
-      if (bike.photo_path) objects.push({ bucket: VEHICLE_PHOTO_BUCKET, path: bike.photo_path });
-    }
-  }
-
-  return objects;
-}
-
-/** Hapus objek Storage per bucket, tanpa melempar galat ke pemanggil. */
-export async function removeOwnMedia(
-  client: AccountClient,
-  objects: MediaObject[],
-): Promise<MediaCleanup> {
-  const grouped = new Map<MediaObject['bucket'], string[]>();
-
-  for (const object of objects) {
-    const paths = grouped.get(object.bucket) ?? [];
-    paths.push(object.path);
-    grouped.set(object.bucket, paths);
-  }
-
-  let removed = 0;
-  let failed = 0;
-
-  for (const [bucket, paths] of grouped) {
-    if (paths.length === 0) continue;
-
-    try {
-      const { data, error } = await client.storage.from(bucket).remove(paths);
-
-      if (error) {
-        failed += paths.length;
-        continue;
+    if (typeof json === 'function') {
+      try {
+        const body: unknown = await (json as () => Promise<unknown>).call(context);
+        if (typeof body === 'object' && body !== null) {
+          const tag = (body as { error?: unknown }).error;
+          if (typeof tag === 'string') return tag;
+        }
+      } catch {
+        // Respons bukan JSON; jatuh ke pencarian kode di bawah.
       }
-
-      removed += data?.length ?? paths.length;
-    } catch {
-      failed += paths.length;
     }
   }
 
-  return { removed, failed };
+  const code = (error as { code?: unknown }).code;
+  return typeof code === 'string' ? code : '';
 }
 
-/** Menganonimkan akun pemanggil. Idempoten di server. */
-export async function deleteMyAccount(client: AccountClient): Promise<ApiResult<null>> {
-  const { error } = await client.rpc('delete_my_account');
+function isCompletedResult(
+  data: unknown,
+): data is { status: 'completed'; alreadyCompleted?: boolean } {
+  return (
+    typeof data === 'object' &&
+    data !== null &&
+    (data as { status?: unknown }).status === 'completed'
+  );
+}
 
-  if (error) return { ok: false, error: mapAccountError(error) };
+/**
+ * Meminta server menghapus akun pemanggil.
+ *
+ * Hasil `ok: true` hanya diberikan bila server menyatakan seluruh langkah
+ * selesai (termasuk Auth Admin API). Pemanggil boleh `signOut()` setelahnya.
+ */
+export async function deleteMyAccount(
+  client: AccountClient,
+): Promise<ApiResult<AccountDeletionResult>> {
+  let result: FunctionInvokeResult;
 
-  return { ok: true, data: null };
+  try {
+    result = (await client.functions.invoke('delete-account', {
+      body: {},
+    })) as FunctionInvokeResult;
+  } catch (error) {
+    return { ok: false, error: mapAccountError(error) };
+  }
+
+  if (result.error) {
+    const code = await readFunctionErrorCode(result.error);
+    return { ok: false, error: mapAccountFunctionError(code) };
+  }
+
+  if (!isCompletedResult(result.data)) {
+    return {
+      ok: false,
+      error: {
+        code: 'deletion_incomplete',
+        message:
+          'Server belum mengonfirmasi bahwa akun benar-benar terhapus. Coba lagi; bila berulang, hubungi dukungan sebelum menganggap akun hilang.',
+        retryable: true,
+      },
+    };
+  }
+
+  return {
+    ok: true,
+    data: {
+      status: 'completed',
+      alreadyCompleted: result.data.alreadyCompleted === true,
+    },
+  };
 }

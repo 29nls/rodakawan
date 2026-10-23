@@ -88,6 +88,15 @@ describe('needsBuild — berkas yang tidak mengubah isi aplikasi', () => {
     assert.equal(needsBuild(['supabase/drafts/milestone_3_ride_state.sql']), false);
   });
 
+  it('Edge Function dan halaman web publik tidak memicu build APK', () => {
+    // Keduanya berjalan di luar bundel Expo: fungsi di server Supabase, halaman
+    // web di hosting statis. Perubahannya tidak mengubah isi APK.
+    assert.equal(needsBuild(['supabase/functions/delete-account/index.ts']), false);
+    assert.equal(needsBuild(['supabase/functions/delete-account/orchestrator.mjs']), false);
+    assert.equal(needsBuild(['web/account-deletion/app.js']), false);
+    assert.equal(needsBuild(['web/privacy/index.html', 'web/styles.css']), false);
+  });
+
   it('dokumentasi tidak memicu build', () => {
     assert.equal(needsBuild(['docs/QA_TEST_PLAN.md']), false);
     assert.equal(needsBuild(['README.md', 'CHANGELOG.md', 'docs/MILESTONE_4_PLAN.md']), false);
@@ -212,6 +221,20 @@ describe('CLI should-release.mjs', () => {
 
     assert.equal(result.stdout.trim(), 'false', result.stderr);
     assert.match(result.stderr, /migrasi database \(1\)/);
+  });
+
+  it('commit yang hanya mengubah Edge Function dan halaman web dilewati', (t) => {
+    const repo = repoWith(t, {
+      'supabase/functions/delete-account/index.ts': 'export const x = 1;\n',
+      'web/account-deletion/app.js': 'console.log(1);\n',
+    });
+
+    const result = runScript(repo.dir, 'should-release.mjs', ['--to', 'HEAD']);
+
+    assert.equal(result.code, 0, result.stderr);
+    assert.equal(result.stdout.trim(), 'false');
+    assert.match(result.stderr, /Edge Function \(1\)/);
+    assert.match(result.stderr, /halaman web publik \(1\)/);
   });
 
   it('commit yang hanya mengubah dokumentasi dan tooling rilis dilewati', (t) => {
