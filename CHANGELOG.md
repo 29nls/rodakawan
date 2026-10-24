@@ -8,6 +8,18 @@ sedangkan build preview (`v<versi>-build<N>`) diringkas di dalam blok yang bisa 
 versi adalah tautan ke halaman rilisnya di GitHub, sehingga riwayat ini bisa dinavigasi langsung
 dari berkas.
 
+## [v0.1.0-build47](https://github.com/29nls/rodakawan/releases/tag/v0.1.0-build47) — 2026-10-24 · pratinjau
+
+<details>
+<summary>Catatan rilis pratinjau</summary>
+
+### Perubahan lain
+
+- catat penerapan migration ADR-078 ke development (`5dae43b`)
+- db: regenerasi tipe setelah migration reliabilitas ADR-078 (`f780d7f`)
+
+</details>
+
 ## [v0.1.0-build46](https://github.com/29nls/rodakawan/releases/tag/v0.1.0-build46) — 2026-10-24 · pratinjau
 
 <details>
