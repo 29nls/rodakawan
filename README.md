@@ -41,7 +41,7 @@ Istilah status dipakai konsisten di seluruh dokumentasi:
 | Milestone 4: laporan bahaya jalan (buat, filter, ubah/lepas, konfirmasi, laporkan) | Ya — RPC transaksional, expiry dihitung server, idempotensi + rate limit + deteksi duplikat di database; tanpa peta, daftar memakai label area perkiraan | Ya (29 test fitur + 6 test layar) | **Ya** (uji RLS LULUS — Database RLS #19) | **Blocked** (belum ada build perangkat) |
 | Milestone 4: chat konvoi (teks, ubah/hapus 15 menit, pesan sistem, realtime, laporkan, blokir) | Ya — Postgres Changes pada `chat_messages`, keyset pagination, idempotensi `client_message_id`, panel chat di detail perjalanan; pesan teks dari pengguna yang diblokir disaring **di server** (policy, ADR-068), bukan di UI | Ya (24 test API + 9 test panel) | **Ya** (uji RLS LULUS — Database RLS #19) | **Blocked** |
 | Milestone 4: moderasi (`content_reports`, `moderation_actions`, `user_blocks`) | Ya — pelaporan lewat RPC `report_content`, dashboard `/moderation` untuk host perjalanan/admin klub dengan aksi hapus konten (soft delete), abaikan, dan tandai ditinjau, jejak audit yang hanya bisa dibaca lewat RPC; **tanpa** peran moderator global (ADR-067) | Ya (16 test layanan + 8 test layar) | **Ya** (uji RLS LULUS — Database RLS #19) | — |
-| Milestone 5: hapus akun penuh + kebijakan privasi | Ya — Edge Function `delete-account` memverifikasi JWT, memindahkan logo klub/menghapus media lewat Storage API, memanggil `purge_account_data()` (satu transaksi), lalu menghapus `auth.users`; tombstone bersama mempertahankan laporan bahaya/audit; status job memakai lease eksklusif + checkpoint (ADR-078); layar `/account-delete` dan halaman statis `web/privacy` + `web/account-deletion` | Ya (13 test layanan + 4 test layar + 19 test orkestrasi Node) | **Ya** untuk ADR-077 (uji RLS lulus; E2E Auth/Storage 23 Okt 2026). Uji lease ADR-078 lulus di dalam transaksi `ROLLBACK`; `db:test` penuh masih 7/8 karena migration ADR-078 belum diterapkan | **Blocked** (belum ada build perangkat; URL web belum live) |
+| Milestone 5: hapus akun penuh + kebijakan privasi | Ya — Edge Function `delete-account` memverifikasi JWT, memindahkan logo klub/menghapus media lewat Storage API, memanggil `purge_account_data()` (satu transaksi), lalu menghapus `auth.users`; tombstone bersama mempertahankan laporan bahaya/audit; status job memakai lease eksklusif + checkpoint (ADR-078); layar `/account-delete` dan halaman statis `web/privacy` + `web/account-deletion` | Ya (13 test layanan + 4 test layar + 19 test orkestrasi Node) | **Ya** untuk ADR-077 (uji RLS lulus; E2E Auth/Storage 23 Okt 2026). Uji lease ADR-078 lulus; setelah migration diterapkan ke development (24 Oktober 2026), `db:test` **8/8** lulus | **Blocked** (belum ada build perangkat; URL web belum live) |
 | Milestone 5: push notification, crash monitoring, device matrix | **Belum** — rencana di `docs/MILESTONE_5_PLAN.md`; push butuh modul native + kredensial FCM | — | — | — |
 | Milestone 6+: feed, musik, voice PTT | **Belum** | — | — | — |
 
@@ -49,9 +49,7 @@ Istilah status dipakai konsisten di seluruh dokumentasi:
 HP fisik. Status **Ya** pada kolom perangkat Milestone 2 berasal dari laporan pemilik aplikasi
 (owner-reported) bahwa build sudah dicoba di HP tanpa error yang teramati; tidak ada log, rekaman,
 atau tag rilis per kasus yang disertakan. Project Supabase development **sudah ada**
-sejak 13 Oktober 2026. Seluruh **22** migration sudah ada di repository. **21** di antaranya sudah
-diterapkan ke project development; `20261023120000_account_deletion_reliability.sql` (ADR-078)
-**belum**, dan selisih itu terlihat di `npx supabase migration list --linked` (22 lokal vs 21 remote).
+sejak 13 Oktober 2026. Seluruh **22** migration sudah ada di repository. **22** di antaranya sudah diterapkan ke project development (termasuk `20261023120000_account_deletion_reliability.sql`/ADR-078 pada 24 Oktober 2026), jadi `npx supabase migration list --linked` kini menunjukkan 22 lokal = 22 remote.
 Uji RLS sudah lulus (ADR-035), dan lubang privasi follow serta integritas detail privat kendaraan
 sudah diperbaiki dengan uji allow/deny (ADR-039, ADR-040). Empat migration Milestone 4 —
 `20261020090000_hazard_reports_m4.sql`, `20261020100000_convoy_chat_m4.sql`,
@@ -310,16 +308,13 @@ Hasil historis pada commit `749424c` (19 Oktober 2026, Node 24.18.1, npm 12.0.2)
 
 **Diperbarui 24 Oktober 2026 (setelah ADR-078):** `npm test -- --ci` **45 suite / 500 test lulus**,
 `npm run test:scripts` **74 suite / 343 test lulus**, `typecheck`/`lint`/`format:check` exit 0,
-`npm run db:test` **7/8 berkas** — `rls_account_delete_test.sql` gagal karena migration ADR-078 belum
-diterapkan ke development, dan lulus saat migration itu diterapkan sementara di dalam transaksi
-`ROLLBACK`; `npm run db:test:lint` **8 berkas uji / 22 migration**, `npm run db:types:check` exit 0,
+`npm run db:test` **8/8 berkas** setelah migration ADR-078 diterapkan ke development (24 Oktober 2026); sebelum itu 7/8 karena empat RPC lease belum ada di remote; `npm run db:test:lint` **8 berkas uji / 22 migration**, `npm run db:types:check` exit 0,
 `npm run storage:test` **27 langkah**, `npm run export:android` exit 0 (bundel Hermes 4.1 MB, tanpa
 string mirip JWT di dalamnya), dan `npm run doctor` **20 dari 21** pemeriksaan — satu yang gagal adalah
 pemeriksaan skema `app.json` yang butuh `exp.host` (DNS lingkungan ini, `ENOTFOUND`), bukan temuan
 proyek. Angka yang lebih lama di tabel ini adalah hasil saat perintah itu dijalankan, bukan status
 terkini. Uji RLS terakhir yang tercatat di GitHub Actions adalah **Database RLS #22** (run
-`39850754772`, 8 berkas lulus) dan **CI #57** (run `39850755047`) pada `afe908e`; commit `afb133d` dan
-branch `fix/adr-078-hardening` belum di-push, jadi run untuknya belum ada.
+`39850754772`, 8 berkas lulus) dan **CI #57** (run `39850755047`) pada `afe908e`; commit `afb133d` dan branch `fix/adr-078-hardening` sudah di-merge lewat PR #8 (`48d7a37`), tetapi run Database RLS-nya gagal karena migration ADR-078 belum diterapkan; run berikutnya dijalankan dari branch `fix/apply-adr-078-migration` setelah migration itu diterapkan.
 
 | Perintah               | Hasil                                                        |
 | ---------------------- | ------------------------------------------------------------ |
