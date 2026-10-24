@@ -318,7 +318,23 @@ Status per Milestone 1.5 (diperbarui pada milestone ini). Istilah status: **Impl
 - [ ] Realtime private channel diuji menggunakan user lain.
 - [ ] Tidak ada service role/private key di mobile bundle, git, issue, log, atau dokumentasi publik.
 - [x] Storage policies sudah diuji, termasuk penolakan signed URL/direct URL dan delete — `npm run db:test` bagian 13, lulus 17 Oktober 2026 (bucket privat; foto kendaraan owner-only; logo klub hanya owner/admin yang menulis).
-- [ ] Input disanitasi/ditangani aman; rate limits aktif.
+- [ ] Input disanitasi/ditangani aman; rate limits aktif — **Implemented sebagian**, belum boleh dicentang (inventaris 24 Oktober 2026). Validasi klien hanya untuk umpan balik; otoritas tetap CHECK constraint dan RPC database.
+
+  | Titik masuk | Validasi klien | Batas/otoritas database |
+  | --- | --- | --- |
+  | Email, kata sandi | `auth/validation.ts` (email ≤ 254; sandi 8–72, huruf + angka) | Supabase Auth (GoTrue) |
+  | Profil | `profile/validation.ts` (username 3–30 pola `[a-z0-9_]`, nama tampilan ≤ 80, bio ≤ 300, kota ≤ 80) | CHECK `public.profiles`; `avatar_url` tanpa batas panjang |
+  | Garasi | `garage/validation.ts` (merek ≤ 80, model ≤ 100, panggilan ≤ 60, tahun 1950–2100, plat ≤ 16, catatan ≤ 500) | CHECK `public.motorcycles`; plat/catatan **belum** dibatasi — migration `20261024011825_m5_private_detail_limits.sql` disiapkan, belum diterapkan |
+  | Klub | `clubs/validation.ts` (nama 2–100, deskripsi ≤ 2000, slug 3–80) | CHECK `public.clubs`; `logo_path` tanpa batas panjang |
+  | Perjalanan | `rides/validation.ts` (judul 3–120, deskripsi ≤ 2000, label ≤ 120, jadwal) | CHECK `public.rides` termasuk rentang koordinat |
+  | Hazard | `hazards/api.ts` (deskripsi ≤ 1000) | RPC tulis + CHECK ≤ 1000; **rate limit 5 laporan/10 menit** dan **10 konfirmasi/jam** |
+  | Chat | `chat/api.ts` (isi ≤ 2000, dirapikan) | Hanya RPC (`send_chat_message`/`edit`/`delete`), CHECK 1–2000, **20 pesan/60 detik**, jendela edit 15 menit |
+  | Laporan moderasi | `moderation/api.ts` (detail ≤ 2000) | RPC `report_content` + CHECK ≤ 2000; **tanpa rate limit** |
+  | Follow, permintaan gabung/undang klub | Tombol UI, tanpa batas frekuensi | RLS + constraint identitas; **tanpa rate limit** |
+  | Lokasi perjalanan | Nilai dari GPS, tanpa validasi rentang di klien | RLS peserta aktif + CHECK rentang; **tanpa throttle di database** |
+  | Hapus akun | Konfirmasi username di layar | Lease + retry **15 menit** setelah kegagalan |
+
+  **Celah terbuka (bukan lulus):** rate limit follow, laporan moderasi, permintaan gabung/undang klub, dan pembaruan lokasi belum ada; batas panjang kolom path (`avatar_url`, `logo_path`, `photo_path`, `media_path`) belum ditegakkan database; migration plat/catatan menunggu persetujuan penerapan. Tidak ada dependency sanitasi baru — data dikirim lewat PostgREST/RPC berparameter, bukan SQL string.
 - [x] Flow hapus akun penuh dan data terdokumentasi — Edge Function `delete-account` + `purge_account_data()`
       + Auth Admin API; layar `/account-delete`; uji SQL `rls_account_delete_test.sql` dan E2E
       development lulus (8/8 berkas, 23 Oktober 2026); rincian di bagian 8.4 dan ADR-077.
