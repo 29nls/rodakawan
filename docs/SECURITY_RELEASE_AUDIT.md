@@ -76,6 +76,12 @@ sebelumnya, lengkap dengan uji yang terdaftar:
 | AUD-10 | `supabase/migrations/20261024003227_m5_catalog_hardening.sql` (kunci `search_path` 12 fungsi; cabut `EXECUTE` 4 fungsi trigger) | `supabase/tests/rls_catalog_test.sql` (notice `UJI KATALOG RLS LULUS`, daftar tunggu anti-usang) | `DEFAULT_TEST_FILES` di `scripts/db-test.mjs` + `.github/workflows/database-rls.yml` |
 | AUD-12 | `supabase/migrations/20261024011825_m5_private_detail_limits.sql` (CHECK plat ≤ 16, catatan ≤ 500, `not valid`) | Belum ada uji SQL khusus (temuan Low, migration sengaja `not valid` sehingga aman untuk data lama) | — |
 
+Dry-run penerapan sudah dijalankan terhadap project development (24 Oktober
+2026): `npx supabase migration list` exit 0 mencocokkan 22 migration remote
+dengan lokal dan menampilkan persis dua yang belum ada di remote;
+`npx supabase db push --dry-run` exit 0 menyebut kedua migration di atas sebagai
+satu-satunya yang akan didorong. Tidak ada yang diterapkan.
+
 Perintah penerapan **setelah persetujuan pemilik** (jalankan di development
 dulu, jangan ke production):
 
