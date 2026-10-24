@@ -58,16 +58,7 @@ sudah diperbaiki dengan uji allow/deny (ADR-039, ADR-040). Empat migration Miles
 Uji SQL RLS Milestone 4 (`rls_hazards_test.sql`, `rls_chat_test.sql`,
 `rls_moderation_m4_test.sql`, `rls_blocked_chat_test.sql`) **sudah dijalankan dan lulus** terhadap
 project development lewat GitHub Actions **Database RLS #19** (commit `1aa1480`, 22 Oktober 2026):
-tujuh berkas uji lulus dan semua notice penanda diterima. Sejak 22 Oktober 2026 sore `npm run db:test`
-di mesin ini juga **lulus** setelah `.env.db` diarahkan ke Session Pooler dan password development
-dirotasi; pada 23 Oktober 2026 hasilnya **8/8 berkas** karena sudah termasuk `rls_account_delete_test.sql`.
-Setelah uji lease ADR-078 ditambahkan, hasil terbaru **7/8** karena migration ADR-078 belum diterapkan
-(berkas yang sama lulus saat migration diterapkan sementara di dalam transaksi `ROLLBACK`).
-Empat migration Milestone 5 — `20261022190000_account_deletion_m5.sql`,
-`20261022193000_account_deletion_storage_api.sql`, `20261023004946_account_deletion_identity.sql`, dan
-`20261023120000_account_deletion_reliability.sql` — tiga yang pertama **sudah diterapkan** ke project
-development; yang keempat menunggu `db push`. Edge Function `delete-account` sudah di-deploy untuk
-alur ADR-077, tetapi **belum di-redeploy** dengan RPC lease ADR-078.
+tujuh berkas uji lulus dan semua notice penanda diterima. Sejak 22 Oktober 2026 sore `npm run db:test` di mesin ini juga **lulus** setelah `.env.db` diarahkan ke Session Pooler dan password development dirotasi; pada 24 Oktober 2026 hasilnya **8/8 berkas**, termasuk `rls_account_delete_test.sql` dengan uji lease ADR-078. Lima migration Milestone 5 — `20261022190000_account_deletion_m5.sql`, `20261022193000_account_deletion_storage_api.sql`, `20261023004946_account_deletion_identity.sql`, `20261023014412_account_deletion_auth_sync.sql`, dan `20261023120000_account_deletion_reliability.sql` — **sudah diterapkan** ke project development, dan Edge Function `delete-account` sudah di-redeploy dengan RPC lease ADR-078 pada 24 Oktober 2026.
 Itu tidak berarti fitur M4/M5 sudah diuji di HP fisik; daftar uji manualnya ada di
 [`docs/QA_TEST_PLAN.md`](docs/QA_TEST_PLAN.md) bagian 8d. Langkah penerapannya ada di
 [`docs/SETUP_GUIDE.md`](docs/SETUP_GUIDE.md#4-menerapkan-migration). Semua langkah yang dapat
@@ -101,7 +92,7 @@ konten keselamatan/audit dialihkan ke tombstone, kepemilikan klub/perjalanan dia
 setelah itu menghapus `auth.users` lewat Auth Admin API. Layar hanya menampilkan sukses setelah
 server menyatakan seluruh langkah selesai; kegagalan sebagian disimpan di `account_deletion_jobs`
 untuk retry. Klaim eksklusif dan checkpoint (ADR-078) mencegah dua proses berjalan bersamaan dan
-mengulang tahap yang sudah tuntas, tetapi migration dan Edge Function-nya belum diterapkan (Blocked).
+mengulang tahap yang sudah tuntas; migration dan Edge Function-nya sudah diterapkan ke project development pada 24 Oktober 2026.
 Access token lama tidak menemukan profil/baris miliknya (diuji), dan login ulang dengan
 akun yang sudah dihapus gagal. Kebijakan privasi (retensi per jenis data, apa yang sengaja
 dipertahankan, kontak dukungan) tersedia di `/privacy`, `web/privacy/`, dan
@@ -555,12 +546,7 @@ tanpa filter).
   tidak ikut muncul sebagai “perubahan” di catatan rilis maupun entri berikutnya. Rinciannya di
   [`docs/SETUP_GUIDE.md`](docs/SETUP_GUIDE.md) bagian 6.8.
 
-Status per 24 Oktober 2026: `origin/main` adalah **`afb133d`** (setelah tag `v0.1.0-build44` pada
-`4e9bfba`). Rilis pratinjau terbaru adalah `v0.1.0-build44` (23 Oktober 2026) dari `4e9bfba`; catatan
-rilisnya memuat fitur hapus akun dan halaman privasi (`4214127`). Build44 memuat alur ADR-077, tetapi
-**belum** memuat RPC lease ADR-078 karena migration `20261023120000` belum diterapkan dan Edge
-Function belum di-redeploy; APK baru diperlukan setelah kedua langkah itu. CI **39850755047** dan
-Database RLS **39850754772** pada `afe908e` (build43) sama-sama hijau; run untuk `afb133d` belum ada.
+Status per 24 Oktober 2026: `origin/main` adalah **`1c469ea`** (pencatat `CHANGELOG.md` untuk `v0.1.0-build46`); perubahan kode terakhir di-merge pada `84b89f2` (PR #9). Rilis pratinjau terbaru adalah `v0.1.0-build46` (24 Oktober 2026) dari `48d7a37`; catatan rilisnya memuat perbaikan hapus akun ADR-078 (`5a854bf`, `65098ea`, `7848e73`, `041ab6c`). Database RLS **40044397262** dan CI **40044397061** pada `84b89f2` sama-sama hijau, begitu juga Database RLS **40044164217** pada `5dae43b`. Build pratinjau untuk `84b89f2` (Release APK **40044587070**) masih berjalan saat catatan ini ditulis dan belum boleh disebut selesai. Build44 (23 Oktober 2026, `4e9bfba`) memuat alur ADR-077 tanpa RPC lease; CI **39850755047** dan Database RLS **39850754772** pada `afe908e` (build43) sama-sama hijau.
 Sebelumnya, build38 terbit sebelum gate rilis diperbaiki; Release APK **39741347027** pada `cc5834d`
 selesai dengan gate hijau dan job build **skipped**, dan Database RLS **39739351279** pada `5a38695`
 hijau.
