@@ -1043,8 +1043,10 @@ begin
     raise exception 'UJI GAGAL: motorcycle_id berubah menjadi % setelah percobaan ditolak', v_bike;
   end if;
 
+  -- Nilai baru harus mematuhi CHECK panjang plat (≤16) yang ditambahkan
+  -- migration 20261024011825_m5_private_detail_limits.sql.
   update public.motorcycle_private_details
-  set plate_number = 'B 1234 XYZ (baru)'
+  set plate_number = 'B 1234 XYZ BARU'
   where motorcycle_id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
 
   get diagnostics v_rows = row_count;

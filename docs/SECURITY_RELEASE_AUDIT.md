@@ -42,9 +42,9 @@ Tidak ada nilai kredensial yang dicetak dalam proses apa pun.
 
 | ID | Area | Severity | Temuan dan bukti | Dampak | Rekomendasi | Status |
 | --- | --- | --- | --- | --- | --- | --- |
-| AUD-10 | Fungsi definer | **Medium** | 12 fungsi `security definer` lama masih `set search_path = public`: enam helper (`20261013022938_initial_schema.sql:245,260,276,291,308,326`) dan enam RPC klub (`20261016093000_club_membership_rpc.sql:84,162,255,327,404,473`); ditambah 4 fungsi trigger yang masih bisa dieksekusi `PUBLIC`/`anon` (`bootstrap_profile`, `set_follow_status`, `clear_ride_location_on_opt_out`, `clear_ride_locations_on_finish`) | Pelanggaran aturan AGENTS.md; pembajakan nama objek bila ada peran yang bisa membuat objek di `public` (peran API pada umumnya tidak punya `CREATE`, jadi bukan Critical) | Terapkan migration aditif `20261024003227_m5_catalog_hardening.sql` yang sudah ditulis, diuji katalog, dan terdaftar; lalu bersihkan daftar tunggu di `supabase/tests/rls_catalog_test.sql` | **Blocked** — migration belum diterapkan, menunggu persetujuan pemilik |
+| AUD-10 | Fungsi definer | **Medium** | 12 fungsi `security definer` lama masih `set search_path = public`: enam helper (`20261013022938_initial_schema.sql:245,260,276,291,308,326`) dan enam RPC klub (`20261016093000_club_membership_rpc.sql:84,162,255,327,404,473`); ditambah 4 fungsi trigger yang masih bisa dieksekusi `PUBLIC`/`anon` (`bootstrap_profile`, `set_follow_status`, `clear_ride_location_on_opt_out`, `clear_ride_locations_on_finish`) | Pelanggaran aturan AGENTS.md; pembajakan nama objek bila ada peran yang bisa membuat objek di `public` (peran API pada umumnya tidak punya `CREATE`, jadi bukan Critical) | Terapkan migration aditif `20261024003227_m5_catalog_hardening.sql` yang sudah ditulis, diuji katalog, dan terdaftar; lalu bersihkan daftar tunggu di `supabase/tests/rls_catalog_test.sql` | **Fixed / Passed against dev backend** — diterapkan 24 Oktober 2026 (persetujuan pemilik); daftar tunggu sudah dihapus, `db:test` 9/9 lulus dengan pemeriksaan anti-usang |
 | AUD-11 | Helper definer untuk `anon` | Low | Enam helper (`is_club_member`, `is_club_admin`, `is_ride_member`, `is_ride_host`, `is_ride_active_member`, `can_publish_ride_location`) tetap dieksekusi `anon` (daftar pengecualian beralasan di `rls_catalog_test.sql`); semuanya mengembalikan `false` tanpa sesi karena memakai `auth.uid()` | Tanpa kebocoran data yang terlihat; permukaan peran tanpa sesi seharusnya nol | Cabut `EXECUTE` dari `anon` pada hardening berikut dan beri grant hanya `authenticated` bila klien memang memakainya | Open |
-| AUD-12 | Batas input | Low | `motorcycle_private_details.plate_number`/`private_notes` tanpa CHECK panjang (`20261013022938_initial_schema.sql:38-39`), padahal klien membatasi 16/500 | Pemilik baris bisa menulis nilai tak terbatas lewat Data API | Terapkan migration `20261024011825_m5_private_detail_limits.sql` (`not valid`), lalu `validate constraint` setelah data lama diperiksa | **Blocked** — menunggu persetujuan penerapan |
+| AUD-12 | Batas input | Low | `motorcycle_private_details.plate_number`/`private_notes` tanpa CHECK panjang (`20261013022938_initial_schema.sql:38-39`), padahal klien membatasi 16/500 | Pemilik baris bisa menulis nilai tak terbatas lewat Data API | Terapkan migration `20261024011825_m5_private_detail_limits.sql` (`not valid`), lalu `validate constraint` setelah data lama diperiksa | **Fixed sebagian** — CHECK sudah diterapkan 24 Oktober 2026 (baris baru + setiap UPDATE diperiksa); `validate constraint` untuk baris lama **belum** dijalankan |
 | AUD-13 | Batas input | Low | Kolom path (`avatar_url`, `logo_path`, `photo_path`, `media_path`) tanpa batas panjang di database | Penyimpangan data, bukan kebocoran | CHECK panjang pada hardening berikut | Open |
 | AUD-14 | Rate limit | **Medium** | Belum ada rate limit pada follow, laporan moderasi (`report_content`), permintaan gabung/undang klub, dan throttle pembaruan lokasi (inventaris `docs/SECURITY_PRIVACY.md` §9) | Spam/abuse pada endpoint publik beta; tidak membuka data | Tambahkan batas di database (hardening M6) sebelum trafik publik | Open |
 | AUD-15 | Edge Function | Info | `Access-Control-Allow-Origin: *` pada `delete-account` (`index.ts:23`) | Situs mana pun bisa memanggil fungsi, tetapi tetap membutuhkan access token milik pengguna itu sendiri | Diterima untuk aplikasi native; pertimbangkan allowlist bila ada klien web | Open (diterima) |
@@ -67,35 +67,31 @@ kebocoran data.
 ## 4. Fase 2 — perbaikan terbatas
 
 Karena tidak ada temuan Critical/High yang belum tertangani, audit ini **tidak
-menambah migration baru** dan **tidak menjalankan `db push`**. Perbaikan untuk
-temuan Medium teratas sudah berupa migration aditif di branch ini dari audit
-sebelumnya, lengkap dengan uji yang terdaftar:
+menambah migration baru**. Perbaikan untuk temuan Medium teratas sudah berupa
+migration aditif dari audit sebelumnya, dan **sudah diterapkan ke project
+development pada 24 Oktober 2026** atas persetujuan pemilik
+(`npx supabase db push --yes`, exit 0); `npx supabase db push --dry-run` yang
+berjalan sebelumnya exit 0 dan hanya menyebut kedua migration ini:
 
-| Temuan | Migration (aditif, belum diterapkan) | Uji | Terdaftar di |
+| Temuan | Migration (aditif, sudah diterapkan ke development) | Uji | Terdaftar di |
 | --- | --- | --- | --- |
-| AUD-10 | `supabase/migrations/20261024003227_m5_catalog_hardening.sql` (kunci `search_path` 12 fungsi; cabut `EXECUTE` 4 fungsi trigger) | `supabase/tests/rls_catalog_test.sql` (notice `UJI KATALOG RLS LULUS`, daftar tunggu anti-usang) | `DEFAULT_TEST_FILES` di `scripts/db-test.mjs` + `.github/workflows/database-rls.yml` |
-| AUD-12 | `supabase/migrations/20261024011825_m5_private_detail_limits.sql` (CHECK plat ≤ 16, catatan ≤ 500, `not valid`) | Belum ada uji SQL khusus (temuan Low, migration sengaja `not valid` sehingga aman untuk data lama) | — |
+| AUD-10 | `supabase/migrations/20261024003227_m5_catalog_hardening.sql` (kunci `search_path` 12 fungsi; cabut `EXECUTE` 4 fungsi trigger) | `supabase/tests/rls_catalog_test.sql` (notice `UJI KATALOG RLS LULUS`; daftar tunggu/pengecualian sementara sudah dihapus, pemeriksaan anti-usang tetap berjaga) | `DEFAULT_TEST_FILES` di `scripts/db-test.mjs` + `.github/workflows/database-rls.yml` |
+| AUD-12 | `supabase/migrations/20261024011825_m5_private_detail_limits.sql` (CHECK plat ≤ 16, catatan ≤ 500, `not valid`) | `supabase/tests/rls_profiles_test.sql` bagian 7f — fixture plat dipatuhi batas baru dan pemilik tetap bisa memperbarui detailnya | `DEFAULT_TEST_FILES` di `scripts/db-test.mjs` + `.github/workflows/database-rls.yml` |
 
 Dry-run penerapan sudah dijalankan terhadap project development (24 Oktober
 2026): `npx supabase migration list` exit 0 mencocokkan 22 migration remote
 dengan lokal dan menampilkan persis dua yang belum ada di remote;
 `npx supabase db push --dry-run` exit 0 menyebut kedua migration di atas sebagai
-satu-satunya yang akan didorong. Tidak ada yang diterapkan.
+satu-satunya yang akan didorong. **Penerapan kemudian disetujui pemilik dan
+berhasil** (24 Oktober 2026): `npx supabase db push --yes` exit 0, kedua
+migration tercatat di remote. Setelahnya `npm run db:test` **9/9** lulus (salah
+satu fixture uji lama menyalahi CHECK plat baru dan diperbaiki sesuai batas
+16 karakter), `npm run db:types:check` lulus (skema tidak berubah strukturnya
+terhadap tipe), dan `npm run db:test:lint` tetap hijau.
 
-Perintah penerapan **setelah persetujuan pemilik** (jalankan di development
-dulu, jangan ke production):
-
-```bash
-npx supabase db push --dry-run   # tinjau diff yang akan dijalankan
-npx supabase db push --yes       # terapkan dua migration di atas
-```
-
-Setelah diterapkan: hapus entri daftar tunggu/pengecualian terkait dari
-`supabase/tests/rls_catalog_test.sql` (ujinya sengaja gagal bila daftar sudah
-usang), jalankan `validate constraint` untuk baris lama bila datanya bersih,
-lalu ulangi `npm run db:test` dan `npm run db:types:check`. Regenerasi tipe
-(`npm run db:types`) pada audit ini **tidak diperlukan** karena skema database
-tidak berubah dan `db:types:check` lulus.
+Perintah yang **tersisa** (belum dijalankan, bukan bagian persetujuan di atas):
+`validate constraint` untuk dua CHECK plat/catatan pada baris lama — aman
+karena migration memakai `not valid`; jalankan setelah data lama diperiksa.
 
 ## 5. Gerbang kualitas (hasil apa adanya, 24 Oktober 2026)
 
