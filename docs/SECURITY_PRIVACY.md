@@ -325,7 +325,7 @@ Status per Milestone 1.5 (diperbarui pada milestone ini). Istilah status: **Impl
 - [x] Privacy policy tersedia di aplikasi — halaman `/privacy` (retensi, data yang disimpan, kontak
       dukungan lewat issue GitHub), plus versi statis di `web/privacy/`. **URL publik belum live**
       (blocker deployment); **syarat komunitas** belum ditulis sebagai halaman tersendiri.
-- [ ] Error log tidak membocorkan koordinat, isi chat, credential, atau identitas sensitif.
+- [x] Error log tidak membocorkan koordinat, isi chat, credential, atau identitas sensitif — **Passed locally** (audit statis, 24 Oktober 2026). `src/` tidak memuat satu pun `console.*`/`logger.*` di luar uji, jadi payload layar, isi chat, koordinat, dan token tidak pernah dicetak klien. `supabase/functions/delete-account/index.ts` hanya punya dua `console.error`: satu untuk konfigurasi platform yang hilang (tanpa nama/nilai) dan satu saat kegagalan yang memuat `{ jobId, step, code }` — tanpa email, token, koordinat, atau isi chat. `detailsOf()` membaca detail galat hanya untuk mengklasifikasi kode, tidak pernah mencatat atau mengembalikannya; respons galat memakai kode tetap dan pesan pemulihan Bahasa Indonesia. **Batasan:** log Edge Function/Postgres di dashboard belum diamati pada beban nyata, dan pemantauan otomatis belum ada.
 - [ ] Prosedur melaporkan dan menangani insiden dibuat sebelum membuka akses publik.
 
 ## 10. Referensi resmi
