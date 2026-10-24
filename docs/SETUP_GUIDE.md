@@ -90,7 +90,7 @@ Bagian ini adalah urutan yang sudah disesuaikan dengan kode di repo. Project dev
 
 ### 4.3 Jalankan migration
 
-Repository ini sekarang memuat **dua puluh** migration. Dua yang pertama adalah **sejarah penyiapan
+Repository ini sekarang memuat **dua puluh dua** migration. Dua yang pertama adalah **sejarah penyiapan
 awal** dan urutannya penting:
 
 1. `supabase/migrations/20261013022938_initial_schema.sql` — skema fondasi (migration awal).
@@ -98,17 +98,15 @@ awal** dan urutannya penting:
    username, dan trigger `updated_at`. Migration ini idempotent (`create or replace`,
    `drop trigger if exists`) sehingga aman dijalankan ulang dan tidak menghapus data.
 
-Delapan belas migration berikutnya bersifat aditif (privasi follow, detail privat kendaraan,
+Dua puluh migration berikutnya bersifat aditif (privasi follow, detail privat kendaraan,
 keanggotaan klub, kendaraan utama, akses perjalanan, tiga bucket Storage, pagar policy, alur
 perjalanan M3 di `20261019120000_ride_workflow.sql`, lalu Milestone 4:
 `20261020090000_hazard_reports_m4.sql`, `20261020100000_convoy_chat_m4.sql`,
 `20261021120000_moderation_dashboard.sql`, dan
-`20261021130000_blocked_chat_server_filter.sql`), serta tiga migration Milestone 5:
+`20261021130000_blocked_chat_server_filter.sql`), serta lima migration Milestone 5:
 `20261022190000_account_deletion_m5.sql` (kolom `profiles.deleted_at`),
 `20261022193000_account_deletion_storage_api.sql` (berhenti menghapus `storage.objects` dari SQL — ADR-076),
-dan `20261023004946_account_deletion_identity.sql` (melepas FK `profiles.id → auth.users`, trigger
-integritas profil, tombstone, `purge_account_data()`, `account_media_manifest()`, job retry, dan
-penonaktifan RPC lama — ADR-077).
+dan `20261023004946_account_deletion_identity.sql` (melepas FK `profiles.id → auth.users`, trigger integritas profil, tombstone, `purge_account_data()`, `account_media_manifest()`, job retry, dan penonaktifan RPC lama — ADR-077), `20261023014412_account_deletion_auth_sync.sql` (sinkronisasi penghapusan Auth), dan `20261023120000_account_deletion_reliability.sql` (lease + checkpoint orkestrasi — ADR-078). Kelimanya sudah diterapkan ke development pada 24 Oktober 2026.
 
 > **Status Milestone 4 (21 Oktober 2026): keempat migration terakhir SUDAH diterapkan ke project
 > development** (terverifikasi `npx supabase migration list --linked`; saat itu 17 local = remote). Pada project
@@ -134,8 +132,8 @@ penonaktifan RPC lama — ADR-077).
 > run #19 (commit `1aa1480`, 22 Oktober 2026 — 7 berkas, 7 lulus). Perintah `--file` di atas tinggal
 > cara menjalankan satu berkas saat sedang mengembangkan uji; tidak ada yang perlu dipindahkan lagi.
 >
-> **Status Milestone 5 (23 Oktober 2026): ketiga migration hapus akun SUDAH diterapkan ke project
-> development** (20 local = remote; `npm run db:types:check` lulus). Pada project yang belum
+> **Status Milestone 5 (24 Oktober 2026): kelima migration hapus akun SUDAH diterapkan ke project
+> development** (22 local = remote; `npm run db:types:check` lulus). Pada project yang belum
 > dimigrasikan, `/account-delete` menampilkan galat backend, bukan klaim sukses. Terapkan dan uji:
 >
 > ```powershell

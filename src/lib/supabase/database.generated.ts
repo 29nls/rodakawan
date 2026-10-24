@@ -16,14 +16,14 @@ export type Database = {
           Tables: {
             "account_deletion_jobs": {
                   Row: {
-                    "attempts": number,"completed_at": string | null,"id": string,"last_error": string | null,"last_step": string,"started_at": string,"status": string,"updated_at": string,"user_id": string
+                    "attempts": number,"completed_at": string | null,"id": string,"last_error": string | null,"last_step": string,"lease_expires_at": string | null,"lease_token": string | null,"started_at": string,"status": string,"updated_at": string,"user_id": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "attempts"?: number,"completed_at"?: string | null,"id"?: string,"last_error"?: string | null,"last_step"?: string,"started_at"?: string,"status"?: string,"updated_at"?: string,"user_id": string
+                    "attempts"?: number,"completed_at"?: string | null,"id"?: string,"last_error"?: string | null,"last_step"?: string,"lease_expires_at"?: string | null,"lease_token"?: string | null,"started_at"?: string,"status"?: string,"updated_at"?: string,"user_id": string
                   }
                   Update: {
-                    "attempts"?: number,"completed_at"?: string | null,"id"?: string,"last_error"?: string | null,"last_step"?: string,"started_at"?: string,"status"?: string,"updated_at"?: string,"user_id"?: string
+                    "attempts"?: number,"completed_at"?: string | null,"id"?: string,"last_error"?: string | null,"last_step"?: string,"lease_expires_at"?: string | null,"lease_token"?: string | null,"started_at"?: string,"status"?: string,"updated_at"?: string,"user_id"?: string
                   }
                   Relationships: [
 
@@ -564,6 +564,11 @@ isOneToOne: false
               "attempts": number,"job_id": string,"last_step": string,"status": string
             }[]
                            },
+"begin_account_deletion_claim":
+{ Args: { "p_lease": string,"p_ttl"?: string,"p_user": string }; Returns: {
+              "attempts": number,"job_id": string,"last_step": string,"status": string
+            }[]
+                           },
 "can_moderate_chat_message":
 { Args: { "p_message_id": string }; Returns: boolean
                            },
@@ -578,6 +583,9 @@ isOneToOne: false
                            },
 "can_publish_ride_location":
 { Args: { "p_ride_id": string }; Returns: boolean
+                           },
+"checkpoint_account_deletion":
+{ Args: { "p_job": string,"p_lease": string,"p_step": string }; Returns: undefined
                            },
 "confirm_hazard":
 { Args: { "p_hazard_id": string }; Returns: number
@@ -680,6 +688,9 @@ isOneToOne: false
                            },
 "finish_account_deletion":
 { Args: { "p_error"?: string,"p_job": string,"p_status": string,"p_step": string }; Returns: undefined
+                           },
+"finish_account_deletion_claim":
+{ Args: { "p_error"?: string,"p_job": string,"p_lease": string,"p_status": string,"p_step": string }; Returns: undefined
                            },
 "get_moderation_subject":
 { Args: { "p_target_id": string,"p_target_type": string }; Returns: Json
@@ -797,6 +808,9 @@ isOneToOne: false
       } },
 "purge_account_data":
 { Args: { "p_user": string }; Returns: Json
+                           },
+"reconcile_account_deletion_jobs":
+{ Args: { "p_limit"?: number }; Returns: Json
                            },
 "remove_club_member":
 { Args: { "p_club_id": string,"p_user_id": string }; Returns: string
