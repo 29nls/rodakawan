@@ -33,7 +33,7 @@ name: Database RLS
 # - Setiap berkas uji di `supabase/tests/` membungkus seluruh asersinya dalam
 #   transaksi yang di-ROLLBACK, sehingga menjalankannya ulang tidak menghapus atau
 #   meninggalkan data apa pun.
-# - `npm run db:test` menjalankan delapan berkas (daftar di `DEFAULT_TEST_FILES`), dan setiap
+# - `npm run db:test` menjalankan sembilan berkas (daftar di `DEFAULT_TEST_FILES`), dan setiap
 #   berkas harus memancarkan notice penandanya sendiri. Berkas kedua adalah pagar katalog
 #   policy: gagal bila ada policy pada tabel wadah yang memberi akses lewat kolom kepemilikan
 #   (created_by/author_id/owner_id/…) tanpa penjaga keanggotaan. Detektornya diuji-diri di
@@ -127,6 +127,10 @@ jobs:
       #   - `UJI RLS PROFIL LULUS`         — aturan izin/penolakan per tabel dan Storage
       #   - `UJI POLICY OWNER-GUARD LULUS`  — tidak ada policy wadah yang memberi akses
       #     lewat kolom kepemilikan tanpa penjaga keanggotaan (ADR-060)
+      #   - `UJI KATALOG RLS LULUS`         — semua tabel public ber-RLS, tidak ada
+      #     fungsi definer terbuka ke PUBLIC/anon di luar pengecualian beralasan,
+      #     search_path definer dikunci, view memakai security_invoker, dan tabel
+      #     realtime terpublikasi dengan RLS aktif
       #   - `UJI RLS PERJALANAN M3 LULUS`   — state machine, consent, dan pembersihan
       #     lokasi perjalanan (ADR-065)
       #   - `UJI RLS LAKUAN M4 LULUS`       — laporan bahaya: RPC, expiry server, rate
@@ -155,6 +159,10 @@ jobs:
           case "${OUTPUT}" in
             *"UJI POLICY OWNER-GUARD LULUS"*) ;;
             *) MISSING="${MISSING} UJI POLICY OWNER-GUARD LULUS" ;;
+          esac
+          case "${OUTPUT}" in
+            *"UJI KATALOG RLS LULUS"*) ;;
+            *) MISSING="${MISSING} UJI KATALOG RLS LULUS" ;;
           esac
           case "${OUTPUT}" in
             *"UJI RLS PERJALANAN M3 LULUS"*) ;;
