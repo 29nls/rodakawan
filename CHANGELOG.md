@@ -8,6 +8,24 @@ sedangkan build preview (`v<versi>-build<N>`) diringkas di dalam blok yang bisa 
 versi adalah tautan ke halaman rilisnya di GitHub, sehingga riwayat ini bisa dinavigasi langsung
 dari berkas.
 
+## [v0.1.0-build46](https://github.com/29nls/rodakawan/releases/tag/v0.1.0-build46) — 2026-10-24 · pratinjau
+
+<details>
+<summary>Catatan rilis pratinjau</summary>
+
+### Perbaikan
+
+- lengkapi kode galat hapus akun yang sedang diproses (`5a854bf`)
+
+### Perubahan lain
+
+- hapus workflow M4 sementara dan perbaiki laporan proxy deps (`65098ea`)
+- catat ADR-078 dan sinkronkan status repository (`7848e73`)
+- kunci lease dan tag galat baru hapus akun (ADR-078) (`041ab6c`)
+- Implement account deletion reliability features (ADR-078) (`afb133d`)
+
+</details>
+
 ## [v0.1.0-build44](https://github.com/29nls/rodakawan/releases/tag/v0.1.0-build44) — 2026-10-23 · pratinjau
 
 <details>
