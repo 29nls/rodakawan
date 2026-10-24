@@ -492,6 +492,46 @@ begin
 end;
 $$;
 
+-- 15b. Peserta yang dikeluarkan host (removed) juga kehilangan akses chat,
+--      bukan hanya peserta yang keluar sendiri (left) seperti langkah 15.
+set local request.jwt.claims = '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}';
+do $$ begin
+  perform public.remove_ride_member(
+    (select id from public.uji_m4_chat_konteks where nama = 'ride'),
+    '55555555-5555-4555-8555-555555555555'
+  );
+end; $$;
+
+set local request.jwt.claims = '{"sub":"55555555-5555-4555-8555-555555555555","role":"authenticated"}';
+do $$
+declare
+  v_ride uuid;
+  v_n int;
+  v_state text := null;
+  v_detail text := null;
+begin
+  select id into v_ride from public.uji_m4_chat_konteks where nama = 'ride';
+
+  select count(*) into v_n
+  from public.chat_messages
+  where ride_id = v_ride and message_type = 'text';
+  if v_n <> 0 then
+    raise exception 'UJI GAGAL: peserta yang dikeluarkan masih membaca % pesan teks', v_n;
+  end if;
+
+  begin
+    perform public.send_chat_message(v_ride, 'Pesan setelah dikeluarkan', null);
+    raise exception 'UJI GAGAL: peserta yang dikeluarkan masih mengirim pesan';
+  exception when others then
+    get stacked diagnostics v_state = RETURNED_SQLSTATE, v_detail = PG_EXCEPTION_DETAIL;
+  end;
+
+  if v_state is distinct from '42501' or v_detail is distinct from 'chat_not_member' then
+    raise exception 'UJI GAGAL: penolakan peserta yang dikeluarkan salah (state=%, detail=%)', v_state, v_detail;
+  end if;
+end;
+$$;
+
 -- 16. Ride final (completed) tidak menerima pesan baru.
 set local request.jwt.claims = '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}';
 do $$
