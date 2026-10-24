@@ -96,6 +96,42 @@ describe('checkOutcome', () => {
       'unverified',
     );
   });
+
+  it('tidak menyebut drift ketika proxy menolak daftar versi dengan HTTP 403', () => {
+    // Bentuk nyata `getVersionsAsync`: exit 1 + statusText server, tanpa daftar paket.
+    assert.equal(
+      checkOutcome({
+        status: 1,
+        stdout: '',
+        stderr:
+          'CommandError: Unexpected response when fetching version info from Expo servers: Forbidden.\n',
+      }),
+      'unverified',
+    );
+  });
+
+  it('mengenali kegagalan jaringan lain sebagai tidak bisa dipastikan', () => {
+    assert.equal(
+      checkOutcome({
+        status: 1,
+        stdout: '',
+        stderr: 'FetchError: request failed, reason: ECONNREFUSED',
+      }),
+      'unverified',
+    );
+  });
+
+  it('tetap melaporkan drift bila paket yang usang memang tercantum', () => {
+    // Pesan jaringan tidak boleh menurunkan drift nyata menjadi sekadar peringatan.
+    assert.equal(
+      checkOutcome({
+        status: 1,
+        stdout: 'expo@57.0.29 - expected version: ~57.0.30\nFound outdated dependencies',
+        stderr: 'proxy: HTTP 403',
+      }),
+      'drift',
+    );
+  });
 });
 
 describe('usefulLines', () => {
@@ -171,6 +207,19 @@ describe('CLI check-expo-deps.mjs', () => {
     assert.equal(hasil.code, 1);
     assert.match(hasil.stderr, /::error::Versi dependency tidak cocok/);
     assert.match(hasil.stderr, /npx expo install --fix/);
+  });
+
+  it('memberi peringatan, bukan error, saat proxy menolak daftar versi (HTTP 403)', (t) => {
+    const h = harness(t, { expoVersion: '57.0.30' });
+
+    const hasil = h.run({ FAKE_EXPO_MODE: 'proxy' });
+
+    // Exit 1 dari CLI bukan berarti versi salah: tidak ada paket yang dibandingkan.
+    assert.equal(hasil.code, 0);
+    assert.equal(hasil.stdout.includes('cocok dengan'), false);
+    assert.match(hasil.stderr, /::warning::Versi dependency tidak bisa dipastikan/);
+    assert.doesNotMatch(hasil.stderr, /::error::/);
+    assert.match(hasil.stderr, /Forbidden/);
   });
 
   it('tidak menyatakan lulus maupun gagal saat validasinya tidak bisa dipercaya', (t) => {

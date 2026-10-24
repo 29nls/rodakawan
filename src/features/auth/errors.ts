@@ -38,8 +38,9 @@ export type AppErrorCode =
   /** Moderasi: isi konten tak terbaca lagi, atau langkah kedua gagal setelah yang pertama. */
   | 'content_unavailable'
   | 'partial'
-  /** Hapus akun: build lama, kegagalan server yang bisa diulang, dan gagal umum. */
+  /** Hapus akun: build lama, proses yang masih berjalan, kegagalan server yang bisa diulang, dan gagal umum. */
   | 'app_outdated'
+  | 'deletion_in_progress'
   | 'deletion_incomplete'
   | 'deletion_failed';
 
