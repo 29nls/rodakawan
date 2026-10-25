@@ -128,7 +128,7 @@ dan `20261023004946_account_deletion_identity.sql` (melepas FK `profiles.id → 
 >
 > Keempat berkas uji itu **sudah** ada di `DEFAULT_TEST_FILES` (`scripts/db-test.mjs`) dan notice
 > penandanya diperiksa `.github/workflows/database-rls.yml`, jadi `npm run db:test` menjalankan
-> kedelapan berkas sekaligus. Statusnya: **lulus terhadap backend development** lewat Database RLS
+> seluruh berkas di `DEFAULT_TEST_FILES` sekaligus (saat ini 11). Statusnya: **lulus terhadap backend development** lewat Database RLS
 > run #19 (commit `1aa1480`, 22 Oktober 2026 — 7 berkas, 7 lulus). Perintah `--file` di atas tinggal
 > cara menjalankan satu berkas saat sedang mengembangkan uji; tidak ada yang perlu dipindahkan lagi.
 >
@@ -145,7 +145,7 @@ dan `20261023004946_account_deletion_identity.sql` (melepas FK `profiles.id → 
 > ```
 >
 > Berkas uji itu sudah ada di `DEFAULT_TEST_FILES` dan notice `UJI HAPUS AKUN LULUS` diperiksa
-> workflow, jadi `npm run db:test` menjalankan **delapan** berkas sekaligus. RPC lama
+> workflow, jadi `npm run db:test` menjalankan seluruh berkas uji (saat ini 11) sekaligus. RPC lama
 > `delete_my_account()` kini **selalu gagal** dengan `account_deletion_requires_server`; build sebelum
 > ADR-077 harus diperbarui, bukan dianggap masih bisa menghapus akun. Satu catatan yang mahal
 > dipelajari: `delete from storage.objects` **ditolak** Supabase ("Direct deletion from storage tables
@@ -171,6 +171,12 @@ yang menyebut `is_private` — dan database berakhir setengah jadi. Pastikan dat
 Supabase menyuntikkan `SUPABASE_URL`, `SUPABASE_ANON_KEY`, dan `SUPABASE_SERVICE_ROLE_KEY` ke fungsi
 secara otomatis, jadi tidak ada secret yang perlu ditulis ke repo atau `.env`.
 
+Repo ini **belum** menyimpan `supabase/config.toml`, sehingga `verify_jwt` dan pengaturan fungsi
+mengikuti nilai project (default-nya verifikasi JWT aktif). Fungsi tetap memverifikasi access token
+sendiri lewat `auth.getUser`, jadi tidak ada jalur yang mengandalkan header saja — tetapi sebelum
+produksi, tambahkan `config.toml` agar pengaturan itu versioned (temuan C-01 di
+[`BETA_READINESS.md`](BETA_READINESS.md)).
+
 ```powershell
 npx supabase functions deploy delete-account --project-ref <project-ref-development>
 ```
@@ -190,10 +196,6 @@ Runner membaca `.env.local` + `.env.db`, menolak URL selain project development,
 hazard/chat/media sintetis, memanggil Edge Function, memeriksa 17 asersi, lalu membersihkan sendiri.
 Verifikasi terakhir 25 Oktober 2026: exit 0, notice `UJI E2E HAPUS AKUN LULUS`, 0 objek/baris sisa.
 Jangan menjalankan tanpa `--yes` di project yang tidak boleh dihapus akunnya.
-
-Halaman web publik ada di `web/` (statis, tanpa build). Ikuti `web/README.md` untuk mengisi URL +
-publishable key, memilih hosting, dan mencatat URL di Play Console. **URL publik belum ada** sampai
-halaman benar-benar diterbitkan; jangan menuliskan URL contoh sebagai bukti.
 
 **Cara 1 — Supabase CLI (disarankan, otomatis dan dapat diulang).** Simpan connection string project
 di berkas `.env.db` di root repo (berkas ini diabaikan Git dan **tidak** dibaca Expo, jadi password
@@ -239,6 +241,32 @@ bisa dipakai `db push` untuk perubahan berikutnya tanpa `supabase migration repa
 
 Verifikasi setelah selesai: **Table Editor → profiles** harus ada, kolom `is_private` harus terlihat,
 dan **Database → Triggers** pada skema `auth` menampilkan `on_auth_user_created`.
+
+### 4.3b Terbitkan halaman web publik (GitHub Pages)
+
+Halaman privasi dan hapus akun ada di `web/` (statis, tanpa build). Workflow
+[`.github/workflows/pages.yml`](../.github/workflows/pages.yml) menerbitkan folder itu ke GitHub Pages;
+tidak ada dependency npm, kredensial Supabase, atau database yang disentuh oleh workflow tersebut.
+
+Langkah pemilik (hanya bisa dilakukan dengan akses Settings repository):
+
+1. Repository → Settings → Pages → Build and deployment → Source: **GitHub Actions**.
+2. Isi [`web/account-deletion/config.js`](../web/account-deletion/config.js) dengan URL project dan
+   publishable/anon key **backend yang akan dipakai halaman itu**. Jangan menaruh service role key,
+   password database, atau ref project development di dokumentasi publik.
+3. Jalankan **Actions → Pages (halaman web publik) → Run workflow** untuk penerbitan pertama.
+4. Buka halaman dari `page_url` di ringkasan job `deploy`, lalu jalankan verifikasi di
+   [`web/README.md`](../web/README.md) bagian 3 dengan akun sintetis.
+
+Uji statis yang sama dijalankan sebelum artefak diunggah dan juga ada di `npm run test:scripts`:
+
+```powershell
+node --test scripts/__tests__/web-static.test.mjs
+```
+
+**Status: Blocked.** Workflow sudah **Implemented** tetapi belum pernah berjalan, Pages belum
+diaktifkan, dan `config.js` masih placeholder. Jangan menulis URL `github.io` sebagai bukti sampai
+halaman benar-benar terbuka dan diuji; nama/visibilitas repository menentukan URL dan dukungan Pages.
 
 ### 4.4 Atur URL konfirmasi email
 

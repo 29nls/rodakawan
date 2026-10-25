@@ -33,7 +33,7 @@ name: Database RLS
 # - Setiap berkas uji di `supabase/tests/` membungkus seluruh asersinya dalam
 #   transaksi yang di-ROLLBACK, sehingga menjalankannya ulang tidak menghapus atau
 #   meninggalkan data apa pun.
-# - `npm run db:test` menjalankan sembilan berkas (daftar di `DEFAULT_TEST_FILES`), dan setiap
+# - `npm run db:test` menjalankan seluruh berkas di `DEFAULT_TEST_FILES` (saat ini 11), dan setiap
 #   berkas harus memancarkan notice penandanya sendiri. Berkas kedua adalah pagar katalog
 #   policy: gagal bila ada policy pada tabel wadah yang memberi akses lewat kolom kepemilikan
 #   (created_by/author_id/owner_id/…) tanpa penjaga keanggotaan. Detektornya diuji-diri di
@@ -131,6 +131,10 @@ jobs:
       #     fungsi definer terbuka ke PUBLIC/anon di luar pengecualian beralasan,
       #     search_path definer dikunci, view memakai security_invoker, dan tabel
       #     realtime terpublikasi dengan RLS aktif
+      #   - `UJI KATALOG HARDENING LULUS`    — detektor teruji-diri untuk tabel tanpa
+      #     RLS, definer tanpa search_path, fungsi public yang EXECUTE-nya terbuka
+      #     ke PUBLIC/anon (dengan pengecualian beralasan dan anti-usang), view tanpa
+      #     security_invoker, bucket Storage publik, dan baca anon atas data privat
       #   - `UJI RLS PERJALANAN M3 LULUS`   — state machine, consent, dan pembersihan
       #     lokasi perjalanan (ADR-065)
       #   - `UJI RLS LAKUAN M4 LULUS`       — laporan bahaya: RPC, expiry server, rate
@@ -165,6 +169,10 @@ jobs:
           case "${OUTPUT}" in
             *"UJI KATALOG RLS LULUS"*) ;;
             *) MISSING="${MISSING} UJI KATALOG RLS LULUS" ;;
+          esac
+          case "${OUTPUT}" in
+            *"UJI KATALOG HARDENING LULUS"*) ;;
+            *) MISSING="${MISSING} UJI KATALOG HARDENING LULUS" ;;
           esac
           case "${OUTPUT}" in
             *"UJI RLS PERJALANAN M3 LULUS"*) ;;

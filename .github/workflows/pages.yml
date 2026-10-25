@@ -1,0 +1,89 @@
+name: Pages (halaman web publik)
+
+# Menerbitkan `web/` (kebijakan privasi + hapus akun) ke GitHub Pages.
+#
+# Kenapa dipisah dari `ci.yml`: halaman ini tidak ikut bundel APK dan tidak
+# membutuhkan dependency npm. Yang dijalankan hanyalah uji statis Node bawaan
+# (`node:test`) lalu unggah folder `web/` sebagai artefak Pages — tanpa
+# `npm ci`, tanpa kredensial Supabase, dan tanpa menyentuh database.
+#
+# Trigger sengaja hanya `web/**` dan dispatch manual: perubahan aplikasi,
+# migration, atau dokumentasi tidak boleh menerbitkan ulang halaman publik.
+# Konsekuensinya perubahan pada workflow ini sendiri baru teruji lewat
+# `workflows-lint` di `ci.yml`; penerbitan pertamanya dijalankan manual setelah
+# pemilik mengaktifkan Pages (Settings → Pages → Source: GitHub Actions).
+#
+# Batasan yang dipegang:
+# - `web/account-deletion/config.js` masih placeholder sampai pemilik mengisi
+#   URL project + publishable key. Halaman akan menampilkan "belum
+#   dikonfigurasi", bukan mengaku berfungsi. Jangan menaruh service role key.
+# - URL publik hanya boleh dicatat setelah halaman benar-benar terbuka; workflow
+#   ini mencetak `page_url` dari GitHub, bukan URL karangan.
+# - Job `build` tidak punya izin tulis apa pun; hanya job `deploy` yang memegang
+#   `pages: write` dan `id-token: write`, sesuai pola pemisahan izin repo ini.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'web/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Uji statis dan siapkan artefak
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Siapkan Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24.x'
+
+      # Uji ini tidak butuh `npm ci`: hanya `node:test`, `fs`, dan `path`.
+      # Isinya menjaga konten wajib (retensi, kontak, langkah hapus akun),
+      # tautan internal, tidak adanya skrip/tracker pihak ketiga, serta tidak
+      # adanya secret atau ref project di berkas yang akan diterbitkan.
+      - name: Uji statis halaman publik
+        run: node --test scripts/__tests__/web-static.test.mjs
+
+      # Tidak memakai `actions/configure-pages`: halaman ini memakai tautan
+      # relatif dan tidak membutuhkan `base_path`, sehingga job build tetap
+      # hanya memegang `contents: read`.
+      - name: Unggah artefak halaman
+        uses: actions/upload-pages-artifact@v3
+        with:
+          # Hanya folder ini yang diterbitkan. Root repository tidak boleh ikut:
+          # di dalamnya ada `.env*`, `supabase/`, dan kode aplikasi.
+          path: web
+
+  deploy:
+    name: Terbitkan ke GitHub Pages
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+      - name: Catat URL hasil deploy
+        run: |
+          echo "Halaman diterbitkan di: ${{ steps.deployment.outputs.page_url }}" >> "$GITHUB_STEP_SUMMARY"

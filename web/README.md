@@ -12,23 +12,34 @@ web/
   account-deletion/config.js URL project + publishable key (diisi saat deploy)
 ```
 
-Halaman ini **belum ter-deploy**. Tidak ada URL publik yang boleh diklaim sampai
-pemilik project benar-benar menerbitkannya. Google Play meminta URL kebijakan
-privasi dan URL penghapusan akun yang dapat dibuka tanpa memasang aplikasi; isi
-keduanya di Play Console setelah deploy.
+Halaman ini **belum ter-deploy**. Workflow penerbitannya sudah ada di
+[`.github/workflows/pages.yml`](../.github/workflows/pages.yml), tetapi belum
+pernah berjalan dan GitHub Pages belum diaktifkan; tidak ada URL publik yang
+boleh diklaim sampai pemilik project benar-benar menerbitkannya. Google Play
+meminta URL kebijakan privasi dan URL penghapusan akun yang dapat dibuka tanpa
+memasang aplikasi; isi keduanya di Play Console setelah deploy diverifikasi.
 
 ## 1. Isi konfigurasi
 
-Ambil nilai dari Supabase Dashboard → project **development** → Project Settings →
-API:
+Nilai diambil dari Supabase Dashboard → Project Settings → API, dari project yang
+memang melayani halaman itu:
 
 - Project URL → `supabaseUrl`
 - Publishable key (atau anon key lama) → `publishableKey`
 
-Edit [`account-deletion/config.js`](account-deletion/config.js). Jangan pernah
-menaruh `service_role` key, password database, atau secret lain di berkas ini:
-halaman statis dapat dibaca siapa saja. Halaman menolak berjalan selama nilai
-masih berawalan `GANTI-`.
+Untuk menguji halaman hari ini, gunakan project **development** dan akun sintetis.
+Untuk Play Console, halaman harus menunjuk backend rilis yang dipakai pengguna —
+jangan mencampur keduanya. Edit [`account-deletion/config.js`](account-deletion/config.js).
+Jangan pernah menaruh `service_role` key, password database, atau secret lain di
+berkas ini: halaman statis dapat dibaca siapa saja. Halaman menolak berjalan
+selama nilai masih berawalan `GANTI-`.
+
+Uji statis (konten, tautan, tracker, secret, dan bentuk config) berjalan tanpa
+jaringan:
+
+```powershell
+node --test scripts/__tests__/web-static.test.mjs
+```
 
 `supportUrl` dan `privacyUrl` boleh disesuaikan. Jangan mengarang alamat email
 atau domain; saat ini dukungan memakai halaman GitHub Issues repository.
@@ -45,25 +56,26 @@ atau domain; saat ini dukungan memakai halaman GitHub Issues repository.
 Tidak ada redirect yang diperlukan. Jangan gunakan URL ini sebagai bukti sebelum
 kedua halaman benar-benar terbuka.
 
-### Opsi B — GitHub Pages (butuh akses Settings repository)
+### Opsi B — GitHub Pages (jalur yang disiapkan repo)
 
-1. Push folder `web/` ke branch `main` (setelah review/merge).
+Workflow [`.github/workflows/pages.yml`](../.github/workflows/pages.yml) sudah
+ada dan hanya menerbitkan folder `web/`. Ia berjalan saat `web/**` berubah di
+`main` atau lewat **Actions → Pages (halaman web publik) → Run workflow**.
+
+1. Push perubahan ke `main` (setelah review/merge).
 2. Repository → Settings → Pages → Build and deployment → Source:
-   **GitHub Actions**.
-3. Tambahkan workflow yang mengunggah `web/` sebagai artifact Pages, atau
-   gunakan source **Deploy from a branch** dengan folder `/` setelah memindahkan
-   isi `web/` ke root — opsi terakhir tidak disarankan karena mencampur kode
-   aplikasi dengan halaman publik.
+   **GitHub Actions**. Langkah ini hanya bisa dilakukan pemilik repository;
+   sampai itu, job `deploy` akan gagal dengan pesan dari GitHub, bukan sukses
+   palsu.
+3. Jalankan workflow secara manual untuk penerbitan pertama.
+4. Salin `page_url` dari ringkasan job `deploy` (workflow mencetaknya). Jangan
+   menebak `https://<owner>.github.io/<repo>/` — nama dan visibilitas repository
+   menentukan hasilnya, dan repository privat membutuhkan paket GitHub yang
+   mendukung Pages.
 
-Contoh langkah workflow (tanpa menambahkan berkas ke repo sekarang):
-
-```yaml
-- uses: actions/configure-pages@v5
-- uses: actions/upload-pages-artifact@v3
-  with:
-    path: web
-- uses: actions/deploy-pages@v4
-```
+Jika memilih **Deploy from a branch** dengan folder `/`, isi `web/` harus
+dipindahkan ke root; itu tidak disarankan karena mencampur kode aplikasi dengan
+halaman publik.
 
 ### Opsi C — hosting statis lain
 
@@ -96,6 +108,9 @@ Gunakan akun uji di project **development**, bukan akun nyata.
 
 Catat hasil per butir. Bila Edge Function belum di-deploy, halaman akan
 menampilkan galat "belum selesai"; itu **bukan** bukti penghapusan berhasil.
+
+Setelah halaman benar-benar terbuka, baru catat URL-nya di `docs/BETA_READINESS.md`
+dan Play Console. Sampai saat itu statusnya tetap **Blocked**.
 
 ## 4. Batasan yang disengaja
 

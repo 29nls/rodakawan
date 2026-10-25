@@ -289,9 +289,13 @@ Rencana terperinci, urutan prioritas, dan irisan vertikal pertama: [`docs/MILEST
       membuktikan Auth user hilang, media bersih, logo klub pindah, JWT lama ditolak, serta login ulang
       gagal (ADR-077). **ADR-078 (lease/checkpoint) Implemented, Passed locally, dan Passed against dev backend** (24 Oktober 2026): migration `20261023120000` sudah diterapkan (22 lokal = 22 remote), Edge Function di-redeploy, dan `npm run db:test` **8/8** lulus. **Blocked:** uji perangkat fisik dan URL web publik (`web/` belum di-deploy).
 - [x] Jalur hapus akun web eksternal — halaman statis `web/account-deletion/` dan kebijakan
-      `web/privacy/` dibuat; **URL publik belum ada (blocker deployment)** sehingga syarat Play Console
-      belum bisa dicentang.
-- [ ] Security and release checklist.
+      `web/privacy/` dibuat, beserta workflow GitHub Pages yang hanya menerbitkan `web/` dan uji
+      statisnya (`scripts/__tests__/web-static.test.mjs`). **URL publik belum ada (blocker deployment):**
+      workflow belum pernah berjalan, Pages belum diaktifkan, dan config masih placeholder. Syarat Play
+      Console belum bisa dicentang.
+- [ ] Security and release checklist — **sebagian**: pagar katalog hardening, uji statis web, dan
+      matriks gerbang ada di [`BETA_READINESS.md`](BETA_READINESS.md); sisa blocker adalah URL web,
+      acceptance perangkat, uji dua klien Realtime, retensi, dan project produksi.
 
 **Exit criteria:** semua P0 acceptance test lulus dan tidak ada blocker severity tinggi.
 
