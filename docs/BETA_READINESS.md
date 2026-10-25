@@ -25,7 +25,7 @@ pemilik/produk/legal) dan **tidak diketahui** (tidak ada bukti yang cukup untuk 
 
 | ID | Butir | Status | Bukti | Tindakan |
 | --- | --- | --- | --- | --- |
-| B-01 | Workflow penerbitan `web/` ke GitHub Pages | **Implemented**; **Passed locally** untuk uji statis | `.github/workflows/pages.yml`; `node --test scripts/__tests__/web-static.test.mjs` 11/11 lulus (bagian dari `npm run test:scripts` 354 test) | Jalankan `workflows-lint` di CI setelah branch di-push; workflow belum pernah dieksekusi |
+| B-01 | Workflow penerbitan `web/` ke GitHub Pages | **Implemented**; **Passed locally** untuk uji statis | `.github/workflows/pages.yml`; `node --test scripts/__tests__/web-static.test.mjs` 11/11 lulus (bagian dari `npm run test:scripts` 366 test) | Jalankan `workflows-lint` di CI setelah branch di-push; workflow belum pernah dieksekusi |
 | B-02 | Halaman web terbuka untuk publik | **Blocked** | Pages belum diaktifkan; `web/account-deletion/config.js` masih `GANTI-…`; tidak ada `page_url` dari run | Pemilik mengaktifkan Pages → isi config → jalankan workflow → verifikasi `web/README.md` §3 |
 | B-03 | URL kebijakan privasi dan hapus akun di Play Console | **Blocked** | Bergantung pada B-02; Play Console belum diisi | Isi setelah URL benar-benar terbuka dan diuji |
 | B-04 | Backend produksi terpisah dari development | **Needs decision** | Tidak ada project produksi di repository; promosi migration terdokumentasi (`docs/SETUP_GUIDE.md` §4.3) tetapi belum pernah dijalankan ke produksi | Pemilik membuat project produksi, menetapkan backup, lalu menguji promosi di staging |
@@ -79,7 +79,7 @@ pemilik/produk/legal) dan **tidak diketahui** (tidak ada bukti yang cukup untuk 
 | ID | Temuan | Severity | Bukti | Status / tindakan |
 | --- | --- | --- | --- | --- |
 | C-01 | `supabase/config.toml` tidak ada, sehingga `verify_jwt` dan konfigurasi Edge Function tidak versioned | Low | `find supabase -name '*.toml'` = kosong; fungsi tetap memverifikasi token lewat `auth.getUser` (`supabase/functions/delete-account/index.ts`), jadi tidak ada jalur tanpa verifikasi yang terlihat | **Open** — tambahkan config.toml sebelum produksi atau dokumentasikan pengaturan platform |
-| C-02 | CORS `Access-Control-Allow-Origin: *` pada `delete-account` | Low | `index.ts` header CORS; token tetap wajib | **Open (diterima)** — persempit ke origin Pages setelah B-02 |
+| C-02 | CORS `delete-account` membuka semua origin (`*`) | Low | Sebelumnya `index.ts` mengirim `Access-Control-Allow-Origin: *`. Kini `cors.mjs` hanya mengizinkan origin persis dari `WEB_ALLOWED_ORIGINS`, menolak `*`, dan fail-closed bila kosong; 12 uji di `scripts/__tests__/delete-account-cors.test.mjs` | **Implemented**; **Passed locally**; origin sebenarnya **Blocked** sampai B-02 — isi `WEB_ALLOWED_ORIGINS` dengan origin halaman setelah URL-nya diketahui, lalu uji preflight/403 dari browser |
 | C-03 | Action workflow dipin ke tag mayor (`@v7`, `@v4`), bukan SHA | Low | `grep 'uses:' .github/workflows` | **Open** — pin SHA sebelum rilis publik; perubahan besar, tidak dilakukan di sini |
 | C-04 | Workflow Pages belum pernah dieksekusi | — | Tidak ada run; Pages belum aktif | **Blocked** — B-02 |
 | C-05 | `web/account-deletion/config.js` masih placeholder | — | `GANTI-PROJECT-REF` / `GANTI-PUBLISHABLE-KEY` | **Blocked** — diisi pemilik |
@@ -110,7 +110,7 @@ pemilik/produk/legal) dan **tidak diketahui** (tidak ada bukti yang cukup untuk 
 | `npm run lint` | exit 0 |
 | `npm run format:check` | exit 0 — seluruh berkas sesuai Prettier |
 | `npm test -- --ci` | exit 0 — 45 suite / **500** test lulus |
-| `npm run test:scripts` | exit 0 — **354** test lulus (termasuk 11 uji statis web) |
+| `npm run test:scripts` | exit 0 — **366** test lulus (termasuk 11 uji statis web dan 12 uji CORS) |
 | `npm run db:test:lint` | exit 0 — **11** berkas uji vs **25** migration |
 | `npm run db:test` | exit 0 — **11/11** berkas lulus; notice `UJI KATALOG HARDENING LULUS` diterima server |
 | `npm run db:types:check` | exit 0 — `database.generated.ts` sama dengan skema development |

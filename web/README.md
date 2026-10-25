@@ -44,6 +44,12 @@ node --test scripts/__tests__/web-static.test.mjs
 `supportUrl` dan `privacyUrl` boleh disesuaikan. Jangan mengarang alamat email
 atau domain; saat ini dukungan memakai halaman GitHub Issues repository.
 
+Halaman ini juga harus terdaftar di Edge Function `delete-account` lewat secret
+`WEB_ALLOWED_ORIGINS` (origin saja: skema + host + port, tanpa path). Tanpa itu
+fungsi menolak semua permintaan browser dengan `403 origin_not_allowed`; aplikasi
+Android tetap bekerja karena tidak mengirim header `Origin`. Langkah dan
+contohnya ada di [`docs/SETUP_GUIDE.md`](../docs/SETUP_GUIDE.md) §4.3a.
+
 ## 2. Deploy (pilih satu)
 
 ### Opsi A — Netlify Drop (paling cepat, tanpa repo workflow)

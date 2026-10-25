@@ -181,6 +181,24 @@ produksi, tambahkan `config.toml` agar pengaturan itu versioned (temuan C-01 di
 npx supabase functions deploy delete-account --project-ref <project-ref-development>
 ```
 
+**CORS hanya untuk origin halaman web.** Fungsi menolak permintaan browser dari origin yang tidak
+terdaftar (`403 origin_not_allowed`, tanpa header `Access-Control-Allow-Origin`) dan **fail-closed**:
+selama daftar kosong, halaman web tidak bisa memanggilnya. Isi daftar dengan **origin** halaman
+publik — skema + host + port, bukan URL lengkap berisi path:
+
+```powershell
+npx supabase secrets set WEB_ALLOWED_ORIGINS="https://<owner>.github.io" --project-ref <project-ref-development>
+```
+
+- Untuk GitHub Pages project site, origin-nya `https://<owner>.github.io`; path repository
+  (`/rodakawan/`) **bukan** bagian origin.
+- Beberapa origin dipisahkan koma, mis. `https://<owner>.github.io,http://localhost:8000` untuk uji
+  lokal. Nilai `*` diabaikan, bukan membuka semua origin.
+- Aplikasi Android tidak mengirim header `Origin`, jadi tetap bekerja tanpa entri apa pun. CORS
+  bukan autentikasi: access token tetap diverifikasi fungsi.
+- Setelah secret diubah, uji ulang dari browser: preflight harus `204` dan permintaan dari domain
+  lain harus `403` tanpa `Access-Control-Allow-Origin`. Jangan memakai `*` sebagai jalan pintas.
+
 Verifikasi setelah deploy (jangan pakai akun nyata): buat dua akun uji, unggah avatar/foto/logo klub,
 panggil fungsi dengan access token akun A, lalu periksa: `auth.users` A hilang, profil A hilang,
 media pribadi hilang, logo klub masih ada di path baru, laporan bahaya tetap ada sebagai tombstone,

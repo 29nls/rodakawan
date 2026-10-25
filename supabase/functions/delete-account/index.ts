@@ -17,27 +17,21 @@
 
 import { createClient } from 'npm:@supabase/supabase-js@2.117.3';
 
+import { handleCors, parseAllowedOrigins } from './cors.mjs';
 import { DeletionStepError, runAccountDeletion } from './orchestrator.mjs';
 
-const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'authorization, apikey, content-type, x-client-info',
-  'Access-Control-Max-Age': '86400',
-};
-
-function json(body: unknown, status: number) {
+function json(body: unknown, status: number, corsHeaders: Record<string, string>) {
   return new Response(JSON.stringify(body), {
     status,
     headers: {
-      ...CORS_HEADERS,
+      ...corsHeaders,
       'Content-Type': 'application/json; charset=utf-8',
       'Cache-Control': 'no-store',
     },
   });
 }
 
-function failure(error: unknown) {
+function failure(error: unknown, corsHeaders: Record<string, string>) {
   const code =
     error instanceof DeletionStepError
       ? error.code
@@ -52,6 +46,7 @@ function failure(error: unknown) {
         message: 'Terlalu banyak percobaan. Tunggu beberapa menit lalu coba lagi.',
       },
       429,
+      corsHeaders,
     );
   }
 
@@ -62,11 +57,12 @@ function failure(error: unknown) {
         message: 'Penghapusan sedang diproses di server. Tunggu sebentar lalu coba lagi.',
       },
       409,
+      corsHeaders,
     );
   }
 
   if (code === 'account_deletion_invalid_user' || code === 'account_deletion_unauthenticated') {
-    return json({ error: 'account_deletion_unauthenticated' }, 401);
+    return json({ error: 'account_deletion_unauthenticated' }, 401, corsHeaders);
   }
 
   return json(
@@ -76,6 +72,7 @@ function failure(error: unknown) {
         'Penghapusan belum selesai sepenuhnya. Data Anda tidak dipakai lagi, tetapi proses perlu diulang. Coba lagi; bila berulang, hubungi dukungan.',
     },
     502,
+    corsHeaders,
   );
 }
 
@@ -87,12 +84,19 @@ function detailsOf(error: { details?: unknown; message?: unknown } | null): stri
 }
 
 Deno.serve(async (request: Request) => {
-  if (request.method === 'OPTIONS') {
-    return new Response(null, { status: 204, headers: CORS_HEADERS });
+  // Allowlist per-origin: hanya halaman yang terdaftar boleh memanggil dari
+  // browser; permintaan native tanpa `Origin` tetap dilayani. Default-nya
+  // fail-closed sampai WEB_ALLOWED_ORIGINS diisi (lihat cors.mjs).
+  const cors = handleCors(request, parseAllowedOrigins(Deno.env.get('WEB_ALLOWED_ORIGINS')));
+
+  if (cors.response) {
+    return cors.response;
   }
 
+  const corsHeaders = cors.headers;
+
   if (request.method !== 'POST') {
-    return json({ error: 'method_not_allowed' }, 405);
+    return json({ error: 'method_not_allowed' }, 405, corsHeaders);
   }
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
@@ -102,14 +106,14 @@ Deno.serve(async (request: Request) => {
   if (!supabaseUrl || !anonKey || !serviceKey) {
     // Konfigurasi platform, bukan kesalahan pengguna. Jangan bocorkan nama nilai.
     console.error('[delete-account] konfigurasi platform tidak lengkap');
-    return json({ error: 'account_deletion_unavailable' }, 503);
+    return json({ error: 'account_deletion_unavailable' }, 503, corsHeaders);
   }
 
   const authorization = request.headers.get('Authorization') ?? '';
   const token = authorization.startsWith('Bearer ') ? authorization.slice(7) : '';
 
   if (!token) {
-    return json({ error: 'account_deletion_unauthenticated' }, 401);
+    return json({ error: 'account_deletion_unauthenticated' }, 401, corsHeaders);
   }
 
   // Body tidak pernah dipakai untuk menentukan target. Terima objek kosong saja;
@@ -120,10 +124,10 @@ Deno.serve(async (request: Request) => {
       try {
         const parsed: unknown = JSON.parse(raw);
         if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
-          return json({ error: 'invalid_body' }, 400);
+          return json({ error: 'invalid_body' }, 400, corsHeaders);
         }
       } catch {
-        return json({ error: 'invalid_body' }, 400);
+        return json({ error: 'invalid_body' }, 400, corsHeaders);
       }
     }
   }
@@ -135,7 +139,7 @@ Deno.serve(async (request: Request) => {
   const { data: userData, error: userError } = await userClient.auth.getUser(token);
 
   if (userError || !userData.user) {
-    return json({ error: 'account_deletion_unauthenticated' }, 401);
+    return json({ error: 'account_deletion_unauthenticated' }, 401, corsHeaders);
   }
 
   const userId = userData.user.id;
@@ -313,7 +317,11 @@ Deno.serve(async (request: Request) => {
 
   try {
     const result = await runAccountDeletion({ userId, lease, deps });
-    return json({ status: 'completed', alreadyCompleted: result.alreadyCompleted }, 200);
+    return json(
+      { status: 'completed', alreadyCompleted: result.alreadyCompleted },
+      200,
+      corsHeaders,
+    );
   } catch (error) {
     const jobId = (error as { jobId?: string }).jobId;
     const step = (error as { step?: string }).step;
@@ -328,6 +336,6 @@ Deno.serve(async (request: Request) => {
             : 'unexpected_failure',
     });
 
-    return failure(error);
+    return failure(error, corsHeaders);
   }
 });
