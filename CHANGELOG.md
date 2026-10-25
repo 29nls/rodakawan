@@ -8,6 +8,27 @@ sedangkan build preview (`v<versi>-build<N>`) diringkas di dalam blok yang bisa 
 versi adalah tautan ke halaman rilisnya di GitHub, sehingga riwayat ini bisa dinavigasi langsung
 dari berkas.
 
+## [v0.1.0-build54](https://github.com/29nls/rodakawan/releases/tag/v0.1.0-build54) — 2026-10-25 · pratinjau
+
+<details>
+<summary>Catatan rilis pratinjau</summary>
+
+### Perbaikan
+
+- tests: skip config.js in secret scanning to allow public Supabase URL and publishable key (`d8697ec`)
+- config: update Supabase URL and publishable key for account deletion page (`1852ee9`)
+- .gitignore: update .freebuff entry to include trailing slash (`2b011a6`)
+- functions: batasi CORS hapus akun ke origin terdaftar (`41b3e9e`)
+
+### Perubahan lain
+
+- pages: catat run pertama tertahan karena Pages belum aktif (`a9f589d`)
+- matriks kesiapan beta dan sinkronisasi status (`973eadd`)
+- web: terbitkan halaman publik lewat GitHub Pages (`87c395a`)
+- db: pagar katalog hardening dengan detektor teruji-diri (`f65b748`)
+
+</details>
+
 ## [v0.1.0-build50](https://github.com/29nls/rodakawan/releases/tag/v0.1.0-build50) — 2026-10-25 · pratinjau
 
 <details>
