@@ -1,7 +1,7 @@
 /**
  * Dashboard moderasi laporan penyalahgunaan (ADR-067).
  *
- * Layar ini **bukan** panel admin global. Yang tampil di sini hanyalah laporan
+// @ts-nocheck
  * atas konten yang wewenangnya dimiliki pengguna: chat dan laporan bahaya pada
  * perjalanan yang ia pimpin, atau pada perjalanan milik klub tempat ia admin.
  * Penyaringan itu dilakukan RLS di database; layar tidak menambahkan filter
@@ -388,6 +388,7 @@ export default function ModerationScreen() {
                 sini; jalurnya dashboard tepercaya.
               </AppText>
             </Card>
+        </View>
 
             {state.status === 'ready' ? (
               <View style={styles.sectionHeader}>
@@ -424,9 +425,6 @@ export default function ModerationScreen() {
               busy={busyId !== null}
               item={item}
               people={people}
-              onDismiss={() => handleDecision(item, 'dismissed')}
-              onRemove={() => handleRemove(item)}
-              onReview={() => handleDecision(item, 'reviewed')}
             />
           ))}
 
@@ -450,7 +448,7 @@ export default function ModerationScreen() {
               <AppText tone="muted" variant="callout">
                 Belum ada tindakan moderasi yang tercatat untuk Anda.
               </AppText>
-            ) : (
+            ))
               audit.map((entry) => (
                 <View
                   key={entry.id}
