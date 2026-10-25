@@ -8,6 +8,31 @@ sedangkan build preview (`v<versi>-build<N>`) diringkas di dalam blok yang bisa 
 versi adalah tautan ke halaman rilisnya di GitHub, sehingga riwayat ini bisa dinavigasi langsung
 dari berkas.
 
+## [v0.1.0-build63](https://github.com/29nls/rodakawan/releases/tag/v0.1.0-build63) — 2026-10-25 · pratinjau
+
+<details>
+<summary>Catatan rilis pratinjau</summary>
+
+### Fitur
+
+- implement moderation dashboard for abuse report management (ADR-067) (`0f4b2cf`)
+- tests: add A/B test documentation for club screen error state messaging and implement error classification tests for community and ride screens (`869528c`)
+- state: implement consistent state classification and error handling across screens (`0467f25`)
+- state: implement consistent state classification and error handling across screens (`31f5f33`)
+
+### Perbaikan
+
+- docs: update beta readiness document for internal testing context and clarify deployment status (`df8adc4`)
+
+### Perubahan lain
+
+- hijaukan gate lint dan format (`ef3442e`)
+- remove unused Supabase state handling and simplify error management across multiple screens (`b4a3612`)
+- simplify conditional rendering and improve readability in ModerationScreen component (`c032ae4`)
+- Refactor ProfileEditScreen and RideScreen components; disable loading notices and error handling in ProfileEditScreen, and simplify conditional rendering in RideScreen. Add new ModerationScreen component for abuse report moderation dashboard with complete functionality and UI elements. (`2aa8a8f`)
+
+</details>
+
 ## [v0.1.0-build54](https://github.com/29nls/rodakawan/releases/tag/v0.1.0-build54) — 2026-10-25 · pratinjau
 
 <details>
