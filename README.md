@@ -97,7 +97,9 @@ Access token lama tidak menemukan profil/baris miliknya (diuji), dan login ulang
 akun yang sudah dihapus gagal. Kebijakan privasi (retensi per jenis data, apa yang sengaja
 dipertahankan, kontak dukungan) tersedia di `/privacy`, `web/privacy/`, dan
 [`docs/SECURITY_PRIVACY.md`](docs/SECURITY_PRIVACY.md) bagian 8.4. Halaman web hapus akun sudah ada
-di `web/account-deletion/`, tetapi **belum ter-deploy** sehingga URL publiknya masih blocker.
+di `web/account-deletion/` beserta workflow GitHub Pages yang hanya menerbitkan `web/`, tetapi
+**belum ter-deploy** (Pages belum diaktifkan, config masih placeholder) sehingga URL publiknya masih
+blocker. Status gerbang beta ada di [`docs/BETA_READINESS.md`](docs/BETA_READINESS.md).
 
 **Unggah foto kendaraan, logo klub, dan foto profil sudah berfungsi.** `vehicle-photos`,
 `club-logos`, dan `avatars` adalah bucket privat: foto kendaraan dan foto profil hanya bisa dibaca
@@ -797,6 +799,7 @@ Setelah `.env.local` terisi, jalankan alur ini di perangkat:
 | [`docs/SECURITY_PRIVACY.md`](docs/SECURITY_PRIVACY.md)     | RLS, privasi lokasi, moderasi, retensi, izin perangkat, threat model.       |
 | [`docs/ERD.md`](docs/ERD.md)                               | Diagram konseptual entitas dan hubungan data.                              |
 | [`docs/ROADMAP.md`](docs/ROADMAP.md)                       | Milestone, urutan pekerjaan, definisi selesai, status verifikasi.           |
+| [`docs/BETA_READINESS.md`](docs/BETA_READINESS.md)         | Matriks gerbang beta: status, bukti, dan pemilik tindakan.                  |
 | [`docs/QA_TEST_PLAN.md`](docs/QA_TEST_PLAN.md)             | Strategi pengujian, skenario penerimaan, uji perangkat dan jaringan.        |
 | [`docs/SETUP_GUIDE.md`](docs/SETUP_GUIDE.md)               | Setup Expo/Supabase dan build APK tanpa Android Studio.                     |
 | [`docs/PROJECT_DECISIONS.md`](docs/PROJECT_DECISIONS.md)   | ADR: keputusan teknis beserta alasannya.                                    |
