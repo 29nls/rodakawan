@@ -521,23 +521,19 @@ export default function RideScreen() {
   );
 
   {showError ? (
-    return (
-      <Screen testID="ride-screen">
-        <ScreenHeader showBack overline="Perjalanan" title="Detail perjalanan" />
-        <ErrorState description={errorMessage} onRetry={reload} />
-      </Screen>
-    );
+    <Screen testID="ride-screen">
+      <ScreenHeader showBack overline="Perjalanan" title="Detail perjalanan" />
+      <ErrorState description={errorMessage} onRetry={reload} />
+    </Screen>
   ) : null}
 
   {showEmpty && !details ? (
-    return (
-      <Screen testID="ride-screen">
-        <ScreenHeader showBack overline="Perjalanan" title="Detail perjalanan" />
-        <AppText tone="muted" variant="caption">
-          Perjalanan belum terisi. Cek tautannya atau cari perjalanan lain.
-        </AppText>
-      </Screen>
-    );
+    <Screen testID="ride-screen">
+      <ScreenHeader showBack overline="Perjalanan" title="Detail perjalanan" />
+      <AppText tone="muted" variant="caption">
+        Perjalanan belum terisi. Cek tautannya atau cari perjalanan lain.
+      </AppText>
+    </Screen>
   ) : null}
 
   if (!ride) return null;

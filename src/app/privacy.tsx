@@ -46,8 +46,8 @@ export default function PrivacyScreen() {
           title="Data yang disimpan"
         />
         {status === 'loading' ? (
-            <AppText variant="callout">
-              • Sedang memuat konfigurasi dan data privasi...\n  </AppText>
+          <AppText variant="callout">
+            • Sedang memuat konfigurasi dan data privasi...\n  </AppText>
           ) : null}
 
           {status === 'ready' && showEmpty ? (
@@ -78,9 +78,7 @@ export default function PrivacyScreen() {
                 • Perangkat: token notifikasi bila fitur notifikasi diaktifkan. Aplikasi tidak menyimpan
                 lokasi presisi di log.
               </AppText>
-            </View>
-          ) : null}
-        </View>
+            </View>          ) : null}
       </Card>
 
       <Card>
@@ -98,38 +96,21 @@ export default function PrivacyScreen() {
           </AppText>
           <AppText variant="callout">
             • Setelah akun dihapus, identitas login, profil, dan data pribadi dihapus. Laporan
-            bahaya dan audit moderasi tetap ada tanpa identitas Anda; pesan konvoi serta
-            postingan/komentar diredaksi dan diatribusikan ke “Akun dihapus”.
-          </AppText>
+            bahaya dan audit moderasi tetap ada tanpa identitas Anda; pesan konvoi serta            postingan/komentar diredaksi dan diatribusikan ke “Akun dihapus”.          </AppText>
           <AppText variant="callout">
-            • Data tidak dijual dan tidak dipakai untuk iklan. Layanan pihak ketiga hanya Supabase
-            (autentikasi, database, penyimpanan) dan penyedia push bila diaktifkan.
-          </AppText>
-        </View>
-      </Card>
+            • Data tidak dijual dan tidak dipakai untuk iklan. Layanan pihak ketiga hanya Supabase            (autentikasi, database, penyimpanan) dan penyedia push bila diaktifkan.          </AppText>        </View>      </Card>
 
       <Card>
         <SectionHeader subtitle="Cara meminta penjelasan atau penghapusan." title="Kontak" />
         <AppText variant="callout">
-          Pertanyaan privasi, permintaan ekspor, atau laporan penyalahgunaan dapat dikirim lewat
-          halaman dukungan:
-        </AppText>
-        <AppText
+          Pertanyaan privasi, permintaan ekspor, atau laporan penyalahgunaan dapat dikirim lewat          halaman dukungan:        </AppText>        <AppText
           accessibilityRole="link"
           onPress={() => {
             void Linking.openURL(SUPPORT_URL);
           }}
           tone="accent"
           variant="callout"
-        >
-          {SUPPORT_URL}
-        </AppText>
-        <AppText tone="muted" variant="caption">
-          Anda juga dapat menghapus akun sendiri dari Profil → Hapus akun. Proses dijalankan di
-          server dan baru dinyatakan berhasil setelah seluruh langkah selesai; bila gagal di tengah
-          jalan, permintaan dapat diulang tanpa menghapus data dua kali.
-        </AppText>
-      </Card>
+        >          {SUPPORT_URL}        </AppText>        <AppText tone="muted" variant="caption">          Anda juga dapat menghapus akun sendiri dari Profil → Hapus akun. Proses dijalankan di          server dan baru dinyatakan berhasil setelah seluruh langkah selesai; bila gagal di tengah          jalan, permintaan dapat diulang tanpa menghapus data dua kali.        </AppText>      </Card>
     </Screen>
   );
 }

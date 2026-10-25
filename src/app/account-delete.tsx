@@ -94,7 +94,6 @@ export default function AccountDeleteScreen() {
       ) : null}
 
       <Card>
-      <Card>
         <SectionHeader
           subtitle="Penghapusan bersifat permanen dan tidak bisa dibatalkan. Anda akan keluar dari perangkat ini."
           title="Apa yang terjadi"

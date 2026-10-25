@@ -367,54 +367,54 @@ export default function ModerationScreen() {
         <Banner message={actionError.message} title="Aksi tidak selesai" tone="danger" />
       ) : null}
 
-      {precondition ? (
-        <EmptyState
-          description={precondition.message}
-          icon="lock-closed-outline"
-          title="Dashboard moderasi belum bisa dibuka"
-        />
-      ) : null}
+      <View>
+        {precondition ? (
+          <EmptyState
+            description={precondition.message}
+            icon="lock-closed-outline"
+            title="Dashboard moderasi belum bisa dibuka"
+          />
+        ) : null}
+        {!precondition ? (
+          <View>
+            <Card>
+              <AppText variant="bodyStrong">Apa yang tercatat</AppText>
+              <AppText tone="secondary" variant="callout">
+                Setiap tindakan menyimpan pelaku, alasan laporan, dan waktu di server. Laporan tidak
+                menghapus konten secara otomatis; penghapusan selalu tindakan terpisah.
+              </AppText>
+              <AppText tone="muted" variant="caption">
+                Laporan bahaya tanpa perjalanan dan konten di luar perjalanan Anda tidak tampil di
+                sini; jalurnya dashboard tepercaya.
+              </AppText>
+            </Card>
 
-      {!precondition ? (
-        <>
-          <Card>
-            <AppText variant="bodyStrong">Apa yang tercatat</AppText>
-            <AppText tone="secondary" variant="callout">
-              Setiap tindakan menyimpan pelaku, alasan laporan, dan waktu di server. Laporan tidak
-              menghapus konten secara otomatis; penghapusan selalu tindakan terpisah.
-            </AppText>
-            <AppText tone="muted" variant="caption">
-              Laporan bahaya tanpa perjalanan dan konten di luar perjalanan Anda tidak tampil di
-              sini; jalurnya dashboard tepercaya.
-            </AppText>
-          </Card>
-
-          <View style={styles.sectionHeader}>
-            <AppText variant="bodyStrong">Menunggu tinjauan</AppText>
             {state.status === 'ready' ? (
-              <Badge
-                label={`${items.length} laporan`}
-                tone={items.length > 0 ? 'warning' : 'neutral'}
+              <View style={styles.sectionHeader}>
+                <AppText variant="bodyStrong">Menunggu tinjauan</AppText>
+                <Badge
+                  label={`${items.length} laporan`}
+                  tone={items.length > 0 ? 'warning' : 'neutral'}
+                />
+              </View>
+            ) : null}
+
+            {showError ? (
+              <ErrorState
+                description={errorMessage}
+                onRetry={reload}
+                title="Antrean gagal dimuat"
               />
             ) : null}
-          </View>
 
-          {showError ? (
-        <ErrorState
-          description={errorMessage}
-          onRetry={reload}
-          title="Antrean gagal dimuat"
-        />
-      ) : null}
-
-      {showEmpty && state.status === 'ready' && state.items.length === 0 ? (
-        <EmptyState
-          description="Belum ada laporan penyalahgunaan yang menunggu di perjalanan atau klub Anda. Laporan baru akan muncul di sini."
-          icon="shield-checkmark-outline"
-          testID="moderation-empty"
-          title="Tidak ada laporan menunggu"
-        />
-      ) : null}
+            {showEmpty && state.status === 'ready' && state.items.length === 0 ? (
+              <EmptyState
+                description="Belum ada laporan penyalahgunaan yang menunggu di perjalanan atau klub Anda. Laporan baru akan muncul di sini."
+                icon="shield-checkmark-outline"
+                testID="moderation-empty"
+                title="Tidak ada laporan menunggu"
+              />
+            ) : null}
 
       {/* Loading state dikelola classifyScreenState */
 
@@ -480,11 +480,13 @@ export default function ModerationScreen() {
               ))
             )}
           </Card>
-        </>
-      ) : null}
-    </Screen>
+        </View>
+      ) : null>
+    </View>
   );
+
 }
+    </Screen>
 
 const styles = StyleSheet.create({
   sectionHeader: {

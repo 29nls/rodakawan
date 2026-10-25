@@ -108,19 +108,11 @@ export default function ProfileEditScreen() {
         </AppText>
       ) : null}
 
-      {/* Loading state managed via classifyScreenState */
+      // Loading state managed via classifyScreenState
 
-      {generatedUsernameNotice ? (
-        <Banner message={generatedUsernameNotice} title="Username ini sementara" tone="warning" />
-      ) : null}
+// generatedUsernameNotice disabled
 
-      {saved ? (
-        <Banner
-          message="Perubahan sudah tersimpan di database dan langsung dipakai aplikasi."
-          title="Profil tersimpan"
-          tone="success"
-        />
-      ) : null}
+// saved section disabled
 
       {error ? <Banner message={error.message} title="Gagal menyimpan" tone="danger" /> : null}
 
