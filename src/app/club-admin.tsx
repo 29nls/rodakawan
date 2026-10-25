@@ -36,6 +36,7 @@ import {
   type MemberRoleFilter,
   type MemberStatusFilter,
 } from '@/features/clubs/memberDirectory';
+import { screenPrecondition } from '@/features/state-helper';
 import {
   CLUB_DESCRIPTION_MAX_LENGTH,
   CLUB_NAME_MAX_LENGTH,
@@ -142,6 +143,12 @@ export default function ClubAdminScreen() {
   const reload = useCallback(() => setReloadToken((token) => token + 1), []);
   const club = state.status === 'ready' ? state.club : null;
   const logoPath = club?.logo_path ?? null;
+  const precondition = screenPrecondition(
+    backend,
+    userId,
+    'Sesi tidak ditemukan di perangkat ini. Masuk kembali untuk membuka pengelolaan klub.',
+  );
+  const missingTarget = clubId.length === 0;
 
   useEffect(() => {
     if (!backend.available || !userId || clubId.length === 0) return;
@@ -408,7 +415,25 @@ export default function ClubAdminScreen() {
         <Banner message={actionError.message} title="Aksi tidak selesai" tone="danger" />
       ) : null}
 
-      {state.status === 'loading' ? <LoadingState label="Memuat keanggotaan…" /> : null}
+      {precondition ? (
+        <UnavailableState
+          description={precondition.message}
+          icon="lock-closed-outline"
+          title="Pengelolaan klub belum bisa dibuka"
+        />
+      ) : null}
+
+      {!precondition && missingTarget ? (
+        <UnavailableState
+          description="Tautan ini tidak memuat ID klub. Buka pengelolaan dari detail klub."
+          icon="alert-circle-outline"
+          title="Klub tidak dikenali"
+        />
+      ) : null}
+
+      {!precondition && !missingTarget && state.status === 'loading' ? (
+        <LoadingState label="Memuat keanggotaan…" />
+      ) : null}
 
       {state.status === 'error' ? (
         <ErrorState description={state.error.message} onRetry={reload} />

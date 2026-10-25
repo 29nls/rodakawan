@@ -12,6 +12,7 @@ import { InfoRow } from '@/components/ui/InfoRow';
 import { Screen } from '@/components/ui/Screen';
 import { ScreenHeader } from '@/components/ui/ScreenHeader';
 import { SectionHeader } from '@/components/ui/SectionHeader';
+import { ErrorState, LoadingState, UnavailableState } from '@/components/ui/StateView';
 import { TextField } from '@/components/ui/TextField';
 import { colors, spacing } from '@/constants/theme';
 import { BackendUnavailableBanner } from '@/features/auth/components/BackendUnavailableBanner';
@@ -34,6 +35,7 @@ import {
   type RideMemberWithProfile,
 } from '@/features/rides/api';
 import { rideStatusCopy } from '@/features/rides/components/RideCard';
+import { screenPrecondition } from '@/features/state-helper';
 import {
   locationAgeLabel,
   locationFreshness,
@@ -105,6 +107,11 @@ export default function RideScreen() {
   const [backgroundPermission, setBackgroundPermission] = useState<string>('undetermined');
 
   const reload = useCallback(() => setReloadToken((token) => token + 1), []);
+  const precondition = screenPrecondition(
+    backend,
+    userId,
+    'Sesi tidak ditemukan di perangkat ini. Masuk kembali untuk membuka perjalanan.',
+  );
 
   useEffect(() => {
     if (!backend.available || !userId || rideId.length === 0) return;
@@ -519,7 +526,46 @@ export default function RideScreen() {
     [details?.members, details?.locations, now],
   );
 
-  if (!ride) return null;
+  // Tanpa cabang ini layar kosong sama sekali saat memuat atau gagal, tanpa
+  // penjelasan dan tanpa tombol coba lagi.
+  if (!ride) {
+    const missingTarget = rideId.length === 0;
+
+    return (
+      <Screen scroll testID="ride-screen">
+        <ScreenHeader showBack overline="Perjalanan" title="Detail perjalanan" />
+
+        {backend.available ? null : <BackendUnavailableBanner reason={backend.reason} />}
+
+        {precondition ? (
+          <UnavailableState
+            description={precondition.message}
+            icon="lock-closed-outline"
+            title="Perjalanan belum bisa dibuka"
+          />
+        ) : missingTarget ? (
+          <UnavailableState
+            action={{
+              label: 'Kembali',
+              onPress: () => router.back(),
+              icon: 'arrow-back-outline',
+            }}
+            description="Tautan ini tidak memuat ID perjalanan. Buka perjalanan dari tab Perjalanan, atau minta tautan baru dari host."
+            icon="alert-circle-outline"
+            title="Perjalanan tidak dikenali"
+          />
+        ) : state.status === 'error' ? (
+          <ErrorState
+            description={state.error.message}
+            onRetry={reload}
+            title="Perjalanan gagal dimuat"
+          />
+        ) : (
+          <LoadingState label="Memuat perjalanan…" />
+        )}
+      </Screen>
+    );
+  }
 
   return (
     <Screen scroll testID="ride-screen">

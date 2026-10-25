@@ -9,6 +9,7 @@ import { Card } from '@/components/ui/Card';
 import { Screen } from '@/components/ui/Screen';
 import { ScreenHeader } from '@/components/ui/ScreenHeader';
 import { SectionHeader } from '@/components/ui/SectionHeader';
+import { LoadingState } from '@/components/ui/StateView';
 import { TextField } from '@/components/ui/TextField';
 import { spacing } from '@/constants/theme';
 import { formatErrorMessage } from '@/features/state-helper';
@@ -31,7 +32,7 @@ const SUPPORT_URL = 'https://github.com/29nls/rodakawan/issues';
 export default function AccountDeleteScreen() {
   const router = useRouter();
   const { backend, userId, signOut } = useAuthSession();
-  const { state } = useProfile();
+  const { state, reload } = useProfile();
 
   // Status layar dibaca dari state profil itu sendiri: `useProfile` sudah
   // menurunkan backend/sesi yang belum siap menjadi state error, jadi tidak ada
@@ -79,13 +80,26 @@ export default function AccountDeleteScreen() {
       scroll
       testID="account-delete-screen"
     >
+      {state.status === 'loading' ? (
+        <LoadingState label="Memuat profil Anda…" testID="account-delete-loading" />
+      ) : null}
+
       {showError && errorMessage ? (
-        <Banner
-          message={errorMessage}
-          title="Akun belum dihapus"
-          tone="danger"
-          testID="account-delete-error-banner"
-        />
+        <>
+          <Banner
+            message={errorMessage}
+            title="Profil belum bisa dimuat"
+            tone="danger"
+            testID="account-delete-error-banner"
+          />
+          <Button
+            icon="refresh"
+            label="Coba lagi"
+            onPress={reload}
+            variant="secondary"
+            testID="account-delete-retry"
+          />
+        </>
       ) : null}
 
       <Card>

@@ -10,7 +10,7 @@ import { Card } from '@/components/ui/Card';
 import { Divider } from '@/components/ui/Divider';
 import { Screen } from '@/components/ui/Screen';
 import { SectionHeader } from '@/components/ui/SectionHeader';
-import { EmptyState, ErrorState, LoadingState } from '@/components/ui/StateView';
+import { EmptyState, ErrorState, LoadingState, UnavailableState } from '@/components/ui/StateView';
 import { TextField } from '@/components/ui/TextField';
 import { spacing } from '@/constants/theme';
 import { BackendUnavailableBanner } from '@/features/auth/components/BackendUnavailableBanner';
@@ -23,6 +23,7 @@ import {
   descriptionError,
   nameError,
 } from '@/features/clubs/validation';
+import { screenPrecondition } from '@/features/state-helper';
 import type {
   ClubJoinPolicy,
   ClubMemberStatus,
@@ -77,6 +78,11 @@ export default function CommunityScreen() {
   const [actionError, setActionError] = useState<AppError | null>(null);
 
   const reload = useCallback(() => setReloadToken((token) => token + 1), []);
+  const precondition = screenPrecondition(
+    backend,
+    userId,
+    'Sesi tidak ditemukan di perangkat ini. Masuk kembali untuk menjelajah klub.',
+  );
 
   useEffect(() => {
     if (!backend.available || !userId) return;
@@ -169,6 +175,16 @@ export default function CommunityScreen() {
         <AppText variant="titleLg">Klub &amp; anggota</AppText>
       </View>
 
+      {backend.available ? null : <BackendUnavailableBanner reason={backend.reason} />}
+
+      {precondition ? (
+        <UnavailableState
+          description={precondition.message}
+          icon="lock-closed-outline"
+          title="Klub belum bisa dimuat"
+        />
+      ) : null}
+
       {notice ? (
         <Banner message={notice} testID="community-notice" title="Berhasil" tone="success" />
       ) : null}
@@ -191,7 +207,7 @@ export default function CommunityScreen() {
           value={query}
         />
 
-        {state.status === 'loading' ? <LoadingState label="Memuat klub…" /> : null}
+        {!precondition && state.status === 'loading' ? <LoadingState label="Memuat klub…" /> : null}
 
         {state.status === 'error' ? (
           <ErrorState description={state.error.message} onRetry={reload} />
