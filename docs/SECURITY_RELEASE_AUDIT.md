@@ -1,9 +1,10 @@
 # Audit keamanan & kesiapan rilis beta — Milestone 5 (P0)
 
-Tanggal: 24 Oktober 2026 · Branch: `chore/m5-security-release-audit` (berbasis
-`chore/m5-security-checklist`, yang sudah memuat `main` `1c469ea`) · Scope:
-audit baca-saja lalu perbaikan terbatas. Tidak ada fitur, dependency, atau izin
-Android baru yang ditambahkan; tidak ada `db push` yang dijalankan.
+Tanggal: 24 Oktober 2026 · Diverifikasi ulang: 25 Oktober 2026 · Branch:
+`chore/m5-security-release-audit` (berbasis `chore/m5-security-checklist`, yang
+sudah memuat `main` `1c469ea`; kini fast-forward ke `origin/main` `c24030a`) ·
+Scope: audit baca-saja lalu perbaikan terbatas. Tidak ada fitur, dependency,
+atau izin Android baru yang ditambahkan; tidak ada `db push` yang dijalankan.
 
 Istilah status memakai katurgantingan repo: **Implemented**, **Passed locally**,
 **Passed against dev backend**, **Tested on physical device**, **Blocked**.
@@ -113,7 +114,55 @@ karena migration memakai `not valid`; jalankan setelah data lama diperiksa.
 Tidak ada gerbang yang dibulatkan menjadi lulus; kegagalan sementara
 `db:types:check` dan `doctor` dicatat apa adanya.
 
-## 6. Batasan audit ini
+## 6. Verifikasi ulang 25 Oktober 2026 (HEAD `c24030a`)
+
+Branch ini di-fast-forward ke `origin/main` sebelum verifikasi; working tree
+bersih. Tidak ada migration baru, tidak ada `db push`, dan tidak ada perubahan
+kode aplikasi pada verifikasi ini — yang diuji adalah keadaan yang sudah
+di-merge lewat PR #11.
+
+### 6.1 Status GitHub dan migration
+
+| Item | Hasil |
+| --- | --- |
+| `npx supabase migration list --linked` | exit 0 — **24 lokal = 24 remote**, termasuk `20261024003227_m5_catalog_hardening.sql` dan `20261024011825_m5_private_detail_limits.sql` |
+| CI (run `40144973648`) | success pada `c24030a` |
+| Database RLS (run `40144973825`) | success pada `c24030a` |
+| Release APK (run `40145137205`) | success; job build/tag **skipped** karena perubahan hanya dokumen — gate `should-release.mjs` bekerja seperti yang diuji |
+| Rilis APK terakhir | `v0.1.0-build47`, tag commit `84b89f2`, asset `app-preview.apk` 106.634.155 byte, digest GitHub `sha256:3af17f8a8f9d4283f715ee61f1f8279602dc518435893191839611565c9c85b8`. Asset **tidak** diunduh ulang dan tanda tangannya **tidak** diverifikasi ulang pada audit ini |
+
+### 6.2 Gerbang kualitas (25 Oktober 2026)
+
+| Perintah | Hasil |
+| --- | --- |
+| `npm ci` | exit 0 |
+| `npm run deps:check` | exit 0 |
+| `npm run typecheck` | exit 0 |
+| `npm run lint` | exit 0 |
+| `npm run format:check` | exit 0 |
+| `npm test -- --ci` | exit 0 — 45 suite / **500** test lulus |
+| `npm run test:scripts` | exit 0 — 74 suite / **343** test lulus |
+| `npm run db:test:lint` | exit 0 — 9 berkas uji vs **24** migration |
+| `npm run db:test` | exit 0 — **9/9** berkas lulus (termasuk `UJI KATALOG RLS LULUS` dan `UJI HAPUS AKUN LULUS`) |
+| `npm run db:types:check` | exit 0 — tipe sama dengan skema development |
+| `npm run export:android` | exit 0 — `entry-6419b9258db0f34c8e54fd125095f410.hbc` |
+| `npm run doctor` | exit 1 — **Blocked**: satu pemeriksaan butuh `exp.host` dan gagal `getaddrinfo EAI_AGAIN` (jaringan mesin, bukan temuan proyek) |
+
+Pemindaian rahasia pada bundel hasil `export:android` di atas: JWT utuh `eyJhbGciOi` = **0**, `postgres://` = **0**, nilai `sb_secret_` (≥30 karakter) = **0**; literal `service_role` = 2 (regex `src/lib/env.ts` dan kode `@supabase/supabase-js`, bukan nilai kunci).
+
+### 6.3 Kesimpulan verifikasi ulang
+
+- **Tidak ada temuan Critical atau High baru.** Seluruh temuan dan status di
+  bagian 2–4 tetap berlaku; AUD-10 sudah **Fixed** dan AUD-12 **Fixed sebagian**.
+- Risiko terbuka yang masih sama: rate limit follow/laporan/gabung klub/lokasi
+  (AUD-14), metadata job tanpa cleanup (AUD-23), project produksi + rollback
+  (AUD-21), keystore cadangan (AUD-22), uji perangkat (AUD-19), uji dua klien
+  Realtime (AUD-18), dan halaman web yang belum ter-deploy (AUD-20 —
+  `web/account-deletion/config.js` masih placeholder `GANTI-…`).
+- Uji SQL membuktikan database/RLS, bukan Auth Admin API atau Storage API; tidak
+  ada klaim **Tested on physical device** pada audit ini.
+
+## 7. Batasan audit ini
 
 - Verifikasi database hanya lewat `db:test` dan `db:types:check` (perintah
   `package.json`), sesuai batasan tugas; tidak ada kueri katalog manual yang
@@ -123,3 +172,9 @@ Tidak ada gerbang yang dibulatkan menjadi lulus; kegagalan sementara
   runtime Supabase; ketiganya tetap **Blocked** dan tidak boleh ditandai lulus.
 - Audit ini tidak menyentuh production, tidak memaksa-push, tidak meng-merge,
   dan tidak menyunting `CHANGELOG.md` maupun entri ADR lama.
+
+Verifikasi ulang 25 Oktober 2026 menambahkan bukti eksekusi pada HEAD
+`c24030a`: migration 24/24, CI + Database RLS hijau, gate rilis melewati build
+untuk perubahan dokumen, dan seluruh gerbang kualitas lulus kecuali `doctor`
+yang **Blocked** karena jaringan. Tidak ada migration yang diterapkan pada
+verifikasi ini.
