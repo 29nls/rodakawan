@@ -74,6 +74,7 @@ const DEFAULT_TEST_FILES = [
   'supabase/tests/rls_profiles_test.sql',
   'supabase/tests/rls_policy_guard_test.sql',
   'supabase/tests/rls_catalog_test.sql',
+  'supabase/tests/rls_catalog_hardening_test.sql',
   'supabase/tests/rls_rides_test.sql',
   'supabase/tests/rls_hazards_test.sql',
   'supabase/tests/rls_chat_test.sql',
