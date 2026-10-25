@@ -6,7 +6,9 @@ import { Screen } from '@/components/ui/Screen';
 import { ScreenHeader } from '@/components/ui/ScreenHeader';
 import { SectionHeader } from '@/components/ui/SectionHeader';
 import { spacing } from '@/constants/theme';
-
+import { useSupabaseState, classifyScreenState, getEmptyStateText, formatErrorMessage } from '@/features/state-helper';
+import { useAuthSession } from '@/features/auth/session';
+import { useProfile } from '@/features/profile/useProfile';
 const SUPPORT_URL = 'https://github.com/29nls/rodakawan/issues';
 
 /**
@@ -18,6 +20,20 @@ const SUPPORT_URL = 'https://github.com/29nls/rodakawan/issues';
  * halaman ini ikut berubah — bukan sebaliknya.
  */
 export default function PrivacyScreen() {
+  const { backend } = useAuthSession();
+  const { state } = useProfile();
+  const supabaseAvailable = backend?.available ?? false;
+
+  // Klasifikasi state layar berdasarkan status Supabase
+  const { status, showEmpty, showError } = classifyScreenState(
+    supabaseAvailable,
+    state.status ?? null,
+    0,
+  );
+
+  // Jika error, dapatkan pesan yang konsisten
+  const errorMessage = showError ? formatErrorMessage(state.error) : undefined;
+
   return (
     <Screen
       header={<ScreenHeader showBack title="Kebijakan privasi" />}
@@ -29,23 +45,41 @@ export default function PrivacyScreen() {
           subtitle="Ringkasan Bahasa Indonesia; diperbarui 23 Oktober 2026."
           title="Data yang disimpan"
         />
-        <View style={styles.list}>
-          <AppText variant="callout">
-            • Akun: email (dikelola Supabase Auth), username, nama tampilan, bio, kota, dan foto
-            profil privat.
-          </AppText>
-          <AppText variant="callout">
-            • Kendaraan: merek, model, tahun, foto, serta nomor polisi dan catatan privat yang hanya
-            dapat dibaca pemilik.
-          </AppText>
-          <AppText variant="callout">
-            • Perjalanan: keanggotaan, posisi terakhir selama Anda mengaktifkan berbagi lokasi,
-            pesan konvoi, dan laporan bahaya yang Anda kirim.
-          </AppText>
-          <AppText variant="callout">
-            • Perangkat: token notifikasi bila fitur notifikasi diaktifkan. Aplikasi tidak menyimpan
-            lokasi presisi di log.
-          </AppText>
+        {status === 'loading' ? (
+            <AppText variant="callout">
+              • Sedang memuat konfigurasi dan data privasi...\n  </AppText>
+          ) : null}
+
+          {status === 'ready' && showEmpty ? (
+            <AppText variant="callout">
+              • {getEmptyStateText('profile')}\n  </AppText>
+          ) : null}
+
+          {status === 'error' && !showEmpty ? (
+            <AppText variant="callout">
+              • {errorMessage ?? 'Terjadi kesalahan. Coba lagi.'}\n  </AppText>
+          ) : null}
+
+          {status === 'ready' && !showEmpty ? (
+            <View style={styles.list}>
+              <AppText variant="callout">
+                • Akun: email (dikelola Supabase Auth), username, nama tampilan, bio, kota, dan foto
+                profil privat.
+              </AppText>
+              <AppText variant="callout">
+                • Kendaraan: merek, model, tahun, foto, serta nomor polisi dan catatan privat yang hanya
+                dapat dibaca pemilik.
+              </AppText>
+              <AppText variant="callout">
+                • Perjalanan: keanggotaan, posisi terakhir selama Anda mengaktifkan berbagi lokasi,
+                pesan konvoi, dan laporan bahaya yang Anda kirim.
+              </AppText>
+              <AppText variant="callout">
+                • Perangkat: token notifikasi bila fitur notifikasi diaktifkan. Aplikasi tidak menyimpan
+                lokasi presisi di log.
+              </AppText>
+            </View>
+          ) : null}
         </View>
       </Card>
 

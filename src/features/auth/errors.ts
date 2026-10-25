@@ -81,7 +81,7 @@ function toErrorLike(error: unknown): ErrorLike {
   return {};
 }
 
-function isFetchFailure(like: ErrorLike): boolean {
+export function isFetchFailure(like: ErrorLike): boolean {
   if (like.name === 'AuthRetryableFetchError') return true;
   // Supabase menandai kegagalan jaringan sebagai status 0.
   if (like.status === 0) return true;

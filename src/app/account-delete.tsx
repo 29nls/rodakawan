@@ -11,12 +11,12 @@ import { ScreenHeader } from '@/components/ui/ScreenHeader';
 import { SectionHeader } from '@/components/ui/SectionHeader';
 import { TextField } from '@/components/ui/TextField';
 import { spacing } from '@/constants/theme';
+import { useSupabaseState, classifyScreenState, formatErrorMessage } from '@/features/state-helper';
 import { deleteMyAccount } from '@/features/account/api';
 import { BackendUnavailableBanner } from '@/features/auth/components/BackendUnavailableBanner';
 import type { AppError } from '@/features/auth/errors';
 import { useAuthSession } from '@/features/auth/session';
 import { useProfile } from '@/features/profile/useProfile';
-
 const SUPPORT_URL = 'https://github.com/29nls/rodakawan/issues';
 
 /**
@@ -32,6 +32,17 @@ export default function AccountDeleteScreen() {
   const router = useRouter();
   const { backend, userId, signOut } = useAuthSession();
   const { state } = useProfile();
+  const supabaseAvailable = backend?.available ?? false;
+
+  // Klasifikasi state layar berdasarkan status Supabase
+  const { status, showEmpty, showError } = classifyScreenState(
+    supabaseAvailable,
+    state.status ?? null,
+    0,
+  );
+
+  // Jika error Supabase, tampilkan banner error konsisten
+  const errorMessage = showError ? formatErrorMessage(state.error) : undefined;
 
   const profile = state.status === 'ready' ? state.profile : null;
   const expectedUsername = profile?.username ?? '';
@@ -73,6 +84,16 @@ export default function AccountDeleteScreen() {
       scroll
       testID="account-delete-screen"
     >
+      {showError && errorMessage ? (
+        <Banner
+          message={errorMessage}
+          title="Akun belum dihapus"
+          tone="danger"
+          testID="account-delete-error-banner"
+        />
+      ) : null}
+
+      <Card>
       <Card>
         <SectionHeader
           subtitle="Penghapusan bersifat permanen dan tidak bisa dibatalkan. Anda akan keluar dari perangkat ini."
