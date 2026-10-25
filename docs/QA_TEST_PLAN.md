@@ -290,7 +290,7 @@ Diperbarui 23 Oktober 2026 setelah ADR-077. Keputusan retensi ada di ADR-077 dan
 | Area | Implemented | Passed locally | Dev backend | Perangkat fisik |
 | --- | --- | --- | --- | --- |
 | Pemisahan identitas + tombstone + `purge_account_data()` | Ya — `20261023004946_account_deletion_identity.sql` | `db:test:lint` lulus (8 berkas, 20 migration) | **Lulus** — `rls_account_delete_test.sql` (48 perintah, notice `UJI HAPUS AKUN LULUS`) | — |
-| Orkestrasi server (Storage → DB → Auth) + retry | Ya — `supabase/functions/delete-account/` | **Lulus** — 10 test Node (urutan, retry, gagal-parsial) | **Lulus E2E** — fungsi di-deploy; Auth user hilang, media bersih, logo klub pindah, JWT lama ditolak, login ulang gagal | — |
+| Orkestrasi server (Storage → DB → Auth) + retry | Ya — `supabase/functions/delete-account/`, runner `scripts/account-deletion-e2e.mjs` | **Lulus** — 10 test Node (urutan, retry, gagal-parsial) | **Lulus E2E** — `npm run e2e:account-delete -- --yes` (25 Oktober 2026, 17 langkah): Auth user hilang, media bersih, logo klub pindah, JWT lama ditolak, login ulang gagal, 0 sisa | — |
 | Layanan klien (Edge Function + pemetaan galat) | Ya (7 test) | Ya | **Lulus** lewat E2E | — |
 | Layar `/account-delete` + `/privacy` | Ya (4 test layar) | Ya | **Blocked** (belum ada build) | **Blocked** |
 | Halaman web `web/account-deletion/` dan `web/privacy/` | Ya | Ya (statis, tanpa build) | **Blocked** — belum ada URL deployment | — |

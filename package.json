@@ -21,6 +21,7 @@
     "db:test": "node --env-file-if-exists=.env.db scripts/db-test.mjs",
     "db:test:lint": "node scripts/check-test-uuid-literals.mjs",
     "storage:test": "node --env-file-if-exists=.env.local --env-file-if-exists=.env.db scripts/storage-test.mjs",
+    "e2e:account-delete": "node --env-file-if-exists=.env.local --env-file-if-exists=.env.db scripts/account-deletion-e2e.mjs",
     "db:types": "node --env-file-if-exists=.env.db scripts/db-types.mjs",
     "db:types:check": "node --env-file-if-exists=.env.db scripts/db-types.mjs --check",
     "doctor": "npx expo-doctor",

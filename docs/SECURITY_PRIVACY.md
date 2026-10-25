@@ -309,7 +309,7 @@ Status per 24 Oktober 2026 (Milestone 5). Istilah status: **Implemented**,
 - Storage policies: **Passed against dev backend** (bucket privat, owner-only foto kendaraan, logo klub per peran, penolakan `anon`, dan CHECK path; 17 Oktober 2026). Yang belum diuji adalah unggahan HTTP nyata dari perangkat dan kedaluwarsa signed URL di klien — lihat `docs/QA_TEST_PLAN.md` (GAR-05/CLUB-11).
 - **Sudah dibangun tetapi belum diuji perangkat:** berbagi lokasi opt-in dan pembersihannya (bagian 4.2), dengan Realtime Postgres Changes yang tunduk pada RLS, serta flow hapus akun penuh (bagian 8.4) dan halaman kebijakan privasi. **Belum dibangun:** rate limit untuk endpoint auth, retensi otomatis metadata job, dan renderer peta. **Blocked:** URL publik halaman web (belum ada deployment).
 
-- [x] RLS aktif pada semua tabel/API yang terekspos — **Passed against dev backend** lewat `rls_catalog_test.sql` dan `rls_policy_guard_test.sql` (`npm run db:test` 9/9, 24 Oktober 2026); temuan grant `security definer` dilacak di butir pertama bagian ini dan masih **Blocked** sampai migration hardening diterapkan.
+- [x] RLS aktif pada semua tabel/API yang terekspos — **Passed against dev backend** lewat `rls_catalog_test.sql` dan `rls_policy_guard_test.sql` (`npm run db:test` 9/9, 24 Oktober 2026); temuan grant `security definer` di butir pertama bagian ini sudah diperbaiki lewat migration `20261024003227_m5_catalog_hardening.sql` (diterapkan ke development 24 Oktober 2026).
 - [x] Negative tests untuk akses non-member dan revoked member lulus — **Passed against dev backend** (24 Oktober 2026). `rls_profiles_test.sql` menolak akses lintas pengguna dan detail privat yang dipindahkan; `rls_rides_test.sql` menolak non-anggota dan `anon` membaca perjalanan/lokasi; `rls_chat_test.sql` bagian 15b (ditambahkan di branch ini) membuktikan peserta berstatus `removed` membaca 0 pesan dan ditolak saat mengirim. Seluruhnya berjalan lewat `npm run db:test` **9/9** lulus; `rls_policy_guard_test.sql` tetap memeriksa policy wadah. Jalur kegagalan runner tetap **Passed locally**.
 - [x] Pagar policy otomatis: `supabase/tests/rls_policy_guard_test.sql` menolak policy pada tabel wadah
       (`club_id`/`ride_id`) yang memberi akses lewat kolom kepemilikan tanpa penjaga keanggotaan;
@@ -329,12 +329,12 @@ Status per 24 Oktober 2026 (Milestone 5). Istilah status: **Implemented**,
   | Perjalanan | `rides/validation.ts` (judul 3–120, deskripsi ≤ 2000, label ≤ 120, jadwal) | CHECK `public.rides` termasuk rentang koordinat |
   | Hazard | `hazards/api.ts` (deskripsi ≤ 1000) | RPC tulis + CHECK ≤ 1000; **rate limit 5 laporan/10 menit** dan **10 konfirmasi/jam** |
   | Chat | `chat/api.ts` (isi ≤ 2000, dirapikan) | Hanya RPC (`send_chat_message`/`edit`/`delete`), CHECK 1–2000, **20 pesan/60 detik**, jendela edit 15 menit |
-  | Laporan moderasi | `moderation/api.ts` (detail ≤ 2000) | RPC `report_content` + CHECK ≤ 2000; **tanpa rate limit** |
-  | Follow, permintaan gabung/undang klub | Tombol UI, tanpa batas frekuensi | RLS + constraint identitas; **tanpa rate limit** |
+  | Laporan moderasi | `moderation/api.ts` (detail ≤ 2000) | RPC `report_content` + CHECK ≤ 2000; **rate limit 10 laporan/10 menit** lewat trigger `content_reports_rate_limit` (menutup RPC dan jalur REST) — diterapkan ke development 25 Oktober 2026 |
+  | Follow, permintaan gabung/undang klub | Tombol UI, tanpa batas frekuensi | RLS + constraint identitas; **rate limit 10 follow/10 menit** (trigger) dan **5 permintaan gabung/10 menit** (RPC) — diterapkan ke development 25 Oktober 2026; undangan klub belum punya jalur tulis |
   | Lokasi perjalanan | Nilai dari GPS, tanpa validasi rentang di klien | RLS peserta aktif + CHECK rentang; **tanpa throttle di database** |
   | Hapus akun | Konfirmasi username di layar | Lease + retry **15 menit** setelah kegagalan |
 
-  **Celah terbuka (bukan lulus):** rate limit follow, laporan moderasi, permintaan gabung/undang klub, dan pembaruan lokasi belum ada; batas panjang kolom path (`avatar_url`, `logo_path`, `photo_path`, `media_path`) belum ditegakkan database. Tidak ada dependency sanitasi baru — data dikirim lewat PostgREST/RPC berparameter, bukan SQL string.
+  **Celah terbuka (bukan lulus):** rate limit follow, laporan moderasi, dan permintaan gabung klub sudah diterapkan ke development (25 Oktober 2026, `db:test` 10/10), sedangkan throttle pembaruan lokasi, rate limit endpoint Auth, dan batas panjang kolom path (`avatar_url`, `logo_path`, `photo_path`, `media_path`) masih terbuka. Tidak ada dependency sanitasi baru — data dikirim lewat PostgREST/RPC berparameter, bukan SQL string.
 - [x] Flow hapus akun penuh dan data terdokumentasi — Edge Function `delete-account` + `purge_account_data()`
       + Auth Admin API; layar `/account-delete`; uji SQL `rls_account_delete_test.sql` dan E2E
       development lulus (9/9 berkas pada 24 Oktober 2026; 8/8 pada 23 Oktober 2026); rincian di bagian 8.4 dan ADR-077.

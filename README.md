@@ -244,6 +244,7 @@ npm run export:android   # bundel Android (Metro + Hermes) tanpa perangkat
 npm run db:test          # uji RLS ke database development (butuh .env.db / DATABASE_URL)
 npm run db:test:lint     # periksa literal UUID di berkas uji SQL (statis, tanpa database)
 npm run storage:test     # uji integrasi HTTP Storage dengan akun uji sementara (.env.local + .env.db)
+npm run e2e:account-delete -- --yes  # E2E Auth+Storage+Edge Function hapus akun (dev; membuat/menghapus akun uji)
 npm run db:types         # generate ulang tipe database dari skema development
 npm run db:types:check   # periksa drift tipe (dijalankan CI database)
 ```
@@ -294,6 +295,7 @@ runner test script (ADR-072) + perbaikan lokal yang belum di-commit saat tabel i
 | `npm run db:test` | **Exit 0 — 8/8 berkas lulus** (23 Oktober 2026, `.env.db` menunjuk Session Pooler project development). Seluruh notice penanda diterima, termasuk keempat berkas M4 dan `rls_account_delete_test.sql`. |
 | `npm run db:types:check` | **Exit 0** — `src/lib/supabase/database.generated.ts` sama dengan skema database (22 Oktober 2026, target session pooler project development). |
 | `npm run storage:test` | **Exit 0 — 27 langkah lulus** (23 Oktober 2026), termasuk verifikasi kebersihan objek/akun uji. |
+| `npm run e2e:account-delete -- --yes` | **Exit 0 — 17 langkah lulus** (25 Oktober 2026): Auth user/profil/media pribadi A hilang, hazard/laporan/chat tombstone, logo klub pindah, akun B utuh, JWT lama ditolak, login ulang gagal, job `completed`, 0 objek/baris sisa. Tanpa service_role. |
 
 Hasil historis pada commit `749424c` (19 Oktober 2026, Node 24.18.1, npm 12.0.2):
 

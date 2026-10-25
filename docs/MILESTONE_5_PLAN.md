@@ -126,7 +126,7 @@ Irisan ini **selesai dan diuji end-to-end terhadap project development** untuk j
 | Layanan klien | `src/features/account/api.ts`, `errors.ts` | 13 test di `src/features/account/__tests__/api.test.ts` |
 | Layar | `src/app/account-delete.tsx`, `src/app/privacy.tsx` | 4 test layar di `src/__tests__/account-delete.test.tsx` |
 | Web publik | `web/account-deletion/`, `web/privacy/` | halaman statis + prosedur deploy; **belum live** |
-| Uji E2E Auth/Storage | skrip sementara (tidak di-commit) dijalankan terhadap development | Auth user A hilang, profil hilang, laporan bahaya tetap, media pribadi hilang, logo klub pindah, JWT lama ditolak, login ulang gagal, akun B tidak tersentuh |
+| Uji E2E Auth/Storage | `scripts/account-deletion-e2e.mjs` (`npm run e2e:account-delete -- --yes`) | **Implemented** (runner permanen) dan **Passed against dev backend** (25 Oktober 2026, 17 langkah): Auth user A hilang, profil/media pribadi hilang, hazard, laporan, dan chat menjadi tombstone/diredaksi, logo klub pindah, akun B utuh, JWT lama ditolak, login ulang gagal, job completed, cleanup 0 sisa |
 
 Perintah yang benar-benar dijalankan (24 Oktober 2026): `npm test -- --ci` **0** (45 suite / 500 test),
 `npm run test:scripts` **0** (74 suite / 343 test), `npm run db:test` **0** (8/8 berkas setelah migration ADR-078 diterapkan ke development; sebelumnya 7/8), `npm run db:types:check` **0** (tipe diregenerasi), `npm run storage:test` **0** (27 langkah), `npm run db:test:lint` **0** (8 berkas uji, 22
@@ -134,7 +134,7 @@ migration), `typecheck`/`lint`/`format:check` **0**, `npm run export:android` **
 4.1 MB), dan `npm run doctor` **1** — 20 dari 21 pemeriksaan lulus, satu pemeriksaan skema `app.json`
 gagal `ENOTFOUND exp.host` (lingkungan, bukan temuan proyek).
 
-**Yang tetap terbuka dan tidak boleh dicatat lulus:** jalur lease sudah aktif di backend development (migration 22 lokal = 22 remote, Edge Function di-redeploy 24 Oktober 2026) tetapi belum diuji E2E terhadap Auth/Storage, belum dijalankan di perangkat, dan belum dijalankan dari CI pada commit final; halaman web belum punya
+**Yang tetap terbuka dan tidak boleh dicatat lulus:** E2E Auth/Storage kini dapat diulang dan lulus pada 25 Oktober 2026 (runner di atas), tetapi belum dijalankan di perangkat dan belum dijalankan dari CI pada commit final; halaman web belum punya
 URL publik (blocker deployment); alur ini belum dicoba di perangkat fisik; metadata job
 (`account_deletion_jobs`) belum dibersihkan otomatis; keputusan retensi untuk laporan bahaya/audit/pesan
 yang diredaksi masih perlu pengesahan produk/legal; dan CI/RLS untuk commit perubahan ini baru berjalan
