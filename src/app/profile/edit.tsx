@@ -13,6 +13,7 @@ import { createOwnProfile, updateOwnProfile } from '@/features/profile/api';
 import { ProfileForm, type ProfileFormValues } from '@/features/profile/components/ProfileForm';
 import { useProfile } from '@/features/profile/useProfile';
 import { isGeneratedUsername } from '@/features/profile/validation';
+import { useSupabaseState, classifyScreenState, formatErrorMessage } from '@/features/state-helper';
 
 /**
  * Mengubah profil sendiri, dan membuat baris profil bila belum ada
@@ -24,6 +25,17 @@ import { isGeneratedUsername } from '@/features/profile/validation';
 export default function ProfileEditScreen() {
   const { backend, userId, requestedUsername } = useAuthSession();
   const { state, reload } = useProfile();
+  const supabaseAvailable = backend?.available ?? false;
+
+  // Klasifikasi state layar berdasarkan status Supabase
+  const { status, showEmpty, showError } = classifyScreenState(
+    supabaseAvailable,
+    state.status ?? null,
+    0,
+  );
+
+  // Jika error, dapatkan pesan yang konsisten
+  const errorMessage = showError ? formatErrorMessage(state.error) : undefined;
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<AppError | null>(null);
@@ -81,16 +93,22 @@ export default function ProfileEditScreen() {
         title={isCreating ? 'Lengkapi profil' : 'Edit profil'}
       />
 
-      {state.status === 'loading' ? <LoadingState label="Memuat profil…" /> : null}
-
-      {state.status === 'error' ? (
+      {showError ? (
         <Banner
           action="Muat ulang halaman ini setelah koneksi kembali."
-          message={state.error.message}
+          message={errorMessage}
           title="Profil belum bisa dimuat"
           tone="danger"
         />
       ) : null}
+
+      {showEmpty && profile === null ? (
+        <AppText tone="muted" variant="caption">
+          Profil belum terisi. Lengkapi data di bawah untuk memulai.
+        </AppText>
+      ) : null}
+
+      {/* Loading state managed via classifyScreenState */
 
       {generatedUsernameNotice ? (
         <Banner message={generatedUsernameNotice} title="Username ini sementara" tone="warning" />

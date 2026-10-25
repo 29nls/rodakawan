@@ -13,9 +13,7 @@ import { Screen } from '@/components/ui/Screen';
 import { ScreenHeader } from '@/components/ui/ScreenHeader';
 import { SectionHeader } from '@/components/ui/SectionHeader';
 import { ErrorState, LoadingState, UnavailableState } from '@/components/ui/StateView';
-import { spacing } from '@/constants/theme';
-import { BackendUnavailableBanner } from '@/features/auth/components/BackendUnavailableBanner';
-import type { AppError } from '@/features/auth/errors';
+import { isFetchFailure, NETWORK_ERROR } from '@/features/auth/errors';
 import { useAuthSession } from '@/features/auth/session';
 import {
   getClubDetails,
@@ -86,7 +84,9 @@ export default function ClubScreen() {
         setState(
           detail.error.code === 'not_found'
             ? { status: 'missing' }
-            : { status: 'error', error: detail.error },
+            : isFetchFailure(detail.error)
+              ? { status: 'error', error: detail.error }
+              : { status: 'error', error: detail.error },
         );
         return;
       }
@@ -98,7 +98,13 @@ export default function ClubScreen() {
       if (!active) return;
 
       if (!members.ok) {
-        setState({ status: 'error', error: members.error });
+        setState(
+          detail.error.code === 'not_found'
+            ? { status: 'missing' }
+            : isFetchFailure(members.error)
+              ? { status: 'error', error: members.error }
+              : { status: 'error', error: members.error },
+        );
         return;
       }
 

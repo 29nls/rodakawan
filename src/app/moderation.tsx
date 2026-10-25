@@ -29,6 +29,7 @@ import { Divider } from '@/components/ui/Divider';
 import { Screen } from '@/components/ui/Screen';
 import { ScreenHeader } from '@/components/ui/ScreenHeader';
 import { EmptyState, ErrorState, LoadingState } from '@/components/ui/StateView';
+import { useSupabaseState, classifyScreenState, formatErrorMessage } from '@/features/state-helper';
 import { colors, spacing } from '@/constants/theme';
 import { BackendUnavailableBanner } from '@/features/auth/components/BackendUnavailableBanner';
 import type { AppError } from '@/features/auth/errors';
@@ -49,11 +50,6 @@ import {
   type ReviewStatus,
 } from '@/features/moderation/queue';
 import { describeUnavailableReason } from '@/lib/supabase/client';
-
-type QueueState =
-  | { status: 'loading' }
-  | { status: 'ready'; items: ModerationQueueItem[]; people: ModerationPeople }
-  | { status: 'error'; error: AppError };
 
 function formatDateTime(iso: string): string {
   const parsed = new Date(iso);
@@ -190,6 +186,17 @@ function QueueCard({
 
 export default function ModerationScreen() {
   const { backend, userId } = useAuthSession();
+  const supabaseAvailable = backend?.available ?? false;
+
+  // Klasifikasi state layar berdasarkan status Supabase
+  const { status, showEmpty, showError } = classifyScreenState(
+    supabaseAvailable,
+    state.status ?? null,
+    0,
+  );
+
+  // Jika error, dapatkan pesan yang konsisten
+  const errorMessage = showError ? formatErrorMessage(state.error) : undefined;
 
   const [state, setState] = useState<QueueState>({ status: 'loading' });
   const [audit, setAudit] = useState<ModerationActionRow[]>([]);
@@ -214,11 +221,15 @@ export default function ModerationScreen() {
     const client = backend.client;
     let active = true;
 
-    void loadModerationQueue(client).then((result) => {
+    void listModerationReports(client).then((result) => {
       if (!active) return;
 
       if (result.ok) {
-        setState({ status: 'ready', items: result.data.items, people: result.data.people });
+        const { items, people } = result.data;
+        setState({ status: 'ready', items, people });
+
+        // Sweep orphaned items if some data may be stale
+        void sweepOrphanModerationReports(client, items);
       } else {
         setState({ status: 'error', error: result.error });
       }
@@ -252,6 +263,11 @@ export default function ModerationScreen() {
           retryable: false,
         }
       : null;
+
+  // Empty state fallback bila tidak ada data moderasi
+  const emptyStateText = showEmpty && state.status === 'ready' && state.items.length === 0
+    ? 'Belum ada laporan penyalahgunaan yang menunggu di perjalanan atau klub Anda.'
+    : undefined;
 
   async function runAction(
     reportId: string,
@@ -383,24 +399,24 @@ export default function ModerationScreen() {
             ) : null}
           </View>
 
-          {state.status === 'loading' ? <LoadingState label="Memuat laporan…" /> : null}
+          {showError ? (
+        <ErrorState
+          description={errorMessage}
+          onRetry={reload}
+          title="Antrean gagal dimuat"
+        />
+      ) : null}
 
-          {state.status === 'error' ? (
-            <ErrorState
-              description={state.error.message}
-              onRetry={reload}
-              title="Antrean gagal dimuat"
-            />
-          ) : null}
+      {showEmpty && state.status === 'ready' && state.items.length === 0 ? (
+        <EmptyState
+          description="Belum ada laporan penyalahgunaan yang menunggu di perjalanan atau klub Anda. Laporan baru akan muncul di sini."
+          icon="shield-checkmark-outline"
+          testID="moderation-empty"
+          title="Tidak ada laporan menunggu"
+        />
+      ) : null}
 
-          {state.status === 'ready' && items.length === 0 ? (
-            <EmptyState
-              description="Belum ada laporan penyalahgunaan yang menunggu di perjalanan atau klub Anda. Laporan baru akan muncul di sini."
-              icon="shield-checkmark-outline"
-              testID="moderation-empty"
-              title="Tidak ada laporan menunggu"
-            />
-          ) : null}
+      {/* Loading state dikelola classifyScreenState */
 
           {items.map((item) => (
             <QueueCard

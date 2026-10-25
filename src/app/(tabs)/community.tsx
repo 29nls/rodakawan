@@ -10,6 +10,7 @@ import { Card } from '@/components/ui/Card';
 import { Divider } from '@/components/ui/Divider';
 import { Screen } from '@/components/ui/Screen';
 import { SectionHeader } from '@/components/ui/SectionHeader';
+import { useSupabaseState, classifyScreenState, formatErrorMessage } from '@/features/state-helper';
 import { EmptyState, ErrorState, LoadingState } from '@/components/ui/StateView';
 import { TextField } from '@/components/ui/TextField';
 import { spacing } from '@/constants/theme';
@@ -66,6 +67,17 @@ const EMPTY_CLUB_FORM = {
 export default function CommunityScreen() {
   const router = useRouter();
   const { backend, userId } = useAuthSession();
+  const supabaseAvailable = backend?.available ?? false;
+
+  // Klasifikasi state layar berdasarkan status Supabase
+  const { status, showEmpty, showError } = classifyScreenState(
+    supabaseAvailable,
+    state.status ?? null,
+    0,
+  );
+
+  // Jika error, dapatkan pesan yang konsisten
+  const errorMessage = showError ? formatErrorMessage(state.error) : undefined;
 
   const [state, setState] = useState<BrowseState>({ status: 'loading' });
   const [reloadToken, setReloadToken] = useState(0);
@@ -169,9 +181,7 @@ export default function CommunityScreen() {
         <AppText variant="titleLg">Klub &amp; anggota</AppText>
       </View>
 
-      {backend.available ? null : <BackendUnavailableBanner reason={backend.reason} />}
-
-      {notice ? (
+      {showError ? (
         <Banner message={notice} testID="community-notice" title="Berhasil" tone="success" />
       ) : null}
 
