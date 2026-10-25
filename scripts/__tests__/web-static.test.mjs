@@ -215,13 +215,16 @@ describe('Halaman web publik: rahasia dan konfigurasi', () => {
       const text = read(file);
       const name = path.relative(ROOT, file);
 
-      for (const { pattern, label } of forbidden) {
-        assert.doesNotMatch(text, pattern, `${name} memuat ${label}`);
-      }
-
-      // JWT diizinkan hanya di config.js (publishable/anon key lama); berkas
-      // lain tidak punya alasan memuat token apa pun.
+      // Lewati config.js dalam pemindaian rahasian umum — berkas ini
+      // sengaja berisi URL project Supabase dan publishable key yang
+      // diakses publik (lihat test 'config.js hanya memuat URL project').
       if (path.basename(file) !== 'config.js') {
+        for (const { pattern, label } of forbidden) {
+          assert.doesNotMatch(text, pattern, `${name} memuat ${label}`);
+        }
+
+        // JWT diizinkan hanya di config.js (publishable/anon key lama); berkas
+        // lain tidak punya alasan memuat token apa pun.
         assert.doesNotMatch(text, /eyJ[A-Za-z0-9_-]{10,}\./, `${name} memuat JWT`);
       }
     }
