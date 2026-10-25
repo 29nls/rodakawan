@@ -178,9 +178,18 @@ npx supabase functions deploy delete-account --project-ref <project-ref-developm
 Verifikasi setelah deploy (jangan pakai akun nyata): buat dua akun uji, unggah avatar/foto/logo klub,
 panggil fungsi dengan access token akun A, lalu periksa: `auth.users` A hilang, profil A hilang,
 media pribadi hilang, logo klub masih ada di path baru, laporan bahaya tetap ada sebagai tombstone,
-dan JWT lama tidak bisa membaca/menulis. Skrip E2E yang dipakai pada 23 Oktober 2026 bersifat
-sementara (tidak di-commit) karena membuat/menghapus akun di project development; langkah manualnya
-ada di `web/README.md` bagian verifikasi.
+dan JWT lama tidak bisa membaca/menulis.
+
+Seluruh langkah itu dapat diulang dengan runner permanen (tanpa service_role):
+
+```powershell
+npm run e2e:account-delete -- --yes
+```
+
+Runner membaca `.env.local` + `.env.db`, menolak URL selain project development, membuat akun/klub/ride/
+hazard/chat/media sintetis, memanggil Edge Function, memeriksa 17 asersi, lalu membersihkan sendiri.
+Verifikasi terakhir 25 Oktober 2026: exit 0, notice `UJI E2E HAPUS AKUN LULUS`, 0 objek/baris sisa.
+Jangan menjalankan tanpa `--yes` di project yang tidak boleh dihapus akunnya.
 
 Halaman web publik ada di `web/` (statis, tanpa build). Ikuti `web/README.md` untuk mengisi URL +
 publishable key, memilih hosting, dan mencatat URL di Play Console. **URL publik belum ada** sampai
