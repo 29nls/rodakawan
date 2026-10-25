@@ -13,12 +13,11 @@
 --    lengkap dengan alasannya. Grant bawaan PostgreSQL untuk fungsi baru
 --    adalah `PUBLIC`, jadi fungsi definer tanpa `revoke` adalah endpoint publik
 --    meskipun tidak pernah dipanggil klien.
--- c. Setiap `security definer` memakai `search_path` kosong. Daftar tunggu di
---    bawah adalah temuan nyata yang perbaikannya ada di migration
---    `20261024003227_m5_catalog_hardening.sql` — belum diterapkan ke
---    development. Setelah migration itu diterapkan, entri daftar tunggu harus
---    dihapus; uji ini sengaja gagal bila entri tidak lagi diperlukan agar
---    daftar tidak menjadi izin permanen.
+-- c. Setiap `security definer` memakai `search_path` kosong. Kunci ini
+--    diterapkan lewat migration `20261024003227_m5_catalog_hardening.sql`
+--    (sudah dijalankan ke development); uji ini gagal bila ada fungsi definer
+--    baru yang tidak mengunci `search_path`, supaya aturan itu tidak melunak
+--    diam-diam.
 -- d. Setiap view di `public` memakai `security_invoker = true` supaya RLS
 --    tabel dasarnya tetap berlaku (view tanpa opsi itu berjalan sebagai
 --    pemilik view dan melewati RLS).
@@ -203,12 +202,7 @@ declare
     'public.is_ride_host(uuid)',
     'public.is_ride_member(uuid)'
   ];
-  v_sementara text[] := array[
-    'public.bootstrap_profile()',
-    'public.clear_ride_location_on_opt_out()',
-    'public.clear_ride_locations_on_finish()'
-  ];
-  v_allowed text[] := v_izin_anon || v_sementara;
+  v_allowed text[] := v_izin_anon;
 begin
   select string_agg(signature, ', ' order by signature)
   into v_terbuka
@@ -221,9 +215,10 @@ begin
       v_terbuka;
   end if;
 
-  -- Anti-usang: entri tetap harus benar-benar ada dan masih terbuka. Setelah
-  -- migration 20261024003227_m5_catalog_hardening.sql diterapkan, entri
-  -- v_sementara gagal di sini dan harus dihapus dari daftar.
+  -- Anti-usang: setiap entri pengecualian harus benar-benar masih terbuka.
+  -- Fungsi trigger (`bootstrap_profile`, `clear_ride_location_on_opt_out`,
+  -- `clear_ride_locations_on_finish`) sudah dicabut `EXECUTE`-nya oleh
+  -- migration 20261024003227 dan karena itu tidak boleh ada di daftar ini.
   foreach v_sig in array v_allowed loop
     if not exists (
       select 1 from pg_temp.uji_definer_terbuka() o
@@ -246,20 +241,7 @@ do $$
 declare
   v_buruk text;
   v_sig text;
-  v_tunggu text[] := array[
-    'public.can_publish_ride_location(uuid)',
-    'public.create_club(text,text,text,text,text)',
-    'public.is_club_admin(uuid)',
-    'public.is_club_member(uuid)',
-    'public.is_ride_active_member(uuid)',
-    'public.is_ride_host(uuid)',
-    'public.is_ride_member(uuid)',
-    'public.leave_club(uuid)',
-    'public.remove_club_member(uuid,uuid)',
-    'public.request_club_membership(uuid)',
-    'public.review_club_membership(uuid,uuid,boolean)',
-    'public.set_club_member_role(uuid,uuid,text)'
-  ];
+  v_tunggu text[] := array[]::text[];
 begin
   select string_agg(signature, ', ' order by signature)
   into v_buruk
@@ -283,7 +265,7 @@ begin
     end if;
   end loop;
 
-  raise notice 'UJI: search_path security definer kosong, kecuali daftar tunggu migration 20261024003227';
+  raise notice 'UJI: seluruh security definer memakai search_path kosong';
 end;
 $$;
 
@@ -355,7 +337,7 @@ $$;
 
 do $$
 begin
-  raise notice 'UJI KATALOG RLS LULUS: semua tabel public ber-RLS, tidak ada definer yang terbuka ke PUBLIC/anon di luar pengecualian beralasan, search_path definer dikunci (kecuali daftar tunggu migration), view memakai security_invoker, dan tabel realtime terpublikasi dengan RLS aktif.';
+  raise notice 'UJI KATALOG RLS LULUS: semua tabel public ber-RLS, tidak ada definer yang terbuka ke PUBLIC/anon di luar pengecualian beralasan, search_path definer terkunci semua, view memakai security_invoker, dan tabel realtime terpublikasi dengan RLS aktif.';
 end;
 $$;
 
