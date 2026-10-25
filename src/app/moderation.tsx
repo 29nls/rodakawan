@@ -48,7 +48,7 @@ import {
   type ModerationQueueItem,
   type ReviewStatus,
 } from '@/features/moderation/queue';
-import { describeUnavailableReason } from '@/lib/supabase/client';
+import { screenPrecondition } from '@/features/state-helper';
 
 /** Status pemuatan antrean; bentuknya eksplisit supaya render tidak menebak. */
 type QueueState =
@@ -239,20 +239,11 @@ export default function ModerationScreen() {
     };
   }, [backend, reloadToken]);
 
-  const precondition: AppError | null = !backend.available
-    ? {
-        code: 'backend_not_configured',
-        message: describeUnavailableReason(backend.reason),
-        retryable: false,
-      }
-    : !userId
-      ? {
-          code: 'session_expired',
-          message:
-            'Sesi tidak ditemukan di perangkat ini. Masuk kembali untuk membuka dashboard moderasi.',
-          retryable: false,
-        }
-      : null;
+  const precondition = screenPrecondition(
+    backend,
+    userId,
+    'Sesi tidak ditemukan di perangkat ini. Masuk kembali untuk membuka dashboard moderasi.',
+  );
 
   async function runAction(
     reportId: string,

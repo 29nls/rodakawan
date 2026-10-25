@@ -29,6 +29,7 @@ import {
   rideLabelError,
   rideTitleError,
 } from '@/features/rides/validation';
+import { screenPrecondition } from '@/features/state-helper';
 import type { RideVisibility } from '@/lib/supabase/database.types';
 
 type FormState = {
@@ -80,6 +81,11 @@ export default function RideNewScreen() {
   const rideId = typeof params.id === 'string' ? params.id : null;
   const editing = rideId !== null;
   const { backend, userId } = useAuthSession();
+  const precondition = screenPrecondition(
+    backend,
+    userId,
+    'Sesi tidak ditemukan di perangkat ini. Masuk kembali untuk membuat perjalanan.',
+  );
 
   const [clubs, setClubs] = useState<RideClubSummary[] | null>(null);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
@@ -227,6 +233,14 @@ export default function RideNewScreen() {
         <Banner message={actionError.message} title="Perjalanan belum tersimpan" tone="danger" />
       ) : null}
 
+      {precondition ? (
+        <UnavailableState
+          description={precondition.message}
+          icon="lock-closed-outline"
+          title="Perjalanan belum bisa dibuat"
+        />
+      ) : null}
+
       {loadProblem ? (
         <UnavailableState
           action={{ label: 'Kembali', onPress: () => router.back(), icon: 'arrow-back-outline' }}
@@ -236,7 +250,9 @@ export default function RideNewScreen() {
         />
       ) : null}
 
-      {clubs === null && !loadProblem ? <LoadingState label="Memuat klub Anda…" /> : null}
+      {!precondition && clubs === null && !loadProblem ? (
+        <LoadingState label="Memuat klub Anda…" />
+      ) : null}
 
       {clubs !== null && clubs.length === 0 && !editing ? (
         <UnavailableState

@@ -25,6 +25,7 @@ import {
   type ApiResult,
   type ClubDetail,
 } from '@/features/clubs/api';
+import { screenPrecondition } from '@/features/state-helper';
 import { CLUB_LOGO_BUCKET, getPhotoSignedUrl } from '@/features/media/photos';
 import type { ClubMemberRow, ClubMemberStatus } from '@/lib/supabase/database.types';
 
@@ -70,6 +71,12 @@ export default function ClubScreen() {
 
   const reload = useCallback(() => setReloadToken((token) => token + 1), []);
   const logoPath = state.status === 'ready' ? state.detail.club.logo_path : null;
+  const precondition = screenPrecondition(
+    backend,
+    userId,
+    'Sesi tidak ditemukan di perangkat ini. Masuk kembali untuk membuka detail klub.',
+  );
+  const missingTarget = clubId.length === 0;
 
   useEffect(() => {
     if (!backend.available || !userId || clubId.length === 0) return;
@@ -208,7 +215,25 @@ export default function ClubScreen() {
         <Banner message={actionError.message} title="Aksi tidak selesai" tone="danger" />
       ) : null}
 
-      {state.status === 'loading' ? <LoadingState label="Memuat klub…" /> : null}
+      {precondition ? (
+        <UnavailableState
+          description={precondition.message}
+          icon="lock-closed-outline"
+          title="Klub belum bisa dibuka"
+        />
+      ) : null}
+
+      {!precondition && missingTarget ? (
+        <UnavailableState
+          description="Tautan ini tidak memuat ID klub. Buka klub dari tab Komunitas, atau minta tautan baru dari pengelola."
+          icon="alert-circle-outline"
+          title="Klub tidak dikenali"
+        />
+      ) : null}
+
+      {!precondition && !missingTarget && state.status === 'loading' ? (
+        <LoadingState label="Memuat klub…" />
+      ) : null}
 
       {state.status === 'error' ? (
         <ErrorState description={state.error.message} onRetry={reload} />

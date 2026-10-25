@@ -17,12 +17,18 @@ jest.mock('expo-router', () => {
   };
 });
 
+let mockBackendAvailable = true;
+
 jest.mock('@/features/auth/session', () => {
-  const backend = { available: true, client: {} };
+  // Objek backend harus stabil antar-render: `useFocusEffect` memakai identitas
+  // `backend` sebagai dependensi, jadi objek baru setiap render akan memicu
+  // muat ulang tanpa henti.
+  const available = { available: true, client: {} };
+  const unavailable = { available: false, reason: 'not_configured' };
 
   return {
     useAuthSession: () => ({
-      backend,
+      backend: mockBackendAvailable ? available : unavailable,
       userId: '11111111-1111-1111-1111-111111111111',
     }),
   };
@@ -65,6 +71,7 @@ const ride: RideWithClub = {
 describe('tab Perjalanan', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockBackendAvailable = true;
     mockedListRides.mockResolvedValue({ ok: true, data: [ride] });
   });
 
@@ -85,6 +92,16 @@ describe('tab Perjalanan', () => {
 
     expect(await screen.findByText('Belum ada perjalanan')).toBeTruthy();
     expect(screen.queryByText('Kopdar Sabtu')).toBeNull();
+  });
+
+  it('menampilkan state belum tersedia, bukan daftar kosong, saat backend belum siap', async () => {
+    mockBackendAvailable = false;
+
+    await render(<RidesScreen />);
+
+    expect(await screen.findByText('Perjalanan belum bisa dimuat')).toBeTruthy();
+    expect(screen.queryByText('Belum ada perjalanan')).toBeNull();
+    expect(mockedListRides).not.toHaveBeenCalled();
   });
 
   it('membuka formulir buat perjalanan', async () => {

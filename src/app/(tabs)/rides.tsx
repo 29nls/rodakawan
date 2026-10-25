@@ -6,13 +6,14 @@ import { AppText } from '@/components/ui/AppText';
 import { Button } from '@/components/ui/Button';
 import { Screen } from '@/components/ui/Screen';
 import { SectionHeader } from '@/components/ui/SectionHeader';
-import { EmptyState, ErrorState, LoadingState } from '@/components/ui/StateView';
+import { EmptyState, ErrorState, LoadingState, UnavailableState } from '@/components/ui/StateView';
 import { spacing } from '@/constants/theme';
 import { BackendUnavailableBanner } from '@/features/auth/components/BackendUnavailableBanner';
 import type { AppError } from '@/features/auth/errors';
 import { useAuthSession } from '@/features/auth/session';
 import { listRides, type RideWithClub } from '@/features/rides/api';
 import { RideCard } from '@/features/rides/components/RideCard';
+import { screenPrecondition } from '@/features/state-helper';
 import type { RideStatus } from '@/lib/supabase/database.types';
 
 type RidesState =
@@ -52,6 +53,11 @@ export default function RidesScreen() {
   const [reloadToken, setReloadToken] = useState(0);
 
   const reload = useCallback(() => setReloadToken((token) => token + 1), []);
+  const precondition = screenPrecondition(
+    backend,
+    userId,
+    'Sesi tidak ditemukan di perangkat ini. Masuk kembali untuk melihat perjalanan.',
+  );
 
   useFocusEffect(
     useCallback(() => {
@@ -109,13 +115,23 @@ export default function RidesScreen() {
         variant="primary"
       />
 
-      {state.status === 'loading' ? <LoadingState label="Memuat perjalanan…" /> : null}
+      {precondition ? (
+        <UnavailableState
+          description={precondition.message}
+          icon="lock-closed-outline"
+          title="Perjalanan belum bisa dimuat"
+        />
+      ) : null}
 
-      {state.status === 'error' ? (
+      {!precondition && state.status === 'loading' ? (
+        <LoadingState label="Memuat perjalanan…" />
+      ) : null}
+
+      {!precondition && state.status === 'error' ? (
         <ErrorState description={state.error.message} onRetry={reload} />
       ) : null}
 
-      {state.status === 'ready' && rides.length === 0 ? (
+      {!precondition && state.status === 'ready' && rides.length === 0 ? (
         <EmptyState
           action={{
             label: 'Buat perjalanan pertama',
@@ -128,7 +144,7 @@ export default function RidesScreen() {
         />
       ) : null}
 
-      {state.status === 'ready'
+      {!precondition && state.status === 'ready'
         ? SECTIONS.map((section) => {
             const items = rides.filter((ride) => ride.status === section.status);
             if (items.length === 0) return null;

@@ -264,6 +264,31 @@ describe('detail perjalanan', () => {
     await waitFor(() => expect(mockedStop).not.toHaveBeenCalled());
   });
 
+  it('menampilkan state error dengan tombol coba lagi saat detail gagal dimuat', async () => {
+    mockedDetails.mockResolvedValue({
+      ok: false,
+      error: { code: 'network', message: 'Tidak dapat terhubung ke server.', retryable: true },
+    });
+
+    await render(<RideScreen />);
+
+    // Sebelumnya layar ini `return null` saat gagal, jadi pesan ini tidak pernah tampil.
+    expect(await screen.findByText('Perjalanan gagal dimuat')).toBeTruthy();
+    expect(screen.getByText('Tidak dapat terhubung ke server.')).toBeTruthy();
+
+    expect(mockedDetails).toHaveBeenCalledTimes(1);
+    await fireEvent.press(screen.getByText('Coba lagi'));
+    await waitFor(() => expect(mockedDetails).toHaveBeenCalledTimes(2));
+  });
+
+  it('menampilkan state memuat selama detail belum tersedia', async () => {
+    mockedDetails.mockReturnValue(new Promise(() => {}));
+
+    await render(<RideScreen />);
+
+    expect(screen.getByText('Memuat perjalanan…')).toBeTruthy();
+  });
+
   it('non-anggota hanya melihat penjelasan, bukan lokasi peserta', async () => {
     mockedDetails.mockResolvedValue({
       ok: true,

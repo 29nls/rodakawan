@@ -9,6 +9,7 @@ import { Screen } from '@/components/ui/Screen';
 import { ScreenHeader } from '@/components/ui/ScreenHeader';
 import { TextField } from '@/components/ui/TextField';
 import { updatePassword } from '@/features/auth/api';
+import { BackendUnavailableBanner } from '@/features/auth/components/BackendUnavailableBanner';
 import type { AppError } from '@/features/auth/errors';
 import { useAuthSession } from '@/features/auth/session';
 import {
@@ -68,6 +69,8 @@ export default function ResetPasswordScreen() {
       />
 
       <View style={styles.block}>
+        {backend.available ? null : <BackendUnavailableBanner reason={backend.reason} />}
+
         {updated ? (
           <>
             <Banner
@@ -122,7 +125,7 @@ export default function ResetPasswordScreen() {
             />
 
             <Button
-              disabled={submitting}
+              disabled={submitting || !backend.available}
               fullWidth
               label={submitting ? 'Menyimpan…' : 'Simpan kata sandi baru'}
               onPress={handleSubmit}

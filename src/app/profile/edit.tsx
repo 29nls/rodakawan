@@ -13,7 +13,6 @@ import { useAuthSession } from '@/features/auth/session';
 import { createOwnProfile, updateOwnProfile } from '@/features/profile/api';
 import { ProfileForm, type ProfileFormValues } from '@/features/profile/components/ProfileForm';
 import { useProfile } from '@/features/profile/useProfile';
-import { isGeneratedUsername } from '@/features/profile/validation';
 import { formatErrorMessage } from '@/features/state-helper';
 
 /**
@@ -53,13 +52,6 @@ export default function ProfileEditScreen() {
   const formKey = profile
     ? `${profile.id}:${profile.updated_at}:${saved ? 'saved' : 'edit'}`
     : 'new';
-
-  const generatedUsernameNotice =
-    profile && isGeneratedUsername(profile.username) && !saved
-      ? `Username "${profile.username}" dibuat otomatis karena ${
-          requestedUsername ? `"${requestedUsername}"` : 'pilihan Anda sebelumnya'
-        } tidak tersedia. Pilih username baru di bawah agar rider lain mudah mengenali Anda.`
-      : null;
 
   async function handleSubmit(values: ProfileFormValues) {
     if (submitting || !backend.available || !userId) return;
@@ -105,8 +97,7 @@ export default function ProfileEditScreen() {
         </AppText>
       ) : null}
 
-      {/* Indikator muat dan galat dimiliki `useProfile`; formulir hanya tampil saat profil siap. */}
-      {/* Notice username otomatis dan banner "tersimpan" sedang dinonaktifkan. */}
+      {state.status === 'loading' ? <LoadingState label="Memuat profil…" /> : null}
 
       {error ? <Banner message={error.message} title="Gagal menyimpan" tone="danger" /> : null}
 

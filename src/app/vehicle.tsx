@@ -46,6 +46,7 @@ import {
   uploadVehiclePhoto,
   VEHICLE_PHOTO_BUCKET,
 } from '@/features/media/photos';
+import { screenPrecondition } from '@/features/state-helper';
 
 type DetailState =
   | { status: 'loading' }
@@ -83,6 +84,12 @@ export default function VehicleScreen() {
 
   const reload = useCallback(() => setReloadToken((token) => token + 1), []);
   const vehiclePhotoPath = state.status === 'ready' ? state.vehicle.photoPath : null;
+  const precondition = screenPrecondition(
+    backend,
+    userId,
+    'Sesi tidak ditemukan di perangkat ini. Masuk kembali untuk membuka kendaraan Anda.',
+  );
+  const missingTarget = vehicleId.length === 0;
 
   useEffect(() => {
     if (!backend.available || !userId || vehicleId.length === 0) return;
@@ -355,7 +362,25 @@ export default function VehicleScreen() {
         <Banner message={actionError.message} title="Aksi tidak selesai" tone="danger" />
       ) : null}
 
-      {state.status === 'loading' ? <LoadingState label="Memuat kendaraan…" /> : null}
+      {precondition ? (
+        <UnavailableState
+          description={precondition.message}
+          icon="lock-closed-outline"
+          title="Kendaraan belum bisa dibuka"
+        />
+      ) : null}
+
+      {!precondition && missingTarget ? (
+        <UnavailableState
+          description="Tautan ini tidak memuat ID kendaraan. Buka kendaraan dari halaman Garasi."
+          icon="alert-circle-outline"
+          title="Kendaraan tidak dikenali"
+        />
+      ) : null}
+
+      {!precondition && !missingTarget && state.status === 'loading' ? (
+        <LoadingState label="Memuat kendaraan…" />
+      ) : null}
 
       {state.status === 'error' ? (
         <ErrorState description={state.error.message} onRetry={reload} />

@@ -1,23 +1,41 @@
-/** Helper shared untuk klasifikasi state dan error handling konsisten.
- *  Semua fitur harus memakai pola ini agar error dan state menampilkan
- *  pesan yang konsisten, menyebut tindakan pemulihan, dan Bahasa Indonesia.
+/**
+ * Helper bersama untuk state layar dan pesan error.
  *
- *  Gunakan dari setiap fitur melalui `import { useSupabaseState, useErrorState }`
- *  dari berkas ini.
+ * Dua hal yang dijaga di sini:
+ * - Prasyarat backend/sesi dikembalikan sebagai `AppError`, bukan boolean, supaya
+ *   layar menampilkan satu state "belum tersedia" yang menyebut tindakan
+ *   pemulihan — bukan spinner yang tidak pernah selesai ketika backend belum
+ *   dikonfigurasi atau sesi tidak ada.
+ * - Pesan error selalu Bahasa Indonesia dan menyebut langkah berikutnya.
  */
 
-/** Status state umum */
-export type StateStatus = 'loading' | 'ready' | 'error' | 'empty';
+import type { AppError } from '@/features/auth/errors';
+import { describeUnavailableReason, type SupabaseClientState } from '@/lib/supabase/client';
 
-/** Result dari supabase state check */
-export function useSupabaseState(): {
-  available: boolean;
-  reason?: 'not_configured' | 'invalid_url' | 'privileged_key';
-  client?: any;
-} {
-  // Import dinamis untuk menghindari circular dependency di build awal
-  // Fungsi ini akan dipakai di layar-layer yang butuh backend
-  return { available: false, reason: 'not_configured' };
+/**
+ * Prasyarat yang harus terpenuhi sebelum layar memuat data dari Supabase.
+ *
+ * `sessionMessage` wajib menyebut apa yang harus dilakukan pengguna (mis.
+ * "Masuk kembali untuk membuka garasi."), karena pesan ini tampil apa adanya.
+ */
+export function screenPrecondition(
+  backend: SupabaseClientState,
+  userId: string | null,
+  sessionMessage: string,
+): AppError | null {
+  if (!backend.available) {
+    return {
+      code: 'backend_not_configured',
+      message: describeUnavailableReason(backend.reason),
+      retryable: false,
+    };
+  }
+
+  if (!userId) {
+    return { code: 'session_expired', message: sessionMessage, retryable: false };
+  }
+
+  return null;
 }
 
 /** Error yang bisa diulang (retryable) */
@@ -75,7 +93,6 @@ export function mapSupabaseError(error: unknown): {
   // Jika error object dengan message
   if (error && typeof error === 'object') {
     const msg = (error as any).message ?? String(error);
-    const code = (error as any).code ?? 'unknown';
 
     // Network errors
     if (msg.includes('network') || msg.includes('gagal') || (error as any).status === 0) {
@@ -151,82 +168,4 @@ export function formatErrorMessage(error: any): string {
 
   // Jika permanent, pesan sudah mencakup tindakan
   return mapped.message;
-}
-
-/** Klasifikasi state layar berdasarkan status Supabase */
-export function classifyScreenState(
-  supabaseAvailable: boolean,
-  profileStatus: 'loading' | 'ready' | 'error' | null,
-  dataCount: number,
-): { status: StateStatus; showEmpty: boolean; showError: boolean } {
-  // Jika backend belum dikonfigurasi
-  if (!supabaseAvailable) {
-    return {
-      status: 'error',
-      showEmpty: false,
-      showError: true,
-    };
-  }
-
-  // Jika sedang loading
-  if (profileStatus === 'loading') {
-    return {
-      status: 'loading',
-      showEmpty: false,
-      showError: false,
-    };
-  }
-
-  // Jika error pada profile
-  if (profileStatus === 'error') {
-    return {
-      status: 'error',
-      showEmpty: false,
-      showError: true,
-    };
-  }
-
-  // Jika ready tapi data kosong
-  if (profileStatus === 'ready' && dataCount === 0) {
-    return {
-      status: 'empty',
-      showEmpty: true,
-      showError: false,
-    };
-  }
-
-  // Jika ready dengan data
-  return {
-    status: 'ready',
-    showEmpty: false,
-    showError: false,
-  };
-}
-
-/** Teks empty state per tipe layar */
-export function getEmptyStateText(
-  screenType: 'garage' | 'club' | 'ride' | 'hazard' | 'profile',
-): string {
-  const texts: Record<string, string> = {
-    garage: 'Belum ada kendaraan. Tambah kendaraan pertama dari Profil → Garasi.',
-    club: 'Belum ada klub. Buat klub pertama dari Garasi → Buat Klub.',
-    ride: 'Belum ada perjalanan. Buat ride pertama dari Garasi → Buat Ride.',
-    hazard: 'Belum ada laporan bahaya. Buat laporan dari tab Peringatan.',
-    profile: 'Belum ada profil. Lengkapi profil dari area Profil.',
-  };
-  return texts[screenType] || 'Belum ada data. Mulai dengan menambah data pertama.';
-}
-
-/** Teks error state per tipe layar */
-export function getErrorStateText(
-  screenType: 'auth' | 'profile' | 'garage' | 'club' | 'ride',
-): string {
-  const texts: Record<string, string> = {
-    auth: 'Belum ada konfigurasi Supabase. Isi .env.local lalu jalankan ulang aplikasi.',
-    profile: 'Profil tidak dapat dimuat. Masuk kembali, lalu muat ulang profil.',
-    garage: 'Gagal memuat garasi. Periksa koneksi, lalu coba lagi.',
-    club: 'Gagal memuat klub. Pastikan Anda anggota, lalu muat ulang.',
-    ride: 'Gagal memuat perjalanan. Pastikan masih bergabung, lalu muat ulang.',
-  };
-  return texts[screenType] || 'Terjadi kesalahan. Coba lagi; bila berulang, hubungi dukungan.';
 }

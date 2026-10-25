@@ -36,8 +36,7 @@ import {
   cleanUpVehiclePhotosAfterDelete,
   sweepOrphanVehiclePhotos,
 } from '@/features/media/photoCleanup';
-import { describeUnavailableReason } from '@/lib/supabase/client';
-import { formatErrorMessage } from '@/features/state-helper';
+import { screenPrecondition } from '@/features/state-helper';
 
 type GarageState =
   | { status: 'loading' }
@@ -59,13 +58,6 @@ export default function GarageScreen() {
   const { backend, userId } = useAuthSession();
 
   const [state, setState] = useState<GarageState>({ status: 'loading' });
-
-  // Status layar dibaca langsung dari state data: `ready` dengan daftar kosong
-  // tetap dianggap siap, supaya empty state dan daftar kendaraan memakai sumber
-  // yang sama.
-  const showError = state.status === 'error';
-  const errorMessage = state.status === 'error' ? formatErrorMessage(state.error) : undefined;
-
   const [reloadToken, setReloadToken] = useState(0);
   const [form, setForm] = useState(EMPTY_FORM);
   const [formErrors, setFormErrors] = useState<MotorcycleFormErrors>({});
@@ -102,19 +94,11 @@ export default function GarageScreen() {
     };
   }, [backend, reloadToken, userId]);
 
-  const precondition: AppError | null = !backend.available
-    ? {
-        code: 'backend_not_configured',
-        message: describeUnavailableReason(backend.reason),
-        retryable: false,
-      }
-    : !userId
-      ? {
-          code: 'session_expired',
-          message: 'Sesi tidak ditemukan di perangkat ini. Masuk kembali untuk membuka garasi.',
-          retryable: false,
-        }
-      : null;
+  const precondition = screenPrecondition(
+    backend,
+    userId,
+    'Sesi tidak ditemukan di perangkat ini. Masuk kembali untuk membuka garasi.',
+  );
 
   async function handleAdd() {
     if (!backend.available || !userId || saving) return;
@@ -238,15 +222,6 @@ export default function GarageScreen() {
       />
 
       {backend.available ? null : <BackendUnavailableBanner reason={backend.reason} />}
-
-      {showError && errorMessage ? (
-        <Banner
-          message={errorMessage}
-          title="Gagal memuat garasi"
-          tone="danger"
-          testID="garage-error-banner"
-        />
-      ) : null}
 
       {notice ? (
         <Banner message={notice} testID="garage-notice" title="Berhasil" tone="success" />

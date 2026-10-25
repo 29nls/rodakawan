@@ -24,7 +24,7 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Screen } from '@/components/ui/Screen';
 import { SectionHeader } from '@/components/ui/SectionHeader';
-import { EmptyState, ErrorState, LoadingState } from '@/components/ui/StateView';
+import { EmptyState, ErrorState, LoadingState, UnavailableState } from '@/components/ui/StateView';
 import { TextField } from '@/components/ui/TextField';
 import { colors, radii, spacing } from '@/constants/theme';
 import { BackendUnavailableBanner } from '@/features/auth/components/BackendUnavailableBanner';
@@ -61,6 +61,7 @@ import {
   reportContent,
   type ContentReportReason,
 } from '@/features/moderation/api';
+import { screenPrecondition } from '@/features/state-helper';
 
 type HazardsState =
   | { status: 'loading' }
@@ -129,6 +130,11 @@ export default function HazardsScreen() {
   const [notice, setNotice] = useState<string | null>(null);
 
   const reload = useCallback(() => setReloadToken((token) => token + 1), []);
+  const precondition = screenPrecondition(
+    backend,
+    userId,
+    'Sesi tidak ditemukan di perangkat ini. Masuk kembali untuk melihat laporan bahaya.',
+  );
 
   useFocusEffect(
     useCallback(() => {
@@ -542,13 +548,23 @@ export default function HazardsScreen() {
         </View>
       </Card>
 
-      {state.status === 'loading' ? <LoadingState label="Memuat laporan bahaya…" /> : null}
+      {precondition ? (
+        <UnavailableState
+          description={precondition.message}
+          icon="lock-closed-outline"
+          title="Laporan bahaya belum bisa dimuat"
+        />
+      ) : null}
 
-      {state.status === 'error' ? (
+      {!precondition && state.status === 'loading' ? (
+        <LoadingState label="Memuat laporan bahaya…" />
+      ) : null}
+
+      {!precondition && state.status === 'error' ? (
         <ErrorState description={state.error.message} onRetry={reload} />
       ) : null}
 
-      {state.status === 'ready' && hazards.length === 0 ? (
+      {!precondition && state.status === 'ready' && hazards.length === 0 ? (
         <EmptyState
           description="Belum ada laporan yang cocok dengan filter ini. Ubah filter, atau laporkan kondisi jalan dengan tombol di atas."
           icon="warning-outline"
