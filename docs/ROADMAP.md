@@ -146,8 +146,11 @@ Status: **Implemented · Passed locally · Passed against dev backend** (13 Okto
       `tabel.policy` pada dua policy hazard yang saat itu belum terdaftar).
 - [ ] Ratifikasi pemilik produk atas model persetujuan follow (ADR-039): notifikasi permintaan,
       layar daftar permintaan, dan apakah follow ke profil publik juga perlu persetujuan.
-- [ ] Rate limit permintaan follow dan penolakan permintaan dari akun yang diblokir (belum ada;
-      `user_blocks` hanya terlihat oleh pihak yang memblokir, jadi butuh helper tersendiri).
+- [ ] Rate limit permintaan follow di database — **Implemented** dan **Passed locally**
+      (10/10 menit, migration `20261025013131_m5_rate_limits.sql`); **Blocked against dev backend**
+      sampai migration diterapkan ke development.
+- [ ] Penolakan permintaan follow dari akun yang diblokir (`user_blocks` hanya terlihat oleh pihak
+      yang memblokir, jadi butuh helper tersendiri).
 - [ ] UI persetujuan follow (daftar permintaan masuk) — aturan database sudah ada, layarnya belum.
       Ini tidak memblokir Milestone 3; masuk ke pekerjaan sosial (Milestone 6).
 
@@ -329,7 +332,7 @@ Rencana terperinci, urutan prioritas, dan irisan vertikal pertama: [`docs/MILEST
 | Uji perangkat fisik Milestone 2 | **Owner-reported lulus** (tanpa artefak per kasus); APK terbaru `v0.1.0-build26` | **Tidak lagi** — M3 sudah berjalan | Pemilik aplikasi |
 | Penyedia peta/tile | **Proposed**: MapLibre + MapTiler Flex (riset 20 Oktober 2026); belum disetujui | **Ya**, hanya untuk langkah marker/peta; skema & RPC ride tidak | Pemilik produk + engineering |
 | UI persetujuan follow (daftar permintaan) | Belum ada; aturan database sudah | Tidak — pekerjaan sosial (M6) | Pemilik produk |
-| Rate limit follow + penolakan permintaan dari akun terblokir | Belum ada | Tidak — hardening sosial (M6) | Engineering |
+| Rate limit follow + penolakan permintaan dari akun terblokir | Rate limit follow sudah (menunggu diterapkan); penolakan akun terblokir belum | Tidak — hardening sosial (M6) | Engineering |
 | Sapuan objek yatim logo klub & avatar | Belum ada; foto kendaraan sudah | Tidak — optimasi kuota | Engineering |
 | Visibilitas avatar | Owner-only sampai kebijakan ada | Tidak | Pemilik produk + security |
 

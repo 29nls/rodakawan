@@ -47,7 +47,7 @@ Tidak ada nilai kredensial yang dicetak dalam proses apa pun.
 | AUD-11 | Helper definer untuk `anon` | Low | Enam helper (`is_club_member`, `is_club_admin`, `is_ride_member`, `is_ride_host`, `is_ride_active_member`, `can_publish_ride_location`) tetap dieksekusi `anon` (daftar pengecualian beralasan di `rls_catalog_test.sql`); semuanya mengembalikan `false` tanpa sesi karena memakai `auth.uid()` | Tanpa kebocoran data yang terlihat; permukaan peran tanpa sesi seharusnya nol | Cabut `EXECUTE` dari `anon` pada hardening berikut dan beri grant hanya `authenticated` bila klien memang memakainya | Open |
 | AUD-12 | Batas input | Low | `motorcycle_private_details.plate_number`/`private_notes` tanpa CHECK panjang (`20261013022938_initial_schema.sql:38-39`), padahal klien membatasi 16/500 | Pemilik baris bisa menulis nilai tak terbatas lewat Data API | Terapkan migration `20261024011825_m5_private_detail_limits.sql` (`not valid`), lalu `validate constraint` setelah data lama diperiksa | **Fixed sebagian** — CHECK sudah diterapkan 24 Oktober 2026 (baris baru + setiap UPDATE diperiksa); `validate constraint` untuk baris lama **belum** dijalankan |
 | AUD-13 | Batas input | Low | Kolom path (`avatar_url`, `logo_path`, `photo_path`, `media_path`) tanpa batas panjang di database | Penyimpangan data, bukan kebocoran | CHECK panjang pada hardening berikut | Open |
-| AUD-14 | Rate limit | **Medium** | Belum ada rate limit pada follow, laporan moderasi (`report_content`), permintaan gabung/undang klub, dan throttle pembaruan lokasi (inventaris `docs/SECURITY_PRIVACY.md` §9) | Spam/abuse pada endpoint publik beta; tidak membuka data | Tambahkan batas di database (hardening M6) sebelum trafik publik | Open |
+| AUD-14 | Rate limit | **Medium** | Belum ada rate limit pada follow, laporan moderasi (`report_content`), permintaan gabung klub, dan throttle pembaruan lokasi (inventaris `docs/SECURITY_PRIVACY.md` §9) | Spam/abuse pada endpoint publik beta; tidak membuka data | Migration `20261025013131_m5_rate_limits.sql` + uji `rls_rate_limits_test.sql` (lihat §4a); throttle lokasi tetap terbuka | **Implemented** · **Passed locally** (dry-run transaksi) · **Blocked against dev backend** — migration belum diterapkan, menunggu persetujuan pemilik |
 | AUD-15 | Edge Function | Info | `Access-Control-Allow-Origin: *` pada `delete-account` (`index.ts:23`) | Situs mana pun bisa memanggil fungsi, tetapi tetap membutuhkan access token milik pengguna itu sendiri | Diterima untuk aplikasi native; pertimbangkan allowlist bila ada klien web | Open (diterima) |
 | AUD-16 | Auth | Info | Access token lama tetap sah sampai kedaluwarsa setelah akun dihapus (terdokumentasi di ADR-077) | Baris data sudah hilang dan tulis baru ditolak FK; yang tersisa hanya jendela token | Bila perlu jaminan keras, validasi `session_id` pada operasi sensitif | Open |
 | AUD-17 | Log/monitoring | Low | Log Edge Function dan Postgres di dashboard belum diamati pada beban nyata; tidak ada pemantauan otomatis | Kebocoran tak terdeteksi baru terlihat saat insiden | Pantau saat beta; ikuti `docs/INCIDENT_RESPONSE.md` | Open |
@@ -93,6 +93,50 @@ terhadap tipe), dan `npm run db:test:lint` tetap hijau.
 Perintah yang **tersisa** (belum dijalankan, bukan bagian persetujuan di atas):
 `validate constraint` untuk dua CHECK plat/catatan pada baris lama — aman
 karena migration memakai `not valid`; jalankan setelah data lama diperiksa.
+
+### 4a. Rate limit database untuk interaksi sosial (AUD-14, 25 Oktober 2026)
+
+Migration aditif `supabase/migrations/20261025013131_m5_rate_limits.sql`:
+
+- `follows_rate_limit` — trigger BEFORE INSERT pada `public.follows`: **10 follow
+  baru / 10 menit / pengikut**. Trigger dipilih karena `follows_insert_self`
+  masih mengizinkan INSERT REST langsung.
+- `content_reports_rate_limit` — trigger BEFORE INSERT pada `public.content_reports`:
+  **10 laporan / 10 menit / pelapor**. Trigger menutup RPC `report_content`
+  **dan** INSERT REST lewat `content_reports_insert_self` yang masih terbuka.
+- `request_club_membership` — badan fungsi sama, ditambah **5 permintaan gabung /
+  10 menit / pengguna** sebelum baris ditulis. Baris berperan `owner` tidak
+  dihitung, sehingga pembuatan klub tidak menghabiskan kuota bergabung. Hitungan
+  menyimpan `FOUND` sebelum `SELECT ... INTO` kuota karena hitungan selalu
+  menemukan satu baris dan akan menimpa `FOUND`.
+
+Semua penolakan memakai SQLSTATE `P0001` + detail
+`follow_rate_limit`/`report_rate_limit`/`club_join_rate_limit`. Identitas selalu
+`auth.uid()`; fungsi trigger `security definer` dengan `search_path = ''` dan
+`EXECUTE` dicabut dari `public`/`anon`/`authenticated`. Tidak ada policy, data,
+atau tanda tangan fungsi yang berubah — `database.generated.ts` tetap sama.
+
+Uji `supabase/tests/rls_rate_limits_test.sql` (notice
+`UJI RATE LIMIT DATABASE LULUS`) terdaftar di `DEFAULT_TEST_FILES` dan penanda
+`.github/workflows/database-rls.yml`. Uji membuktikan allow/deny, isolasi per
+pengguna, jalur REST `content_reports` ikut tertutup, dan penolakan tidak
+menyimpan baris. Berkas uji dijalankan bersama migration di dalam satu transaksi
+yang di-ROLLBACK terhadap project development: **exit 0**, notice diterima.
+
+Status: **Implemented** · **Passed locally** (dry-run transaksi) ·
+**Blocked against dev backend** — migration **belum diterapkan**, sesuai aturan
+"jangan menerapkan tanpa persetujuan pemilik". Perintah setelah disetujui:
+
+```bash
+npx supabase db push --yes    # target project development xvmcpfkkveeaevfcvfug
+```
+
+Sampai itu dijalankan, `npm run db:test` berhenti pada berkas baru dengan pesan
+paritas yang jelas (9/10 lulus, 1 gagal). Gerbang lain pada 25 Oktober 2026:
+`typecheck`, `lint`, `format:check`, `db:types:check`, `npm test -- --ci`
+(500 test), `test:scripts` (343 test), dan `export:android` semuanya exit 0;
+`db:test:lint` exit 0 untuk **10 berkas vs 25 migration**. Temuan yang tetap
+terbuka: throttle pembaruan lokasi dan rate limit endpoint Auth.
 
 ## 5. Gerbang kualitas (hasil apa adanya, 24 Oktober 2026)
 
@@ -154,8 +198,9 @@ Pemindaian rahasia pada bundel hasil `export:android` di atas: JWT utuh `eyJhbGc
 
 - **Tidak ada temuan Critical atau High baru.** Seluruh temuan dan status di
   bagian 2–4 tetap berlaku; AUD-10 sudah **Fixed** dan AUD-12 **Fixed sebagian**.
-- Risiko terbuka yang masih sama: rate limit follow/laporan/gabung klub/lokasi
-  (AUD-14), metadata job tanpa cleanup (AUD-23), project produksi + rollback
+- Risiko terbuka: **throttle pembaruan lokasi** (sisa AUD-14; rate limit
+  follow/laporan/gabung klub sudah diimplementasikan di §4a dan menunggu
+  penerapan), metadata job tanpa cleanup (AUD-23), project produksi + rollback
   (AUD-21), keystore cadangan (AUD-22), uji perangkat (AUD-19), uji dua klien
   Realtime (AUD-18), dan halaman web yang belum ter-deploy (AUD-20 —
   `web/account-deletion/config.js` masih placeholder `GANTI-…`).

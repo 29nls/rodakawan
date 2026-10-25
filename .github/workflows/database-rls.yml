@@ -141,6 +141,8 @@ jobs:
       #     sesuai wewenang host/admin klub (Milestone 4)
       #   - `UJI FILTER BLOKIR CHAT LULUS`  — pesan teks pengguna yang diblokir tidak
       #     pernah terkirim ke pemblokir (ADR-068, Milestone 4)
+      #   - `UJI RATE LIMIT DATABASE LULUS` — batas follow, laporan moderasi, dan
+      #     permintaan gabung klub per pengguna (AUD-14)
       #
       # Runner "hijau palsu" (mis. berkas uji terpotong) tidak bisa lolos karena
       # `scripts/db-test.mjs` hanya melaporkan lulus bila notice itu benar-benar diterima;
@@ -187,6 +189,10 @@ jobs:
           case "${OUTPUT}" in
             *"UJI HAPUS AKUN LULUS"*) ;;
             *) MISSING="${MISSING} UJI HAPUS AKUN LULUS" ;;
+          esac
+          case "${OUTPUT}" in
+            *"UJI RATE LIMIT DATABASE LULUS"*) ;;
+            *) MISSING="${MISSING} UJI RATE LIMIT DATABASE LULUS" ;;
           esac
           if [ -n "${MISSING}" ]; then
             echo "::error::Penanda lulus berikut tidak diterima:${MISSING}. Berkas uji berhenti sebelum seluruh asersi dijalankan."

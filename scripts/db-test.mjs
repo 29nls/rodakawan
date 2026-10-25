@@ -80,6 +80,7 @@ const DEFAULT_TEST_FILES = [
   'supabase/tests/rls_moderation_m4_test.sql',
   'supabase/tests/rls_blocked_chat_test.sql',
   'supabase/tests/rls_account_delete_test.sql',
+  'supabase/tests/rls_rate_limits_test.sql',
 ];
 
 /** Direktif di dalam berkas uji: notice yang harus diterima dari server. */
