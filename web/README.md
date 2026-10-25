@@ -13,9 +13,10 @@ web/
 ```
 
 Halaman ini **belum ter-deploy**. Workflow penerbitannya sudah ada di
-[`.github/workflows/pages.yml`](../.github/workflows/pages.yml), tetapi belum
-pernah berjalan dan GitHub Pages belum diaktifkan; tidak ada URL publik yang
-boleh diklaim sampai pemilik project benar-benar menerbitkannya. Google Play
+[`.github/workflows/pages.yml`](../.github/workflows/pages.yml); job build (uji
+statis + unggah artefak) sudah lulus pada run pertama, tetapi job deploy gagal
+`404` karena GitHub Pages belum diaktifkan. Tidak ada URL publik yang boleh
+diklaim sampai pemilik project benar-benar menerbitkannya. Google Play
 meminta URL kebijakan privasi dan URL penghapusan akun yang dapat dibuka tanpa
 memasang aplikasi; isi keduanya di Play Console setelah deploy diverifikasi.
 

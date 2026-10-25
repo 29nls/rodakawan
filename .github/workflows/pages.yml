@@ -9,9 +9,9 @@ name: Pages (halaman web publik)
 #
 # Trigger sengaja hanya `web/**` dan dispatch manual: perubahan aplikasi,
 # migration, atau dokumentasi tidak boleh menerbitkan ulang halaman publik.
-# Konsekuensinya perubahan pada workflow ini sendiri baru teruji lewat
-# `workflows-lint` di `ci.yml`; penerbitan pertamanya dijalankan manual setelah
-# pemilik mengaktifkan Pages (Settings → Pages → Source: GitHub Actions).
+# Run pertama membuktikan job `build` berjalan (uji statis + unggah artefak),
+# lalu gagal di job `deploy` dengan 404 karena Pages belum diaktifkan. Aktifkan
+# lewat Settings → Pages → Source: GitHub Actions sebelum menjalankan ulang.
 #
 # Batasan yang dipegang:
 # - `web/account-deletion/config.js` masih placeholder sampai pemilik mengisi
@@ -80,6 +80,10 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      # Jangan menambahkan `configure-pages` dengan `enablement: true` sebagai
+      # "perbaikan": GITHUB_TOKEN tidak berwenang membuat Pages site (gagal
+      # `Resource not accessible by integration`). Pages harus diaktifkan pemilik
+      # sekali lewat Settings; setelah itu token ini cukup untuk deploy.
       - name: Deploy
         id: deployment
         uses: actions/deploy-pages@v4

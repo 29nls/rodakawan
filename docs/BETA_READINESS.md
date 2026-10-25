@@ -19,14 +19,14 @@ pemilik/produk/legal) dan **tidak diketahui** (tidak ada bukti yang cukup untuk 
 | Apakah beta publik bisa dimulai sekarang? | **Belum.** Tiga blocker utama: halaman web belum ter-deploy (syarat Play Console), acceptance perangkat belum dijalankan, dan retensi data belum disahkan. |
 | Apakah ada temuan Critical/High baru? | **Tidak.** Audit 24–25 Oktober 2026 tidak menemukan Critical/High; temuan Medium yang tersisa tercatat di §5 dan `SECURITY_RELEASE_AUDIT.md`. |
 | Apakah ada perubahan dependency/izin Android? | **Tidak.** Perubahan hanya workflow, uji, dan dokumentasi. |
-| Apakah halaman web sudah live? | **Belum.** Workflow GitHub Pages sudah ada dan diuji statis, tetapi belum pernah berjalan; `config.js` masih placeholder. Tidak ada URL publik yang diklaim. |
+| Apakah halaman web sudah live? | **Belum.** Job build workflow Pages sudah berhasil pada percobaan pertama (uji statis + unggah artefak), tetapi job deploy ditolak GitHub dengan `404` karena Pages belum diaktifkan; `config.js` masih placeholder. Tidak ada URL publik yang diklaim. |
 
 ## 2. Gerbang lingkungan dan rilis
 
 | ID | Butir | Status | Bukti | Tindakan |
 | --- | --- | --- | --- | --- |
-| B-01 | Workflow penerbitan `web/` ke GitHub Pages | **Implemented**; **Passed locally** untuk uji statis | `.github/workflows/pages.yml`; `node --test scripts/__tests__/web-static.test.mjs` 11/11 lulus (bagian dari `npm run test:scripts` 366 test) | Jalankan `workflows-lint` di CI setelah branch di-push; workflow belum pernah dieksekusi |
-| B-02 | Halaman web terbuka untuk publik | **Blocked** | Pages belum diaktifkan; `web/account-deletion/config.js` masih `GANTI-…`; tidak ada `page_url` dari run | Pemilik mengaktifkan Pages → isi config → jalankan workflow → verifikasi `web/README.md` §3 |
+| B-01 | Workflow penerbitan `web/` ke GitHub Pages | **Implemented**; **Passed locally** untuk uji statis; job build lulus di GitHub Actions; deploy **Blocked** | `.github/workflows/pages.yml`; `node --test scripts/__tests__/web-static.test.mjs` 11/11 lulus. Run pertama di GitHub Actions: artefak `github-pages` ditemukan dan diunggah, lalu `deploy-pages` gagal `404` dengan pesan "Ensure GitHub Pages has been enabled" | Pemilik mengaktifkan Pages (Settings → Pages → Source: GitHub Actions) lalu menjalankan ulang workflow. Jangan menambahkan `configure-pages` + `enablement: true`: `GITHUB_TOKEN` tidak berwenang membuat Pages site |
+| B-02 | Halaman web terbuka untuk publik | **Blocked** | Run pertama gagal di `deploy-pages` (`404`, Pages belum aktif); `web/account-deletion/config.js` masih `GANTI-…`; tidak ada `page_url` | Pemilik mengaktifkan Pages → isi config → jalankan workflow → verifikasi `web/README.md` §3 |
 | B-03 | URL kebijakan privasi dan hapus akun di Play Console | **Blocked** | Bergantung pada B-02; Play Console belum diisi | Isi setelah URL benar-benar terbuka dan diuji |
 | B-04 | Backend produksi terpisah dari development | **Needs decision** | Tidak ada project produksi di repository; promosi migration terdokumentasi (`docs/SETUP_GUIDE.md` §4.3) tetapi belum pernah dijalankan ke produksi | Pemilik membuat project produksi, menetapkan backup, lalu menguji promosi di staging |
 | B-05 | Rollback migration | **Blocked** | Tidak ada down migration; rollback hanya lewat cadangan/forward-fix; prosedur backup produksi belum diuji | Putuskan RPO/RTO dan uji restore sebelum beta publik |
@@ -81,7 +81,7 @@ pemilik/produk/legal) dan **tidak diketahui** (tidak ada bukti yang cukup untuk 
 | C-01 | `supabase/config.toml` tidak ada, sehingga `verify_jwt` dan konfigurasi Edge Function tidak versioned | Low | `find supabase -name '*.toml'` = kosong; fungsi tetap memverifikasi token lewat `auth.getUser` (`supabase/functions/delete-account/index.ts`), jadi tidak ada jalur tanpa verifikasi yang terlihat | **Open** — tambahkan config.toml sebelum produksi atau dokumentasikan pengaturan platform |
 | C-02 | CORS `delete-account` membuka semua origin (`*`) | Low | Sebelumnya `index.ts` mengirim `Access-Control-Allow-Origin: *`. Kini `cors.mjs` hanya mengizinkan origin persis dari `WEB_ALLOWED_ORIGINS`, menolak `*`, dan fail-closed bila kosong; 12 uji di `scripts/__tests__/delete-account-cors.test.mjs` | **Implemented**; **Passed locally**; origin sebenarnya **Blocked** sampai B-02 — isi `WEB_ALLOWED_ORIGINS` dengan origin halaman setelah URL-nya diketahui, lalu uji preflight/403 dari browser |
 | C-03 | Action workflow dipin ke tag mayor (`@v7`, `@v4`), bukan SHA | Low | `grep 'uses:' .github/workflows` | **Open** — pin SHA sebelum rilis publik; perubahan besar, tidak dilakukan di sini |
-| C-04 | Workflow Pages belum pernah dieksekusi | — | Tidak ada run; Pages belum aktif | **Blocked** — B-02 |
+| C-04 | Workflow Pages sudah dieksekusi, deployment belum berhasil | — | Run pertama: job build (uji statis + unggah artefak) lulus; `deploy-pages` gagal `404` karena Pages belum aktif | **Blocked** — B-02; bukan kegagalan kode workflow |
 | C-05 | `web/account-deletion/config.js` masih placeholder | — | `GANTI-PROJECT-REF` / `GANTI-PUBLISHABLE-KEY` | **Blocked** — diisi pemilik |
 | C-06 | Rate limit endpoint Auth tidak terlihat di repo | — | Konfigurasi GoTrue berada di dashboard/platform | **tidak diketahui** — periksa dashboard sebelum beta |
 | C-07 | `.env.example` hanya berisi variabel publik; `.env*`, `*.jks`, `.env.db`, `supabase/.temp/` diabaikan | Info | `.env.example`, `.gitignore` | **Passed locally** |
@@ -117,7 +117,8 @@ pemilik/produk/legal) dan **tidak diketahui** (tidak ada bukti yang cukup untuk 
 | `npm run export:android` | exit 0 — `entry-6419b9258db0f34c8e54fd125095f410.hbc` (4,1 MB); pemindaian rahasia 0 JWT / 0 `postgres://` / 0 `sb_secret_` panjang |
 | `npm ci` | **tidak dijalankan** pada perubahan ini — tidak ada perubahan dependency/lockfile; jalankan pada CI |
 | `npx supabase migration list --linked` | **tidak dijalankan** pada perubahan ini — tidak ada migration baru; paritas terakhir 25/25 (25 Oktober 2026) |
-| Workflow Pages / `workflows-lint` | **Blocked** — belum di-push; actionlint baru berjalan di CI |
+| Workflow Pages (run pertama) | job build + uji statis + unggah artefak lulus; job deploy gagal `404` "Ensure GitHub Pages has been enabled" — **Blocked**, bukan kegagalan kode |
+| CI, Database RLS, `workflows-lint` | **tidak diketahui** — log yang tersedia hanya workflow Pages; run lain tidak diperiksa |
 
 Uji statis halaman dapat diulang tanpa jaringan:
 
@@ -132,8 +133,8 @@ perintah yang menyentuh produksi, dan tidak ada password/URL database yang dicet
 
 - Tidak ada uji perangkat fisik, uji dua klien WebSocket, atau uji browser terhadap halaman yang
   ter-deploy. Ketiganya tetap **Blocked** dan tidak boleh ditulis lulus.
-- CI dan Database RLS **belum berjalan** untuk branch ini karena belum di-push; status hijau yang
-  dikutip berasal dari commit yang sudah di-merge, bukan dari perubahan ini.
+- CI, Database RLS, dan `workflows-lint` untuk commit yang menjalankan Pages **belum diverifikasi**;
+  log yang diperiksa hanya job Pages, dan status hijau lain yang dikutip berasal dari commit sebelumnya.
 - APK terakhir yang tercatat di audit sebelumnya bukan hasil branch ini; tidak ada klaim build baru.
 - Dokumen ini memetakan gerbang, bukan menggantikan `docs/QA_TEST_PLAN.md` (bukti per kasus) atau
   `docs/SECURITY_RELEASE_AUDIT.md` (temuan dan severity).

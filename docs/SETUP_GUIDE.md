@@ -282,9 +282,11 @@ Uji statis yang sama dijalankan sebelum artefak diunggah dan juga ada di `npm ru
 node --test scripts/__tests__/web-static.test.mjs
 ```
 
-**Status: Blocked.** Workflow sudah **Implemented** tetapi belum pernah berjalan, Pages belum
-diaktifkan, dan `config.js` masih placeholder. Jangan menulis URL `github.io` sebagai bukti sampai
-halaman benar-benar terbuka dan diuji; nama/visibilitas repository menentukan URL dan dukungan Pages.
+**Status: Blocked.** Workflow sudah **Implemented** dan pernah berjalan: job build (uji statis +
+unggah artefak) lulus, job deploy gagal `404` "Ensure GitHub Pages has been enabled" karena Pages
+belum diaktifkan. Jangan menggantinya dengan `configure-pages` + `enablement: true`: `GITHUB_TOKEN`
+tidak berwenang membuat Pages site. Jangan menulis URL `github.io` sebagai bukti sampai halaman
+benar-benar terbuka dan diuji; nama/visibilitas repository menentukan URL dan dukungan Pages.
 
 ### 4.4 Atur URL konfirmasi email
 
