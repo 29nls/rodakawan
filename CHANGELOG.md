@@ -8,6 +8,34 @@ sedangkan build preview (`v<versi>-build<N>`) diringkas di dalam blok yang bisa 
 versi adalah tautan ke halaman rilisnya di GitHub, sehingga riwayat ini bisa dinavigasi langsung
 dari berkas.
 
+## [v0.1.0-build50](https://github.com/29nls/rodakawan/releases/tag/v0.1.0-build50) — 2026-10-25 · pratinjau
+
+<details>
+<summary>Catatan rilis pratinjau</summary>
+
+### Fitur
+
+- scripts: runner E2E hapus akun yang dapat diulang (`6e2953a`)
+- db: batasi follow, laporan, dan gabung klub per pengguna (`9e8592f`)
+
+### Perubahan lain
+
+- verifikasi ulang audit keamanan M5 pada HEAD c24030a (`6c48d4a`)
+- db: catat penerapan migration hardening M5 ke development (`6d2e344`)
+- catat hasil dry-run penerapan migration M5 di laporan audit (`0a7d95a`)
+- tambah audit keamanan dan kesiapan rilis beta M5 (`4f9a454`)
+- perbarui checklist keamanan M5 dengan bukti (`5471230`)
+- tambah prosedur tanggap insiden (`2071c9a`)
+- catat bukti realtime pada lapisan database (`ad551e6`)
+- inventarisasi validasi input dan rate limit (`8ea44c1`)
+- catat audit kebocoran log klien dan Edge Function (`f61eeb6`)
+- perbarui bukti secret scan bundel Android (`fe08afb`)
+- buktikan peserta yang dikeluarkan kehilangan akses chat (`9b7b076`)
+- tambah pagar katalog RLS dan migration hardening (`829142d`)
+- sinkronkan status M5 dengan migration dan rilis terbaru (`5f0d214`)
+
+</details>
+
 ## [v0.1.0-build47](https://github.com/29nls/rodakawan/releases/tag/v0.1.0-build47) — 2026-10-24 · pratinjau
 
 <details>
