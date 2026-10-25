@@ -10,8 +10,8 @@
  * menampilkan pesan "belum dikonfigurasi" selama masih ada awalan GANTI-.
  */
 window.RODAKAWAN_WEB = {
-  supabaseUrl: 'https://GANTI-PROJECT-REF.supabase.co',
-  publishableKey: 'GANTI-PUBLISHABLE-KEY',
+  supabaseUrl: 'https://xvmcpfkkveeaevfcvfug.supabase.co',
+  publishableKey: 'sb_publishable_FobyswQFUo0_C1WLzAYTFA_TxZ9h0-A',
   supportUrl: 'https://github.com/29nls/rodakawan/issues',
   privacyUrl: '../privacy/',
 };
