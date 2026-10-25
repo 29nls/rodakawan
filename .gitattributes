@@ -1,0 +1,4 @@
+# Semua berkas teks disimpan dan di-checkout sebagai LF, di OS mana pun.
+# Tanpa ini, checkout Windows (core.autocrlf=true) menghasilkan CRLF sehingga
+# `npm run lint` dan `format:check` melaporkan ribuan galat "Delete ␍" palsu.
+* text=auto eol=lf

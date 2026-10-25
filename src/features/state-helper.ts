@@ -81,7 +81,8 @@ export function mapSupabaseError(error: unknown): {
     if (msg.includes('network') || msg.includes('gagal') || (error as any).status === 0) {
       return {
         code: 'network',
-        message: 'Tidak dapat terhubung ke server. Periksa koneksi internet Anda, lalu coba lagi. Data yang sudah Anda isi tidak hilang.',
+        message:
+          'Tidak dapat terhubung ke server. Periksa koneksi internet Anda, lalu coba lagi. Data yang sudah Anda isi tidak hilang.',
         retryable: true,
       };
     }
@@ -99,7 +100,8 @@ export function mapSupabaseError(error: unknown): {
     if (msg.includes('kata sandi') || msg.includes('password')) {
       return {
         code: 'invalid_credentials',
-        message: 'Email atau kata sandi tidak cocok. Periksa kembali, atau pulihkan kata sandi bila lupa.',
+        message:
+          'Email atau kata sandi tidak cocok. Periksa kembali, atau pulihkan kata sandi bila lupa.',
         retryable: false,
       };
     }
@@ -107,7 +109,8 @@ export function mapSupabaseError(error: unknown): {
     // Default: unknown error
     return {
       code: 'unknown',
-      message: 'Terjadi kesalahan yang belum dikenali. Coba lagi; bila berulang, laporkan ke pengembang.',
+      message:
+        'Terjadi kesalahan yang belum dikenali. Coba lagi; bila berulang, laporkan ke pengembang.',
       retryable: true,
     };
   }
@@ -154,7 +157,7 @@ export function formatErrorMessage(error: any): string {
 export function classifyScreenState(
   supabaseAvailable: boolean,
   profileStatus: 'loading' | 'ready' | 'error' | null,
-  dataCount: number
+  dataCount: number,
 ): { status: StateStatus; showEmpty: boolean; showError: boolean } {
   // Jika backend belum dikonfigurasi
   if (!supabaseAvailable) {
@@ -201,7 +204,9 @@ export function classifyScreenState(
 }
 
 /** Teks empty state per tipe layar */
-export function getEmptyStateText(screenType: 'garage' | 'club' | 'ride' | 'hazard' | 'profile'): string {
+export function getEmptyStateText(
+  screenType: 'garage' | 'club' | 'ride' | 'hazard' | 'profile',
+): string {
   const texts: Record<string, string> = {
     garage: 'Belum ada kendaraan. Tambah kendaraan pertama dari Profil → Garasi.',
     club: 'Belum ada klub. Buat klub pertama dari Garasi → Buat Klub.',
@@ -213,7 +218,9 @@ export function getEmptyStateText(screenType: 'garage' | 'club' | 'ride' | 'haza
 }
 
 /** Teks error state per tipe layar */
-export function getErrorStateText(screenType: 'auth' | 'profile' | 'garage' | 'club' | 'ride'): string {
+export function getErrorStateText(
+  screenType: 'auth' | 'profile' | 'garage' | 'club' | 'ride',
+): string {
   const texts: Record<string, string> = {
     auth: 'Belum ada konfigurasi Supabase. Isi .env.local lalu jalankan ulang aplikasi.',
     profile: 'Profil tidak dapat dimuat. Masuk kembali, lalu muat ulang profil.',
