@@ -388,19 +388,17 @@ export default function ModerationScreen() {
                 sini; jalurnya dashboard tepercaya.
               </AppText>
             </Card>
-        </View>
-
-            {state.status === 'ready' ? (
-              <View style={styles.sectionHeader}>
-                <AppText variant="bodyStrong">Menunggu tinjauan</AppText>
-                <Badge
+        </View>      {state.status === 'ready' && (
+      <View style={styles.sectionHeader}>
+            <AppText variant="bodyStrong">Menunggu tinjauan</AppText>
+            <Badge
+    
                   label={`${items.length} laporan`}
                   tone={items.length > 0 ? 'warning' : 'neutral'}
                 />
-              </View>
-            ) : null}
+              </View>            )}
 
-            {showError ? (
+          {showError ? (
               <ErrorState
                 description={errorMessage}
                 onRetry={reload}
@@ -409,15 +407,13 @@ export default function ModerationScreen() {
             ) : null}
 
             {showEmpty && state.status === 'ready' && state.items.length === 0 ? (
-              <EmptyState
+            <EmptyState
                 description="Belum ada laporan penyalahgunaan yang menunggu di perjalanan atau klub Anda. Laporan baru akan muncul di sini."
                 icon="shield-checkmark-outline"
                 testID="moderation-empty"
                 title="Tidak ada laporan menunggu"
               />
             ) : null}
-
-      {/* Loading state dikelola classifyScreenState */
 
           {items.map((item) => (
             <QueueCard
@@ -448,8 +444,8 @@ export default function ModerationScreen() {
               <AppText tone="muted" variant="callout">
                 Belum ada tindakan moderasi yang tercatat untuk Anda.
               </AppText>
-            ))
-              audit.map((entry) => (
+            ) : (
+              audit.map((entry) => ({
                 <View
                   key={entry.id}
                   style={styles.auditRow}
@@ -469,22 +465,18 @@ export default function ModerationScreen() {
                     {contentReportReasonLabel(entry.reason)} · oleh{' '}
                     {entry.actor_id === userId ? 'Anda' : reporterLabel(people, entry.actor_id)}
                   </AppText>
-                  {entry.note ? (
-                    <AppText tone="muted" variant="caption">
-                      Catatan: {entry.note}
+                  {entry.note ? (                      <AppText tone="muted" variant="caption">
+                        Catatan: {entry.note}
                     </AppText>
-                  ) : null}
                 </View>
-              ))
+              }))
             )}
           </Card>
         </View>
-      ) : null>
+      ) : null
     </View>
   );
-
 }
-    </Screen>
 
 const styles = StyleSheet.create({
   sectionHeader: {
