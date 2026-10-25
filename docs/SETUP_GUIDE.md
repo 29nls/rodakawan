@@ -181,6 +181,24 @@ produksi, tambahkan `config.toml` agar pengaturan itu versioned (temuan C-01 di
 npx supabase functions deploy delete-account --project-ref <project-ref-development>
 ```
 
+**CORS hanya untuk origin halaman web.** Fungsi menolak permintaan browser dari origin yang tidak
+terdaftar (`403 origin_not_allowed`, tanpa header `Access-Control-Allow-Origin`) dan **fail-closed**:
+selama daftar kosong, halaman web tidak bisa memanggilnya. Isi daftar dengan **origin** halaman
+publik — skema + host + port, bukan URL lengkap berisi path:
+
+```powershell
+npx supabase secrets set WEB_ALLOWED_ORIGINS="https://<owner>.github.io" --project-ref <project-ref-development>
+```
+
+- Untuk GitHub Pages project site, origin-nya `https://<owner>.github.io`; path repository
+  (`/rodakawan/`) **bukan** bagian origin.
+- Beberapa origin dipisahkan koma, mis. `https://<owner>.github.io,http://localhost:8000` untuk uji
+  lokal. Nilai `*` diabaikan, bukan membuka semua origin.
+- Aplikasi Android tidak mengirim header `Origin`, jadi tetap bekerja tanpa entri apa pun. CORS
+  bukan autentikasi: access token tetap diverifikasi fungsi.
+- Setelah secret diubah, uji ulang dari browser: preflight harus `204` dan permintaan dari domain
+  lain harus `403` tanpa `Access-Control-Allow-Origin`. Jangan memakai `*` sebagai jalan pintas.
+
 Verifikasi setelah deploy (jangan pakai akun nyata): buat dua akun uji, unggah avatar/foto/logo klub,
 panggil fungsi dengan access token akun A, lalu periksa: `auth.users` A hilang, profil A hilang,
 media pribadi hilang, logo klub masih ada di path baru, laporan bahaya tetap ada sebagai tombstone,
@@ -264,9 +282,11 @@ Uji statis yang sama dijalankan sebelum artefak diunggah dan juga ada di `npm ru
 node --test scripts/__tests__/web-static.test.mjs
 ```
 
-**Status: Blocked.** Workflow sudah **Implemented** tetapi belum pernah berjalan, Pages belum
-diaktifkan, dan `config.js` masih placeholder. Jangan menulis URL `github.io` sebagai bukti sampai
-halaman benar-benar terbuka dan diuji; nama/visibilitas repository menentukan URL dan dukungan Pages.
+**Status: Blocked.** Workflow sudah **Implemented** dan pernah berjalan: job build (uji statis +
+unggah artefak) lulus, job deploy gagal `404` "Ensure GitHub Pages has been enabled" karena Pages
+belum diaktifkan. Jangan menggantinya dengan `configure-pages` + `enablement: true`: `GITHUB_TOKEN`
+tidak berwenang membuat Pages site. Jangan menulis URL `github.io` sebagai bukti sampai halaman
+benar-benar terbuka dan diuji; nama/visibilitas repository menentukan URL dan dukungan Pages.
 
 ### 4.4 Atur URL konfirmasi email
 
