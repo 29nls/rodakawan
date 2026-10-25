@@ -11,7 +11,7 @@ import { ScreenHeader } from '@/components/ui/ScreenHeader';
 import { SectionHeader } from '@/components/ui/SectionHeader';
 import { TextField } from '@/components/ui/TextField';
 import { spacing } from '@/constants/theme';
-import { useSupabaseState, classifyScreenState, formatErrorMessage } from '@/features/state-helper';
+import { formatErrorMessage } from '@/features/state-helper';
 import { deleteMyAccount } from '@/features/account/api';
 import { BackendUnavailableBanner } from '@/features/auth/components/BackendUnavailableBanner';
 import type { AppError } from '@/features/auth/errors';
@@ -32,16 +32,11 @@ export default function AccountDeleteScreen() {
   const router = useRouter();
   const { backend, userId, signOut } = useAuthSession();
   const { state } = useProfile();
-  const supabaseAvailable = backend?.available ?? false;
 
-  // Klasifikasi state layar berdasarkan status Supabase
-  const { status, showEmpty, showError } = classifyScreenState(
-    supabaseAvailable,
-    state.status ?? null,
-    0,
-  );
-
-  // Jika error Supabase, tampilkan banner error konsisten
+  // Status layar dibaca dari state profil itu sendiri: `useProfile` sudah
+  // menurunkan backend/sesi yang belum siap menjadi state error, jadi tidak ada
+  // klasifikasi terpisah yang bisa menyimpang darinya.
+  const showError = state.status === 'error';
   const errorMessage = showError ? formatErrorMessage(state.error) : undefined;
 
   const profile = state.status === 'ready' ? state.profile : null;

@@ -2,6 +2,7 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
+import { AppText } from '@/components/ui/AppText';
 import { Banner } from '@/components/ui/Banner';
 import { Screen } from '@/components/ui/Screen';
 import { ScreenHeader } from '@/components/ui/ScreenHeader';
@@ -13,7 +14,7 @@ import { createOwnProfile, updateOwnProfile } from '@/features/profile/api';
 import { ProfileForm, type ProfileFormValues } from '@/features/profile/components/ProfileForm';
 import { useProfile } from '@/features/profile/useProfile';
 import { isGeneratedUsername } from '@/features/profile/validation';
-import { useSupabaseState, classifyScreenState, formatErrorMessage } from '@/features/state-helper';
+import { formatErrorMessage } from '@/features/state-helper';
 
 /**
  * Mengubah profil sendiri, dan membuat baris profil bila belum ada
@@ -25,16 +26,12 @@ import { useSupabaseState, classifyScreenState, formatErrorMessage } from '@/fea
 export default function ProfileEditScreen() {
   const { backend, userId, requestedUsername } = useAuthSession();
   const { state, reload } = useProfile();
-  const supabaseAvailable = backend?.available ?? false;
 
-  // Klasifikasi state layar berdasarkan status Supabase
-  const { status, showEmpty, showError } = classifyScreenState(
-    supabaseAvailable,
-    state.status ?? null,
-    0,
-  );
-
-  // Jika error, dapatkan pesan yang konsisten
+  // Status layar dibaca dari state profil itu sendiri: `useProfile` sudah
+  // menurunkan backend/sesi yang belum siap menjadi state error, jadi tidak ada
+  // klasifikasi terpisah yang bisa menyimpang darinya.
+  const showError = state.status === 'error';
+  const showEmpty = state.status === 'ready';
   const errorMessage = showError ? formatErrorMessage(state.error) : undefined;
 
   const [submitting, setSubmitting] = useState(false);
@@ -108,11 +105,8 @@ export default function ProfileEditScreen() {
         </AppText>
       ) : null}
 
-      // Loading state managed via classifyScreenState
-
-// generatedUsernameNotice disabled
-
-// saved section disabled
+      {/* Indikator muat dan galat dimiliki `useProfile`; formulir hanya tampil saat profil siap. */}
+      {/* Notice username otomatis dan banner "tersimpan" sedang dinonaktifkan. */}
 
       {error ? <Banner message={error.message} title="Gagal menyimpan" tone="danger" /> : null}
 

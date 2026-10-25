@@ -8,7 +8,6 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Screen } from '@/components/ui/Screen';
 import { ScreenHeader } from '@/components/ui/ScreenHeader';
-import { useSupabaseState, classifyScreenState, formatErrorMessage } from '@/features/state-helper';
 import { LoadingState, UnavailableState } from '@/components/ui/StateView';
 import { TextField } from '@/components/ui/TextField';
 import { colors, radii, spacing } from '@/constants/theme';
@@ -81,17 +80,6 @@ export default function RideNewScreen() {
   const rideId = typeof params.id === 'string' ? params.id : null;
   const editing = rideId !== null;
   const { backend, userId } = useAuthSession();
-  const supabaseAvailable = backend?.available ?? false;
-
-  // Klasifikasi state layar berdasarkan status Supabase
-  const { status, showEmpty, showError } = classifyScreenState(
-    supabaseAvailable,
-    state.loading ? 'loading' : state.status ?? null,
-    0,
-  );
-
-  // Jika error, dapatkan pesan yang konsisten
-  const errorMessage = showError ? formatErrorMessage(state.error) : undefined;
 
   const [clubs, setClubs] = useState<RideClubSummary[] | null>(null);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
@@ -233,14 +221,6 @@ export default function RideNewScreen() {
         title={editing ? 'Ubah perjalanan' : 'Buat perjalanan'}
       />
 
-      {showError ? (
-        <Banner
-          message={errorMessage}
-          title="Gagal memuat data"
-          tone="danger"
-        />
-      ) : null}
-
       {backend.available ? null : <BackendUnavailableBanner reason={backend.reason} />}
 
       {actionError ? (
@@ -254,12 +234,6 @@ export default function RideNewScreen() {
           icon="alert-circle-outline"
           title="Perjalanan tidak bisa diubah"
         />
-      ) : null}
-
-      {showEmpty ? (
-        <AppText tone="muted" variant="caption">
-          Silakan pilih klub untuk membuat perjalanan.
-        </AppText>
       ) : null}
 
       {clubs === null && !loadProblem ? <LoadingState label="Memuat klub Anda…" /> : null}

@@ -1,7 +1,7 @@
 /**
  * Dashboard moderasi laporan penyalahgunaan (ADR-067).
  *
-// @ts-nocheck
+ * Wewenang tidak datang dari peran global: dashboard hanya menampilkan laporan
  * atas konten yang wewenangnya dimiliki pengguna: chat dan laporan bahaya pada
  * perjalanan yang ia pimpin, atau pada perjalanan milik klub tempat ia admin.
  * Penyaringan itu dilakukan RLS di database; layar tidak menambahkan filter
@@ -29,7 +29,6 @@ import { Divider } from '@/components/ui/Divider';
 import { Screen } from '@/components/ui/Screen';
 import { ScreenHeader } from '@/components/ui/ScreenHeader';
 import { EmptyState, ErrorState, LoadingState } from '@/components/ui/StateView';
-import { useSupabaseState, classifyScreenState, formatErrorMessage } from '@/features/state-helper';
 import { colors, spacing } from '@/constants/theme';
 import { BackendUnavailableBanner } from '@/features/auth/components/BackendUnavailableBanner';
 import type { AppError } from '@/features/auth/errors';
@@ -50,6 +49,12 @@ import {
   type ReviewStatus,
 } from '@/features/moderation/queue';
 import { describeUnavailableReason } from '@/lib/supabase/client';
+
+/** Status pemuatan antrean; bentuknya eksplisit supaya render tidak menebak. */
+type QueueState =
+  | { status: 'loading' }
+  | { status: 'ready'; items: ModerationQueueItem[]; people: ModerationPeople }
+  | { status: 'error'; error: AppError };
 
 function formatDateTime(iso: string): string {
   const parsed = new Date(iso);
@@ -186,17 +191,6 @@ function QueueCard({
 
 export default function ModerationScreen() {
   const { backend, userId } = useAuthSession();
-  const supabaseAvailable = backend?.available ?? false;
-
-  // Klasifikasi state layar berdasarkan status Supabase
-  const { status, showEmpty, showError } = classifyScreenState(
-    supabaseAvailable,
-    state.status ?? null,
-    0,
-  );
-
-  // Jika error, dapatkan pesan yang konsisten
-  const errorMessage = showError ? formatErrorMessage(state.error) : undefined;
 
   const [state, setState] = useState<QueueState>({ status: 'loading' });
   const [audit, setAudit] = useState<ModerationActionRow[]>([]);
@@ -221,15 +215,11 @@ export default function ModerationScreen() {
     const client = backend.client;
     let active = true;
 
-    void listModerationReports(client).then((result) => {
+    void loadModerationQueue(client).then((result) => {
       if (!active) return;
 
       if (result.ok) {
-        const { items, people } = result.data;
-        setState({ status: 'ready', items, people });
-
-        // Sweep orphaned items if some data may be stale
-        void sweepOrphanModerationReports(client, items);
+        setState({ status: 'ready', items: result.data.items, people: result.data.people });
       } else {
         setState({ status: 'error', error: result.error });
       }
@@ -263,11 +253,6 @@ export default function ModerationScreen() {
           retryable: false,
         }
       : null;
-
-  // Empty state fallback bila tidak ada data moderasi
-  const emptyStateText = showEmpty && state.status === 'ready' && state.items.length === 0
-    ? 'Belum ada laporan penyalahgunaan yang menunggu di perjalanan atau klub Anda.'
-    : undefined;
 
   async function runAction(
     reportId: string,
@@ -341,6 +326,7 @@ export default function ModerationScreen() {
   }
 
   const items = state.status === 'ready' ? state.items : [];
+  const showEmpty = state.status === 'ready' && state.items.length === 0;
   // Label dari antrean dan audit digabung: pelaku di jejak audit bisa moderator
   // lain yang tidak muncul sebagai pelapor/penulis di antrean.
   const people: ModerationPeople = {
@@ -367,59 +353,63 @@ export default function ModerationScreen() {
         <Banner message={actionError.message} title="Aksi tidak selesai" tone="danger" />
       ) : null}
 
-      <View>
-        {precondition ? (
-          <EmptyState
-            description={precondition.message}
-            icon="lock-closed-outline"
-            title="Dashboard moderasi belum bisa dibuka"
-          />
-        ) : null}
-        {!precondition ? (
-          <View>
-            <Card>
-              <AppText variant="bodyStrong">Apa yang tercatat</AppText>
-              <AppText tone="secondary" variant="callout">
-                Setiap tindakan menyimpan pelaku, alasan laporan, dan waktu di server. Laporan tidak
-                menghapus konten secara otomatis; penghapusan selalu tindakan terpisah.
-              </AppText>
-              <AppText tone="muted" variant="caption">
-                Laporan bahaya tanpa perjalanan dan konten di luar perjalanan Anda tidak tampil di
-                sini; jalurnya dashboard tepercaya.
-              </AppText>
-            </Card>
-        </View>      {state.status === 'ready' && (
-      <View style={styles.sectionHeader}>
-            <AppText variant="bodyStrong">Menunggu tinjauan</AppText>
-            <Badge
-    
-                  label={`${items.length} laporan`}
-                  tone={items.length > 0 ? 'warning' : 'neutral'}
-                />
-              </View>            )}
+      {precondition ? (
+        <EmptyState
+          description={precondition.message}
+          icon="lock-closed-outline"
+          title="Dashboard moderasi belum bisa dibuka"
+        />
+      ) : (
+        <View>
+          <Card>
+            <AppText variant="bodyStrong">Apa yang tercatat</AppText>
+            <AppText tone="secondary" variant="callout">
+              Setiap tindakan menyimpan pelaku, alasan laporan, dan waktu di server. Laporan tidak
+              menghapus konten secara otomatis; penghapusan selalu tindakan terpisah.
+            </AppText>
+            <AppText tone="muted" variant="caption">
+              Laporan bahaya tanpa perjalanan dan konten di luar perjalanan Anda tidak tampil di
+              sini; jalurnya dashboard tepercaya.
+            </AppText>
+          </Card>
 
-          {showError ? (
-              <ErrorState
-                description={errorMessage}
-                onRetry={reload}
-                title="Antrean gagal dimuat"
+          {state.status === 'ready' ? (
+            <View style={styles.sectionHeader}>
+              <AppText variant="bodyStrong">Menunggu tinjauan</AppText>
+              <Badge
+                label={`${items.length} laporan`}
+                tone={items.length > 0 ? 'warning' : 'neutral'}
               />
-            ) : null}
+            </View>
+          ) : null}
 
-            {showEmpty && state.status === 'ready' && state.items.length === 0 ? (
+          {state.status === 'loading' ? <LoadingState testID="moderation-loading" /> : null}
+
+          {state.status === 'error' ? (
+            <ErrorState
+              description={state.error.message}
+              onRetry={reload}
+              title="Antrean gagal dimuat"
+            />
+          ) : null}
+
+          {showEmpty ? (
             <EmptyState
-                description="Belum ada laporan penyalahgunaan yang menunggu di perjalanan atau klub Anda. Laporan baru akan muncul di sini."
-                icon="shield-checkmark-outline"
-                testID="moderation-empty"
-                title="Tidak ada laporan menunggu"
-              />
-            ) : null}
+              description="Belum ada laporan penyalahgunaan yang menunggu di perjalanan atau klub Anda. Laporan baru akan muncul di sini."
+              icon="shield-checkmark-outline"
+              testID="moderation-empty"
+              title="Tidak ada laporan menunggu"
+            />
+          ) : null}
 
           {items.map((item) => (
             <QueueCard
               key={item.report.id}
               busy={busyId !== null}
               item={item}
+              onDismiss={() => handleDecision(item, 'dismissed')}
+              onRemove={() => handleRemove(item)}
+              onReview={() => handleDecision(item, 'reviewed')}
               people={people}
             />
           ))}
@@ -445,7 +435,7 @@ export default function ModerationScreen() {
                 Belum ada tindakan moderasi yang tercatat untuk Anda.
               </AppText>
             ) : (
-              audit.map((entry) => ({
+              audit.map((entry) => (
                 <View
                   key={entry.id}
                   style={styles.auditRow}
@@ -465,16 +455,18 @@ export default function ModerationScreen() {
                     {contentReportReasonLabel(entry.reason)} · oleh{' '}
                     {entry.actor_id === userId ? 'Anda' : reporterLabel(people, entry.actor_id)}
                   </AppText>
-                  {entry.note ? (                      <AppText tone="muted" variant="caption">
-                        Catatan: {entry.note}
+                  {entry.note ? (
+                    <AppText tone="muted" variant="caption">
+                      Catatan: {entry.note}
                     </AppText>
+                  ) : null}
                 </View>
-              }))
+              ))
             )}
           </Card>
         </View>
-      ) : null
-    </View>
+      )}
+    </Screen>
   );
 }
 

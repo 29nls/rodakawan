@@ -54,12 +54,21 @@ export function mapSupabaseError(error: unknown): {
   message: string;
   retryable: boolean;
 } {
-  // Jika sudah AppError, kembalikan langsung
-  if (error && typeof error === 'object' && 'code' in error && 'message' in error && 'retryable' in error) {
+  // Jika sudah AppError, kembalikan langsung. Pemeriksaan struktural hanya
+  // membuktikan ketiga properti ada; nilainya tetap `unknown`, jadi bentuknya
+  // ditegaskan sekali di sini alih-alih menyebar `any` ke pemanggil.
+  if (
+    error &&
+    typeof error === 'object' &&
+    'code' in error &&
+    'message' in error &&
+    'retryable' in error
+  ) {
+    const appError = error as { code: string; message: string; retryable: boolean };
     return {
-      code: error.code,
-      message: error.message,
-      retryable: error.retryable,
+      code: appError.code,
+      message: appError.message,
+      retryable: appError.retryable,
     };
   }
 

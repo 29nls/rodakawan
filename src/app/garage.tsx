@@ -37,7 +37,7 @@ import {
   sweepOrphanVehiclePhotos,
 } from '@/features/media/photoCleanup';
 import { describeUnavailableReason } from '@/lib/supabase/client';
-import { useSupabaseState, classifyScreenState, getEmptyStateText, formatErrorMessage } from '@/features/state-helper';
+import { formatErrorMessage } from '@/features/state-helper';
 
 type GarageState =
   | { status: 'loading' }
@@ -57,17 +57,14 @@ const EMPTY_FORM = { make: '', model: '', nickname: '', modelYear: '' };
 export default function GarageScreen() {
   const router = useRouter();
   const { backend, userId } = useAuthSession();
-  const supabaseAvailable = backend?.available ?? false;
 
-  // Klasifikasi state layar berdasarkan status Supabase
-  const { status, showEmpty, showError } = classifyScreenState(
-    supabaseAvailable,
-    state.status ?? null,
-    state.vehicles.length,
-  );
+  const [state, setState] = useState<GarageState>({ status: 'loading' });
 
-  // Jika error, dapatkan pesan yang konsisten
-  const errorMessage = showError ? formatErrorMessage(state.error) : undefined;
+  // Status layar dibaca langsung dari state data: `ready` dengan daftar kosong
+  // tetap dianggap siap, supaya empty state dan daftar kendaraan memakai sumber
+  // yang sama.
+  const showError = state.status === 'error';
+  const errorMessage = state.status === 'error' ? formatErrorMessage(state.error) : undefined;
 
   const [reloadToken, setReloadToken] = useState(0);
   const [form, setForm] = useState(EMPTY_FORM);
@@ -275,13 +272,13 @@ export default function GarageScreen() {
           />
           <Divider />
 
-          {status === 'loading' ? <LoadingState label="Memuat kendaraan…" /> : null}
+          {state.status === 'loading' ? <LoadingState label="Memuat kendaraan…" /> : null}
 
-          {status === 'error' ? (
+          {state.status === 'error' ? (
             <ErrorState onRetry={reload} description={state.error.message} />
           ) : null}
 
-          {status === 'ready' && state.vehicles.length === 0 ? (
+          {state.status === 'ready' && state.vehicles.length === 0 ? (
             <EmptyState
               description="Belum ada kendaraan di garasi ini. Tambahkan kendaraan pertama Anda pada formulir di bawah."
               icon="bicycle-outline"
@@ -290,7 +287,7 @@ export default function GarageScreen() {
             />
           ) : null}
 
-          {status === 'ready'
+          {state.status === 'ready'
             ? state.vehicles.map((vehicle) => (
                 <Card key={vehicle.id} padding="md" variant="raised" style={styles.vehicle}>
                   <InfoRow

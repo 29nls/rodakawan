@@ -12,7 +12,6 @@ import { InfoRow } from '@/components/ui/InfoRow';
 import { Screen } from '@/components/ui/Screen';
 import { ScreenHeader } from '@/components/ui/ScreenHeader';
 import { SectionHeader } from '@/components/ui/SectionHeader';
-import { ErrorState, LoadingState } from '@/components/ui/StateView';
 import { TextField } from '@/components/ui/TextField';
 import { colors, spacing } from '@/constants/theme';
 import { BackendUnavailableBanner } from '@/features/auth/components/BackendUnavailableBanner';
@@ -519,22 +518,6 @@ export default function RideScreen() {
     () => buildRideMarkers(details?.members ?? [], details?.locations ?? [], now),
     [details?.members, details?.locations, now],
   );
-
-  {showError ? (
-    <Screen testID="ride-screen">
-      <ScreenHeader showBack overline="Perjalanan" title="Detail perjalanan" />
-      <ErrorState description={errorMessage} onRetry={reload} />
-    </Screen>
-  ) : null}
-
-  {showEmpty && !details ? (
-    <Screen testID="ride-screen">
-      <ScreenHeader showBack overline="Perjalanan" title="Detail perjalanan" />
-      <AppText tone="muted" variant="caption">
-        Perjalanan belum terisi. Cek tautannya atau cari perjalanan lain.
-      </AppText>
-    </Screen>
-  ) : null}
 
   if (!ride) return null;
 
