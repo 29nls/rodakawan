@@ -8,6 +8,17 @@ sedangkan build preview (`v<versi>-build<N>`) diringkas di dalam blok yang bisa 
 versi adalah tautan ke halaman rilisnya di GitHub, sehingga riwayat ini bisa dinavigasi langsung
 dari berkas.
 
+## [v0.1.0-build64](https://github.com/29nls/rodakawan/releases/tag/v0.1.0-build64) — 2026-10-25 · pratinjau
+
+<details>
+<summary>Catatan rilis pratinjau</summary>
+
+### Fitur
+
+- implement error and loading states across various screens (`ff654ab`)
+
+</details>
+
 ## [v0.1.0-build63](https://github.com/29nls/rodakawan/releases/tag/v0.1.0-build63) — 2026-10-25 · pratinjau
 
 <details>
