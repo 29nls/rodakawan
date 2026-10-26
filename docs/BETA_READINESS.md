@@ -52,7 +52,7 @@ pemilik/produk/legal) dan **tidak diketahui** (tidak ada bukti yang cukup untuk 
 | S-08 | E2E hapus akun lintas Auth/Storage/DB | **Passed against dev backend** (25 Oktober 2026); tidak dijalankan ulang pada perubahan ini | `npm run e2e:account-delete -- --yes`: 17 langkah, 0 objek/baris sisa; runner permanen `scripts/account-deletion-e2e.mjs`. Bisa diulang untuk 5 pengguna internal. |
 | S-09 | Lease/checkpoint hapus akun aman terhadap crash dan duplikasi | **Passed locally** + **Passed against dev backend** | 19 test Node (`scripts/__tests__/account-deletion.test.mjs`); uji SQL lease; migration ADR-078 diterapkan | Reconcile job masih manual; jadwalkan operator |
 | S-10 | Uji perangkat fisik | **Blocked** | Tidak ada perangkat pada sesi ini; APK terakhir dari audit sebelumnya, bukan dari branch ini. Dapat dijadwinkan dengan 5 perangkat fisik internal. | Jadwinkan ACC-01..08 + QA 8d untuk 5 perangkat internal. |
-| S-11 | Realtime dua klien (terima/tolak, reconnect, filter blokir) | **Blocked** | Lapisan database **Passed against dev backend**; dua klien WebSocket nyata belum diuji. Bisa diuji dengan 2 akun internal dalam satu perjalanan. | Uji dua akun internal dalam satu perjalanan |
+| S-11 | Realtime dua klien (terima/tolak, reconnect, filter blokir) | **Passed against dev backend** untuk dua klien nyata; **Blocked** di perangkat | `npm run e2e:shared-ride` (25 Oktober 2026, 24 pemeriksaan): dua klien supabase-js dengan JWT GoTrue asli berlangganan `ride_locations` + `chat_messages`; chat/lokasi B diterima A dalam 208 ms dan 593 ms (batas 5 dtk); C (bukan anggota) menerima 0 event dan membaca 0 baris; ride selesai menghapus lokasi. Sisa yang masih **Blocked**: reconnect saat jaringan putus/pulih dan filter blokir di perangkat (QA 8d/8f, PD-09/PD-15) | Jalankan PD-09 + PD-15 di 8f |
 | S-12 | Tidak ada service role/private key di bundel | **Passed locally** | `npm run export:android` exit 0; `entry-6419….hbc`: JWT utuh 0, `postgres://` 0, nilai `sb_secret_` ≥30 karakter 0 (literal `service_role` 2× = regex klien + kode dependency). Bisa diverifikasi tanpa secret di bundel internal. | Ulangi setiap kali `.env.local` berisi kredensial nyata |
 | S-13 | Tidak ada secret di repo/riwayat | **Passed locally** (audit 24 Oktober 2026; tidak ada kredensial baru) | `git log --all --diff-filter=A -- '.env*'` hanya `.env.example`; pemindaian tree/riwayat. Bisa diverifikasi untuk internal. | Ulangi sebelum rilis publik |
 | S-14 | Konfigurasi web hanya URL + publishable key | **Passed locally** | `web-static.test.mjs`: kunci config dibatasi 4; JWT hanya boleh di `config.js` dengan payload `role = anon`; tidak ada ref development/secret di `web/`. Bisa diisi dengan URL internal. | Isi config dengan nilai publik saat deploy |
@@ -67,7 +67,7 @@ pemilik/produk/legal) dan **tidak diketahui** (tidak ada bukti yang cukup untuk 
 | P-01 | Akun, profil, klub, buat/gabung/perjalanan berfungsi di perangkat target | **Blocked** | Unit/komponen lulus; tidak ada bukti perangkat untuk alur penuh. Bisa diuji dengan 5 pengguna internal. |
 | P-02 | Live location foreground/background, izin ditolak, GPS mati, jaringan hilang, app dihentikan | **Blocked** | Rencana di `QA_TEST_PLAN.md` 8d; tidak ada artefak. Bisa diuji dengan 5 perangkat internal. |
 | P-03 | Marker menunjukkan waktu update; posisi lama tidak tampak live | **Implemented**; **Blocked** di perangkat | Logika stale + label umur posisi ada; renderer peta belum dipasang (ADR-064). Bisa diuji dengan 5 pengguna. |
-| P-04 | Non-anggota tidak dapat membaca lokasi/chat lewat API/Realtime | **Passed against dev backend** (lapisan database); **Blocked** untuk dua klien Realtime. Bisa dikonfigurasi akses tim internal. |
+| P-04 | Non-anggota tidak dapat membaca lokasi/chat lewat API/Realtime | **Passed against dev backend** | `db:test` + `e2e:shared-ride`: pengguna C menerima 0 event realtime dan membaca 0 baris `rides`/`chat_messages`/`ride_locations`; pengiriman chat non-anggota ditolak RPC. Bukt perangkat: PD-15 di QA 8f | **Blocked** di perangkat |
 | P-05 | Road report kedaluwarsa dan dapat dilaporkan | **Passed against dev backend**; **Blocked** di perangkat. Bisa diuji dengan 5 pengguna internal. |
 | P-06 | Chat membatasi akses berdasarkan anggota perjalanan | **Passed against dev backend**; **Blocked** untuk realtime klien. Bisa dikonfigurasi untuk tim internal. |
 | P-07 | Kunci service role tidak ada di bundel | **Passed locally** | S-12. |
@@ -103,7 +103,23 @@ D-03a (personal): Untuk 5 pengguna internal, masih pakai development project `xv
 | D-07 | Ratifikasi model persetujuan follow (ADR-039) | Fitur sosial M6, bukan blocker beta inti | Pemilik produk |
 | D-08 | Jadwalkan uji perangkat ACC-01..08 + QA 8d | Satu-satunya bukti yang tidak bisa digantikan uji SQL/unit | Pemilik + QA |
 
-## 7. Perintah verifikasi (hasil apa adanya, 25 Oktober 2026)
+## 7a. Verifikasi ulang 26 Oktober 2026 (branch `feat/beta-tertutup-kesiapan`)
+
+Seluruh perintah dijalankan terhadap project development pada 26 Oktober 2026:
+
+| Perintah | Hasil |
+| --- | --- |
+| `npm run db:test` | exit 0 — **11/11** berkas lulus |
+| `npm run db:types:check` | exit 0 — tipe generated sama dengan skema development |
+| `npm run storage:test` | exit 0 — **27** langkah, 0 objek/akun sisa |
+| `npm run e2e:account-delete -- --yes` | exit 0 — **17** langkah, 0 sisa |
+| `npm run e2e:shared-ride` | exit 0 — **24** pemeriksaan LULUS (dua pengguna + realtime; lokasi 208 ms, chat 593 ms; 0 sisa) |
+| `npm run beta:preflight` | exit 1 — **7 lulus, 1 gagal**: `mailer_autoconfirm` aktif di development (temuan nyata; keputusan pemilik untuk project beta — `docs/BETA_RUNBOOK.md` bagian 4) |
+| `npm test -- --ci` | exit 0 — **518** test lulus |
+| `npm run test:scripts` | exit 0 — **395** test lulus |
+| `npm ci` | exit 0 — lockfile tidak berubah |
+
+## 8. Perintah verifikasi (hasil apa adanya, 25 Oktober 2026)
 
 | Perintah | Hasil |
 | --- | --- |

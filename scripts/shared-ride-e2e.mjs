@@ -202,7 +202,9 @@ async function subscribeRide(client, rideId, label) {
   await Promise.race([
     subscribed,
     delay(SUBSCRIBE_TIMEOUT_MS).then(() => {
-      throw new UjiGagal(`langganan realtime ${label} tidak selesai dalam ${SUBSCRIBE_TIMEOUT_MS} ms.`);
+      throw new UjiGagal(
+        `langganan realtime ${label} tidak selesai dalam ${SUBSCRIBE_TIMEOUT_MS} ms.`,
+      );
     }),
   ]);
 
@@ -327,7 +329,9 @@ async function main() {
       await sql(`delete from auth.users where id = any($1::uuid[])`, [[id.a, id.b, id.c]]);
     } catch (error) {
       bersihGagal = true;
-      console.error(`[e2e:shared-ride] pembersihan gagal: ${redactSensitive(error?.message ?? error)}`);
+      console.error(
+        `[e2e:shared-ride] pembersihan gagal: ${redactSensitive(error?.message ?? error)}`,
+      );
     }
 
     try {
@@ -351,7 +355,9 @@ async function main() {
       }
     } catch (error) {
       bersihGagal = true;
-      console.error(`[e2e:shared-ride] verifikasi kebersihan: ${redactSensitive(error?.message ?? error)}`);
+      console.error(
+        `[e2e:shared-ride] verifikasi kebersihan: ${redactSensitive(error?.message ?? error)}`,
+      );
     }
 
     return bersihGagal;
@@ -485,7 +491,10 @@ async function main() {
         p_ride_id: rideId,
         p_enabled: true,
       });
-      check(!error && enabled === true, `${label} gagal menyalakan berbagi lokasi: ${describeError(error)}.`);
+      check(
+        !error && enabled === true,
+        `${label} gagal menyalakan berbagi lokasi: ${describeError(error)}.`,
+      );
     }
     ok('A dan B menyalakan consent berbagi lokasi');
 
@@ -618,10 +627,14 @@ async function main() {
       `lokasi terakhir belum terhapus (${remaining?.length ?? 0} baris): ${describeError(remainingError)}.`,
     );
 
-    const sisaLokasi = await scalar(`select count(*) as count from public.ride_locations where ride_id = $1`, [
-      rideId,
-    ]);
-    check(sisaLokasi === 0, `masih ada ${sisaLokasi} baris ride_locations setelah perjalanan selesai.`);
+    const sisaLokasi = await scalar(
+      `select count(*) as count from public.ride_locations where ride_id = $1`,
+      [rideId],
+    );
+    check(
+      sisaLokasi === 0,
+      `masih ada ${sisaLokasi} baris ride_locations setelah perjalanan selesai.`,
+    );
     ok('lokasi terakhir A dan B terhapus setelah perjalanan selesai');
 
     console.log(`\n[e2e:shared-ride] ${SUCCESS_NOTICE}`);

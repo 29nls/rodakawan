@@ -35,13 +35,14 @@ Istilah status dipakai konsisten di seluruh dokumentasi:
 | Milestone 2: klub (buat, gabung, peran, keluarkan, jejak audit) | Ya | Ya | **Ya** (uji RLS LULUS) | **Ya** (dilaporkan pemilik) |
 | Milestone 2: foto kendaraan & logo klub (Supabase Storage) | Ya — bucket privat, unggah/ganti/hapus, foto diperkecil + dikompres otomatis di perangkat, objek yatim disapu otomatis | Ya (75 unit test) | **Ya** (uji Storage RLS LULUS + uji HTTP LULUS) | **Ya** (dilaporkan pemilik; build19/build20 memuat modul native) |
 | Milestone 2: foto profil (avatar) | Ya — bucket privat owner-only, unggah/ganti/hapus dari tab Profil, foto diperkecil otomatis | Ya (17 unit test) | **Ya** (uji HTTP Storage LULUS) | **Ya** (dilaporkan pemilik) |
-| Milestone 3: perjalanan klub (buat, undang, gabung, keluar, host memulai/menyelesaikan/membatalkan) | Ya — RPC transactional, state machine di database | Ya (27 test fitur + 20 test layar, termasuk 11 test formulir buat/ubah) | **Ya** (uji RLS/RPC 67 perintah) | **Blocked** (dua perangkat) |
-| Milestone 3: berbagi lokasi opt-in (foreground + background) | Ya — consent terpisah dari izin OS, sampling 15 dtk/25 m, basi 60 dtk, lokasi terakhir dihapus saat opt-out/keluar/ride final | Ya | **Ya** (uji allow/deny lokasi) | **Blocked** (izin, GPS mati, force-stop, baterai 30 menit) |
+| Milestone 3: perjalanan klub (buat, undang, gabung, keluar, host memulai/menyelesaikan/membatalkan) | Ya — RPC transactional, state machine di database | Ya (27 test fitur + 20 test layar, termasuk 11 test formulir buat/ubah) | **Ya** (uji RLS/RPC 67 perintah + E2E dua pengguna/realtime LULUS 25 Okt 2026) | **Blocked** (dua perangkat fisik; alur dua pengguna lewat API sudah terbukti `e2e:shared-ride`) |
+| Milestone 3: berbagi lokasi opt-in (foreground + background) | Ya — consent terpisah dari izin OS, sampling 15 dtk/25 m, basi 60 dtk, lokasi terakhir dihapus saat opt-out/keluar/ride final | Ya | **Ya** (uji allow/deny lokasi + E2E: lokasi terakhir terhapus saat ride selesai, 25 Okt 2026) | **Blocked** (izin, GPS mati, force-stop, baterai 30 menit di HP fisik) |
 | Milestone 3: peta konvoi | **Belum** — ADR-064 masih **Proposed** (rekomendasi MapLibre + MapTiler Flex, riset ulang 20 Oktober 2026); layar menampilkan daftar posisi + status kesegaran, bukan peta tiruan | — | — | — |
 | Milestone 4: laporan bahaya jalan (buat, filter, ubah/lepas, konfirmasi, laporkan) | Ya — RPC transaksional, expiry dihitung server, idempotensi + rate limit + deteksi duplikat di database; tanpa peta, daftar memakai label area perkiraan | Ya (29 test fitur + 6 test layar) | **Ya** (uji RLS LULUS — Database RLS #19) | **Blocked** (belum ada build perangkat) |
-| Milestone 4: chat konvoi (teks, ubah/hapus 15 menit, pesan sistem, realtime, laporkan, blokir) | Ya — Postgres Changes pada `chat_messages`, keyset pagination, idempotensi `client_message_id`, panel chat di detail perjalanan; pesan teks dari pengguna yang diblokir disaring **di server** (policy, ADR-068), bukan di UI | Ya (24 test API + 9 test panel) | **Ya** (uji RLS LULUS — Database RLS #19) | **Blocked** |
+| Milestone 4: chat konvoi (teks, ubah/hapus 15 menit, pesan sistem, realtime, laporkan, blokir) | Ya — Postgres Changes pada `chat_messages`, keyset pagination, idempotensi `client_message_id`, panel chat di detail perjalanan; pesan teks dari pengguna yang diblokir disaring **di server** (policy, ADR-068), bukan di UI | Ya (24 test API + 9 test panel) | **Ya** (uji RLS LULUS — Database RLS #19; chat realtime lintas pengguna dibuktikan E2E 25 Okt 2026) | **Blocked** |
 | Milestone 4: moderasi (`content_reports`, `moderation_actions`, `user_blocks`) | Ya — pelaporan lewat RPC `report_content`, dashboard `/moderation` untuk host perjalanan/admin klub dengan aksi hapus konten (soft delete), abaikan, dan tandai ditinjau, jejak audit yang hanya bisa dibaca lewat RPC; **tanpa** peran moderator global (ADR-067) | Ya (16 test layanan + 8 test layar) | **Ya** (uji RLS LULUS — Database RLS #19) | — |
 | Milestone 5: hapus akun penuh + kebijakan privasi | Ya — Edge Function `delete-account` memverifikasi JWT, memindahkan logo klub/menghapus media lewat Storage API, memanggil `purge_account_data()` (satu transaksi), lalu menghapus `auth.users`; tombstone bersama mempertahankan laporan bahaya/audit; status job memakai lease eksklusif + checkpoint (ADR-078); layar `/account-delete` dan halaman statis `web/privacy` + `web/account-deletion` | Ya (13 test layanan + 4 test layar + 19 test orkestrasi Node) | **Ya** untuk ADR-077 (uji RLS lulus; E2E Auth/Storage 23 Okt 2026). Uji lease ADR-078 lulus; setelah migration diterapkan ke development (24 Oktober 2026), `db:test` **8/8** lulus | **Blocked** (belum ada build perangkat; URL web belum live) |
+| Kesiapan beta tertutup (E2E dua pengguna/realtime, preflight hanya-baca, dokumen beta) | Ya — `npm run e2e:shared-ride` (alur klub → perjalanan → konvoi dua pengguna + Postgres Changes lewat GoTrue/PostgREST/Realtime) dan `npm run beta:preflight` (8 pemeriksaan kesiapan project, hanya-baca), `docs/BETA_RUNBOOK.md`, `docs/BETA_GUIDE_PESERTA.md` | Ya (29 test helper node:test) | **Ya** (E2E LULUS 24 pemeriksaan, 25 Okt 2026; preflight development 7/8 — autoconfirm aktif, keputusan pemilik) | — |
 | Milestone 5: push notification, crash monitoring, device matrix | **Belum** — rencana di `docs/MILESTONE_5_PLAN.md`; push butuh modul native + kredensial FCM | — | — | — |
 | Milestone 6+: feed, musik, voice PTT | **Belum** | — | — | — |
 
@@ -49,7 +50,7 @@ Istilah status dipakai konsisten di seluruh dokumentasi:
 HP fisik. Status **Ya** pada kolom perangkat Milestone 2 berasal dari laporan pemilik aplikasi
 (owner-reported) bahwa build sudah dicoba di HP tanpa error yang teramati; tidak ada log, rekaman,
 atau tag rilis per kasus yang disertakan. Project Supabase development **sudah ada**
-sejak 13 Oktober 2026. Seluruh **22** migration sudah ada di repository. **22** di antaranya sudah diterapkan ke project development (termasuk `20261023120000_account_deletion_reliability.sql`/ADR-078 pada 24 Oktober 2026), jadi `npx supabase migration list --linked` kini menunjukkan 22 lokal = 22 remote.
+sejak 13 Oktober 2026. Seluruh **25** migration sudah ada di repository dan **25** di antaranya sudah diterapkan ke project development (terakhir `20261025013131_m5_rate_limits.sql` pada 25 Oktober 2026), jadi `npx supabase migration list --linked` menunjukkan 25 lokal = 25 remote — diverifikasi ulang oleh `npm run beta:preflight` pada 25 Oktober 2026.
 Uji RLS sudah lulus (ADR-035), dan lubang privasi follow serta integritas detail privat kendaraan
 sudah diperbaiki dengan uji allow/deny (ADR-039, ADR-040). Empat migration Milestone 4 —
 `20261020090000_hazard_reports_m4.sql`, `20261020100000_convoy_chat_m4.sql`,
@@ -63,6 +64,20 @@ Itu tidak berarti fitur M4/M5 sudah diuji di HP fisik; daftar uji manualnya ada 
 [`docs/QA_TEST_PLAN.md`](docs/QA_TEST_PLAN.md) bagian 8d. Langkah penerapannya ada di
 [`docs/SETUP_GUIDE.md`](docs/SETUP_GUIDE.md#4-menerapkan-migration). Semua langkah yang dapat
 dijalankan tanpa backend sudah dijalankan — lihat [Perintah pengujian](#perintah-pengujian).
+
+Sejak 25 Oktober 2026 ada dua alat bukti tambahan untuk kesiapan beta tertutup. `npm run
+e2e:shared-ride` menjalankan alur nyata dua pengguna — buat klub, minta gabung, setujui, buat
+perjalanan, undang, mulai, nyalakan berbagi lokasi, kirim chat + posisi, selesai — lewat GoTrue,
+PostgREST, dan Realtime terhadap project development, dan **LULUS dengan 24 pemeriksaan**: lokasi
+dan chat B diterima A dalam 208 ms dan 593 ms (batas 5 detik), pengguna C yang bukan anggota tidak
+menerima satu pun event dan tidak bisa membaca `rides`/`chat_messages`/`ride_locations`, dan
+seluruh lokasi terakhir terhapus setelah perjalanan selesai; tiga akun uji dibersihkan dengan
+verifikasi 0 sisa. `npm run beta:preflight` memeriksa kesiapan project beta secara hanya-baca
+(sinkronisasi migration remote = lokal, RLS semua tabel, bucket privat, penolakan Edge Function
+tanpa JWT, autoconfirm, sisa akun uji); terhadap development hasilnya **7 lulus, 1 gagal** —
+`mailer_autoconfirm` aktif, yang harus diputuskan sadar sebelum peserta beta mendaftar. Langkah
+pemilik ada di [`docs/BETA_RUNBOOK.md`](docs/BETA_RUNBOOK.md); panduan untuk peserta ada di
+[`docs/BETA_GUIDE_PESERTA.md`](docs/BETA_GUIDE_PESERTA.md).
 
 Layar Milestone 2 (garasi dan klub) dan Milestone 3 (perjalanan) sepenuhnya **berfungsi**: seluruh
 aksinya memanggil service yang menembak tabel/RPC Supabase, dan setiap mutasi punya uji RLS allow/deny

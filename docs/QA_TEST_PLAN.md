@@ -239,9 +239,12 @@ realtime. Ini inti perubahannya — sebelumnya isinya tetap terkirim.
 
 ### 8d. Uji manual hazard dan chat (sisa M4)
 
-Backend SQL-nya sudah lulus di Database RLS #19, jadi daftar ini **hanya** untuk perilaku aplikasi
-yang tidak bisa dibuktikan runner database. Jalankan pada APK preview terbaru dengan dua akun
-(**A** pelapor/host, **B** peserta lain) di satu perjalanan aktif.
+Backend SQL-nya sudah lulus di Database RLS #19, dan alur dua pengguna + realtime lewat API sudah
+dibuktikan `npm run e2e:shared-ride` (LULUS 25 Oktober 2026, 24 pemeriksaan: dua klien supabase-js
+dengan JWT GoTrue asli, chat + lokasi diterima ≤5 detik, pengguna non-anggota menerima 0 event dan
+membaca 0 baris). Karena itu daftar ini **hanya** untuk perilaku aplikasi di perangkat yang tidak
+bisa dibuktikan runner mana pun. Jalankan pada APK preview terbaru dengan dua akun (**A**
+pelapor/host, **B** peserta lain) di satu perjalanan aktif.
 
 **Laporan bahaya**
 
@@ -306,6 +309,44 @@ nyata (termasuk saat jaringan putus di tengah proses dan retry), memastikan sign
 mati setelah akun dihapus, serta membuka halaman web dari URL publik. Butir ACC-01..ACC-08 di bagian 3
 adalah daftar periksa untuk itu. Uji E2E di atas memakai akun uji sintetis di project development,
 bukan perangkat atau akun nyata.
+
+### 8f. Checklist penerimaan perangkat fisik (pilot 2–5 pengguna)
+
+Daftar ini pelengkap 8a–8e untuk **pilot internal**: satu tabel yang diisi apa adanya selama uji
+berjalan. Semua baris dimulai **Blocked** — dinaikkan hanya dengan bukti per baris (foto/tangkapan
+layar, logcat, atau catatan percakapan). Kolom "Hasil aktual" dan "Bukti" diisi oleh orang yang
+menjalankan; jangan menyalin kolom "Hasil yang diharapkan".
+
+Isi kolom **Perangkat** dengan model + versi Android + ROM (vendor menentukan perilaku baterai),
+dan **Versi APK** dengan tag rilis (mis. `v0.1.0-build64`) beserta SHA-256 yang dicocokkan dengan
+bagian 🔒 Verifikasi berkas di halaman rilis. Dua perangkat berbeda vendor minimal; lima lebih baik.
+
+| ID | Perangkat | Versi APK | Akun | Langkah | Hasil yang diharapkan | Hasil aktual | Bukti | Status |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| PD-01 | | | A, B | Daftar + login di dua perangkat; tutup aplikasi; buka lagi; matikan jaringan sesaat lalu buka | Sesi pulih tanpa login ulang; galat jaringan menjelaskan pemulihan, bukan crash | | | **Blocked** |
+| PD-02 | | | A (host), B | A membuat perjalanan `planned`, mengundang B, B menerima, A memulai | Kedua layar menampilkan status yang sama setelah tersimpan di server | | | **Blocked** |
+| PD-03 | | | A, B | A & B mengaktifkan berbagi lokasi (consent per perjalanan); keduanya bergerak | Posisi + timestamp satu sama lain diperbarui di layar yang lain; label segar/basi benar | | | **Blocked** |
+| PD-04 | | | A | Tolak izin lokasi OS saat menyalakan berbagi lokasi dan saat "Gunakan lokasi saat ini" di form bahaya | Aplikasi menjelaskan akibatnya; tidak ada koordinat 0,0; perjalanan tetap bisa diikuti | | | **Blocked** |
+| PD-05 | | | A, B | Matikan GPS (mode hemat daya) di tengah perjalanan | Pembaruan berhenti dengan status yang jelas; tidak ada lokasi basi berlabel live | | | **Blocked** |
+| PD-06 | | | A | Ubah izin lokasi aplikasi di Pengaturan Android saat aplikasi berjalan | Aplikasi menangani perubahan tanpa crash; pesan dapat dipahami | | | **Blocked** |
+| PD-07 | | | A | A pindah ke background (layar masih hidup) selama 5 menit | Lokasi tetap terkirim (foreground service); catat notifikasi layanan yang terlihat | | | **Blocked** |
+| PD-08 | | | A | Kunci layar 10 menit di tengah perjalanan aktif | Lokasi tetap terkirim; catat vendor, konsumsi baterai, dan apakah ROM mematikan layanan | | | **Blocked** |
+| PD-09 | | | A, B | Matikan data seluler/Wi-Fi 30–60 detik di tengah chat, lalu nyalakan | Indikator offline jelas; setelah pulih chat/posisi tersambung ulang tanpa data ganda; retry pesan terkirim **sekali** | | | **Blocked** |
+| PD-10 | | | A | Aktifkan battery saver + pembatasan background untuk aplikasi | Catat perilaku vendor (umumnya lokasi berhenti); aplikasi tidak crash dan status tetap jujur | | | **Blocked** |
+| PD-11 | | | A | Force-stop aplikasi dari Pengaturan, lalu buka lagi | Sesi dan state konsisten dari server; tracking tidak nyala sendiri tanpa ride aktif + opt-in | | | **Blocked** |
+| PD-12 | | | A | Reboot perangkat, lalu buka aplikasi | Sesi pulih (atau diminta login dengan jelas); tidak ada tracking diam-diam | | | **Blocked** |
+| PD-13 | | | A, B | A menonaktifkan berbagi lokasi; B keluar/dikeluarkan host | Lokasi terakhir benar-benar terhapus; yang keluar tidak bisa menerbitkan lokasi baru | | | **Blocked** |
+| PD-14 | | | A, B | A menyelesaikan (dan satu skenario: membatalkan) perjalanan | Status final terlihat di B; tidak bisa dikembalikan ke aktif lewat aplikasi | | | **Blocked** |
+| PD-15 | | | A, B, (C) | Chat realtime A↔B; sunting/hapus dalam 15 menit; kirim saat mode pesawat lalu ulangi (idempoten); gulir muat pesan lama; akun C diblokir A | Pesan tanpa muat ulang; edit/hapus tercermin; retry tidak menduplikasi; riwayat utuh; pesan teks C tidak pernah sampai ke A (disaring server) | | | **Blocked** |
+| PD-16 | | | A, B | Laporan bahaya: buat, duplikat 50 m/10 menit, rate limit 5/10 menit, konfirmasi "masih ada", ubah/hapus dalam 15 menit, kedaluwarsa 24 jam | Perilaku sesuai aturan database dengan pesan yang dapat dipahami; tidak ada data ganda | | | **Blocked** |
+| PD-17 | | | A (host), B (pelapor) | Alur moderasi 8b di perangkat: laporkan konten, tinjau di `/moderation`, hapus/abaikan, jejak audit | Antrean, aksi, dan audit tampil benar di perangkat | | | **Blocked** |
+| PD-18 | | | A, B | Unggah avatar, foto kendaraan, logo klub; coba akses media akun lain (mis. lewat tautan yang dibagikan) | Unggah/ganti/hapus berfungsi; media orang lain tidak terbaca; signed URL mati setelah diganti | | | **Blocked** |
+| PD-19 | | | A | Hapus akun lewat tab Profil di perangkat (satu skenario dengan jaringan dipotus di tengah lalu dicoba lagi) | Tidak ada klaim sukses sebelum server selesai; hasil retensi sesuai ADR-077; retry aman | | | **Blocked** |
+| PD-20 | | | semua | Ulangi PD-02…PD-05 dan PD-09 di perangkat vendor kedua | Hasil dicatat terpisah per perangkat; perbedaan vendor ditulis apa adanya | | | **Blocked** |
+
+Dua perangkat lebih dulu (PD-01…PD-05, PD-09, PD-13…PD-15) sudah cukup untuk menyatakan pilot
+berfungsi; sisanya menaikkan keyakinan sebelum meluas. Selama ada satu baris Blocked yang relevan
+untuk fitur itu, fitur tersebut tidak boleh dilaporkan "lulus di perangkat".
 
 ## 9. Status otomatisasi dan verifikasi (Milestone 1–3)
 

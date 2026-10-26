@@ -155,3 +155,13 @@ tanpa atribusi.
 4. Renderer dibungkus lapisan provider tunggal, atribusi MapTiler + OSM ditampilkan, dan keadaan
    "peta belum dikonfigurasi"/galat tetap eksplisit.
 5. Baru setelah itu marker posisi peserta (hanya anggota aktif, lewat RLS yang sudah ada) dikerjakan.
+
+### Catatan 26 Oktober 2026: pilot internal berjalan tanpa peta
+
+Gerbang kesiapan bersama-pakai (26 Oktober 2026) memutuskan **tidak** memasang renderer pada tahap
+ini: ADR-064 masih **Proposed** (keputusan D-06 di `BETA_READINESS.md`), belum ada akun/kunci
+provider yang sah untuk dibuat agent, dan memasang dependency native tanpa uji perangkat akan
+menambah risiko tanpa nilai pengguna — tanpa style URL yang valid, peta tetap menampilkan
+"belum dikonfigurasi". Kontrak `src/features/map/` beserta 27 tesnya tetap lulus; pemasangan
+MapLibre nanti mengikuti tujuh langkah di [`src/features/map/README.md`](../src/features/map/README.md)
+setelah keputusan provider disetujui dan kunci tersedia.
