@@ -8,6 +8,19 @@ sedangkan build preview (`v<versi>-build<N>`) diringkas di dalam blok yang bisa 
 versi adalah tautan ke halaman rilisnya di GitHub, sehingga riwayat ini bisa dinavigasi langsung
 dari berkas.
 
+## [v0.1.0-build68](https://github.com/29nls/rodakawan/releases/tag/v0.1.0-build68) — 2026-10-26 · pratinjau
+
+<details>
+<summary>Catatan rilis pratinjau</summary>
+
+### Perubahan lain
+
+- security: update production migration plan reference and clarify execution status (`9afb10b`)
+- update .gitignore to exclude backup files and add production migration plan (`25268d3`)
+- security: audit M5 ulang di HEAD c882939 — 0 Critical/High (`ee5a141`)
+
+</details>
+
 ## [v0.1.0-build66](https://github.com/29nls/rodakawan/releases/tag/v0.1.0-build66) — 2026-10-26 · pratinjau
 
 <details>
