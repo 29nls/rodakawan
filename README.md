@@ -50,7 +50,7 @@ Istilah status dipakai konsisten di seluruh dokumentasi:
 HP fisik. Status **Ya** pada kolom perangkat Milestone 2 berasal dari laporan pemilik aplikasi
 (owner-reported) bahwa build sudah dicoba di HP tanpa error yang teramati; tidak ada log, rekaman,
 atau tag rilis per kasus yang disertakan. Project Supabase development **sudah ada**
-sejak 13 Oktober 2026. Seluruh **27** migration sudah ada di repository dan **27/27** sudah diterapkan ke project development (terakhir `20261026191105_m5_write_throttle_serialization.sql` pada 26 Oktober 2026), jadi `npx supabase migration list --linked` menunjukkan **27 lokal = 27 remote** — diverifikasi ulang pada 27 Oktober 2026. Throttle klub/ride/lokasi dari `20261026184430_m5_write_throttles.sql` dan serialisasi konkurensinya (`pg_advisory_xact_lock`) sudah aktif di development.
+sejak 13 Oktober 2026. Seluruh **28** migration sudah ada di repository dan **28/28** sudah diterapkan ke project development (terakhir `20261026195421_m5_write_throttle_function_parity.sql` pada 26 Oktober 2026), jadi `npx supabase migration list --linked` menunjukkan **28 lokal = 28 remote** — diverifikasi ulang pada 27 Oktober 2026. Throttle klub/ride/lokasi dari `20261026184430_m5_write_throttles.sql` dan serialisasi konkurensinya (`pg_advisory_xact_lock`) sudah aktif di development; migration paritas memastikan fungsi di development sama dengan repo.
 Uji RLS sudah lulus (ADR-035), dan lubang privasi follow serta integritas detail privat kendaraan
 sudah diperbaiki dengan uji allow/deny (ADR-039, ADR-040). Empat migration Milestone 4 —
 `20261020090000_hazard_reports_m4.sql`, `20261020100000_convoy_chat_m4.sql`,
@@ -328,7 +328,7 @@ terkini. Uji RLS terakhir yang tercatat di GitHub Actions adalah **Database RLS 
 
 **Diperbarui 27 Oktober 2026 (branch `fix/beta-readiness-rate-limits`):** `npm test -- --ci`
 **48 suite / 525 test**; `npm run test:scripts` **94 suite / 395 test**; `npm run db:test`
-**12/12** berkas; `db:test:lint` **12 berkas uji / 27 migration**; `db:types:check` exit 0;
+**12/12** berkas; `db:test:lint` **12 berkas uji / 28 migration**; `db:types:check` exit 0;
 `storage:test` **27 langkah**; `e2e:account-delete` **17 langkah**; `e2e:shared-ride`
 **24 pemeriksaan**; `export:android` exit 0. `db:test:concurrency` baru membuktikan dua
 `create_club`/`create_ride` serentak tidak melampaui kuota. `npm run doctor` tetap **Blocked**
@@ -744,9 +744,9 @@ scripts/        # generate-assets.mjs, db-test.mjs (runner uji RLS), verify-apk.
                 # preview lama)
 docs/           # sumber kebenaran produk
 supabase/
-  migrations/   # dua puluh tujuh migration: dua berkas fondasi awal
+  migrations/   # dua puluh delapan migration: dua berkas fondasi awal
                 # (20261013022938_initial_schema.sql, 20261013023038_auth_profile_bootstrap.sql)
-                # + dua puluh lima migration aditif (privasi, klub, garasi, Storage, perjalanan M3,
+                # + dua puluh enam migration aditif (privasi, klub, garasi, Storage, perjalanan M3,
                 #   empat migration M4, dan hardening M5 termasuk hapus akun, rate limit, serta
                 #   throttle jalur tulis yang diserialisasi per pengguna)
   tests/        # delapan berkas uji RLS/RPC; rls_profiles_test.sql (dua akun + kontrol positif),

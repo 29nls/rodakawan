@@ -98,7 +98,7 @@ pemilik/produk/legal) dan **tidak diketahui** (tidak ada bukti yang cukup untuk 
 | D-01 | Aktifkan GitHub Pages dan tentukan backend yang ditunjuk `config.js` (development untuk uji, produksi untuk Play) | Tanpa URL live, syarat Play Console dan uji halaman tidak terpenuhi | Pemilik repository |
 D-01a (personal): Untuk 5 pengguna internal, tetap pakai development project `xvmcpfkkveeaevfcvfug`. Aktifkan GitHub Pages hanya jika dibutuhkan untuk internal testing; tidak memerlukan publik. | D-02 | Sahkan retensi laporan bahaya, audit moderasi, pesan yang diredaksi, dan metadata job | Kebijakan publik saat ini menyebut "disimpan selama diperlukan" tanpa periode; cleanup otomatis belum boleh dibuat sebelum dasar hukumnya jelas | Produk + legal |
 | D-03 | Buat project Supabase produksi, backup, dan prosedur rollback | Beta publik tidak boleh berjalan di project development | Pemilik + engineering |
-D-03a (personal): Untuk 5 pengguna internal, masih pakai development project `xvmcpfkkveeaevfcvfug` yang sudah memiliki 27 migration dan 12/12 RLS test lulus (27 Oktober 2026). Tidak ada kebutuhan project produksi terpisah untuk penggunaan pribadi. | D-04 | Tetapkan jadwal cadangan/verifikasi keystore | Keystore hilang = APK terpasang tidak bisa diperbarui | Pemilik |
+D-03a (personal): Untuk 5 pengguna internal, masih pakai development project `xvmcpfkkveeaevfcvfug` yang sudah memiliki 28 migration dan 12/12 RLS test lulus (27 Oktober 2026). Tidak ada kebutuhan project produksi terpisah untuk penggunaan pribadi. | D-04 | Tetapkan jadwal cadangan/verifikasi keystore | Keystore hilang = APK terpasang tidak bisa diperbarui | Pemilik |
 | D-05 | Tetapkan nama paket final (`com.rodakawan.app` masih sementara, ADR-015) | Tidak bisa diubah setelah unggah pertama Play | Pemilik produk |
 | D-06 | Setujui/tolak ADR-064 (penyedia peta) | Marker peta dan P-03 tidak bisa diklaim selesai | Pemilik produk |
 | D-07 | Ratifikasi model persetujuan follow (ADR-039) | Fitur sosial M6, bukan blocker beta inti | Pemilik produk |
@@ -134,9 +134,9 @@ atau produksi. Tidak ada APK baru dan tidak ada klaim uji perangkat.
 | `npm run format:check` | exit 0 |
 | `npm test -- --ci` | exit 0 — **48 suite / 525 test** |
 | `npm run test:scripts` | exit 0 — **94 suite / 395 test** |
-| `npm run db:test:lint` | exit 0 — **12 berkas uji / 27 migration** |
+| `npm run db:test:lint` | exit 0 — **12 berkas uji / 28 migration** |
 | `npm run db:test` | exit 0 — **12/12** berkas lulus |
-| `npm run db:test:concurrency` | exit 0 — dua `create_club` dan dua `create_ride` serentak; yang kedua menunggu lock lalu ditolak `P0001`; data uji bersih |
+| `npm run db:test:concurrency` | exit 0 — dua `create_club` dan dua `create_ride` dengan slug berbeda; `pg_stat_activity` membuktikan koneksi kedua menunggu lock `advisory`, lalu ditolak `P0001`; data uji bersih |
 | `npm run db:types:check` | exit 0 |
 | `npm run storage:test` | exit 0 — **27** langkah, 0 sisa |
 | `npm run e2e:account-delete -- --yes` | exit 0 — **17** langkah, 0 sisa |
@@ -144,7 +144,8 @@ atau produksi. Tidak ada APK baru dan tidak ada klaim uji perangkat.
 | `npm run export:android` | exit 0 — `entry-5b1e7578341af943a8c87db4569e242c.hbc` (4,1 MB) |
 | `npm run doctor` | **exit 1 — Blocked**: `getaddrinfo EAI_AGAIN exp.host` (jaringan mesin) |
 | `npm run beta:preflight` | **tidak dijalankan** — tidak ada project beta/credential pada sesi ini; hasil development bukan hasil beta |
-| `npx supabase migration list --linked` | **27 lokal = 27 remote** (development) |
+| `npx supabase migration list --linked` | **28 lokal = 28 remote** (development) |
+| Paritas fungsi development | Migration `20261026195421` mengembalikan `create_club`/`create_ride` ke definisi repo; sebelumnya development masih memakai revisi antara dengan row lock `profiles`. Perbedaan ini ditemukan saat uji konkurensi diperkuat. |
 
 ## 8. Perintah verifikasi (historis, 25 Oktober 2026)
 

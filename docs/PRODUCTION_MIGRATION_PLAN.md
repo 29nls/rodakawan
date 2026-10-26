@@ -265,7 +265,7 @@ keluarannya ke laporan publik. **Jangan** menjalankan `db:test`,
 
 ### 5.3 Setelah push
 
-- [ ] `migration list` **27 = 27** (atau jumlah aktual saat itu).
+- [ ] `migration list` **28 = 28** (atau jumlah aktual saat itu).
 - [ ] Tabel tombstone ada tepat satu; `deleted_at` terisi.
 - [ ] Ketiga bucket ada dan **privat** (preflight).
 - [ ] `delete-account` di-deploy, memakai key baru (bukan env legacy yang

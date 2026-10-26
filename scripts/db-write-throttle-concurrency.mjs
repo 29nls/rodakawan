@@ -166,32 +166,56 @@ async function cleanup(admin) {
  * pemanggil kedua terbukti menunggu, lalu commit. Pemanggil kedua harus
  * ditolak dengan P0001 + detail yang diharapkan.
  */
-async function proveSerialization(config, { label, call, expectedDetail }) {
+async function proveSerialization(admin, config, { label, sql, params, expectedDetail }) {
   const first = await connect(config);
   const second = await connect(config);
   let secondSettled = false;
 
   try {
     await beginAs(first, USER_ID);
-    const firstResult = await first.query(call.sql, call.params);
+    const firstResult = await first.query(sql, params[0]);
     if (!firstResult.rows[0]) throw new Error(`${label}: pemanggilan pertama tanpa hasil`);
 
     await beginAs(second, USER_ID);
+    const { rows: pidRows } = await second.query('select pg_backend_pid() as pid');
+    const secondPid = pidRows[0].pid;
+
     const secondPromise = second
-      .query(call.sql, call.params)
+      .query(sql, params[1])
       .then((result) => ({ ok: true, result }))
       .catch((error) => ({ ok: false, error }));
     secondPromise.then(() => {
       secondSettled = true;
     });
 
-    // Beri waktu trigger kedua mencapai advisory lock. Tanpa serialisasi,
-    // pemanggilan kedua akan selesai (menulis baris ke-11) dalam waktu ini.
-    await new Promise((resolve) => setTimeout(resolve, 700));
+    // Tunggu sampai koneksi kedua benar-benar menunggu advisory lock. Tanpa
+    // pemeriksaan ini, commit yang terlalu cepat bisa membuat koneksi kedua
+    // dieksekusi setelahnya dan ditolak karena kuota, bukan karena serialisasi.
+    let blocked = false;
+    let lastActivity = null;
+    for (let attempt = 0; attempt < 40 && !secondSettled; attempt += 1) {
+      const { rows } = await admin.query(
+        `select wait_event_type, wait_event, state
+           from pg_stat_activity
+          where pid = $1`,
+        [secondPid],
+      );
+      const activity = rows[0];
+      lastActivity = activity ?? null;
+      if (
+        activity?.state === 'active' &&
+        activity?.wait_event_type === 'Lock' &&
+        activity?.wait_event === 'advisory'
+      ) {
+        blocked = true;
+        break;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
 
-    if (secondSettled) {
+    if (!blocked) {
       throw new Error(
-        `${label}: permintaan kedua selesai saat yang pertama masih menahan transaksi — tidak terserialisasi`,
+        `${label}: koneksi kedua tidak teramati menunggu advisory lock (activity=${JSON.stringify(lastActivity)}) — serialisasi tidak terbukti`,
       );
     }
 
@@ -232,12 +256,12 @@ async function main() {
     cleanupNeeded = true;
 
     await seedClubs(admin);
-    await proveSerialization(config, {
+    await proveSerialization(admin, config, {
       label: 'create_club',
-      call: {
-        sql: `select public.create_club('Klub Konkurensi 10', $1, null, 'private', 'approval')`,
-        params: [`${CLUB_SLUG_PREFIX}10`],
-      },
+      sql: `select public.create_club('Klub Konkurensi', $1, null, 'private', 'approval')`,
+      // Slug harus berbeda: slug yang sama akan menunggu unique index, bukan
+      // advisory lock throttle, sehingga uji bisa lolos karena alasan salah.
+      params: [[`${CLUB_SLUG_PREFIX}10`], [`${CLUB_SLUG_PREFIX}11`]],
       expectedDetail: 'club_create_rate_limit',
     });
 
@@ -250,12 +274,10 @@ async function main() {
     }
 
     const clubId = await seedRideContext(admin);
-    await proveSerialization(config, {
+    await proveSerialization(admin, config, {
       label: 'create_ride',
-      call: {
-        sql: `select public.create_ride($1, 'Uji Konkurensi Ride 10', now() + interval '1 hour')`,
-        params: [clubId],
-      },
+      sql: `select public.create_ride($1, 'Uji Konkurensi Ride', now() + interval '1 hour')`,
+      params: [[clubId], [clubId]],
       expectedDetail: 'ride_create_rate_limit',
     });
 
