@@ -56,6 +56,9 @@ type ErrorLike = {
   message?: string;
   code?: string;
   status?: number;
+  /** PostgREST memakai `details`; beberapa jalur Supabase memakai `detail`. */
+  detail?: unknown;
+  details?: unknown;
   reasons?: unknown;
   weak_password?: { reasons?: unknown };
 };
@@ -79,6 +82,18 @@ export const NETWORK_APP_ERROR = NETWORK_ERROR;
 function toErrorLike(error: unknown): ErrorLike {
   if (typeof error === 'object' && error !== null) return error as ErrorLike;
   return {};
+}
+
+/**
+ * Tag mesin dari `raise ... using detail = '<tag>'`.
+ *
+ * Tag stabil; teks `message` database tidak dipakai untuk keputusan atau
+ * ditampilkan apa adanya. Menerima `details` (PostgREST) maupun `detail`
+ * (beberapa pembungkus Supabase).
+ */
+function errorTag(like: ErrorLike): string {
+  const value = like.details ?? like.detail;
+  return typeof value === 'string' ? value : '';
 }
 
 export function isFetchFailure(like: ErrorLike): boolean {
@@ -387,6 +402,36 @@ export function mapStorageError(error: unknown): AppError {
 /** Error dari pemanggilan RPC (`client.rpc(...)`). */
 export function mapRpcError(error: unknown): AppError {
   const like = toErrorLike(error);
+  const tag = errorTag(like);
+
+  // Rate limit ditulis migration sebagai SQLSTATE P0001 + detail tag stabil.
+  // Jangan pernah menampilkan SQLSTATE/detail mentah ke pengguna; pesan di
+  // bawah ini yang menjelaskan batas dan tindakan pemulihannya.
+  switch (tag) {
+    case 'club_create_rate_limit':
+      return {
+        code: 'rate_limited',
+        message:
+          'Batas pembuatan klub tercapai: maksimal 10 klub baru per jam. Tunggu hingga kuota jam ini pulih, lalu coba lagi.',
+        retryable: true,
+      };
+    case 'ride_create_rate_limit':
+      return {
+        code: 'rate_limited',
+        message:
+          'Batas pembuatan perjalanan tercapai: maksimal 10 perjalanan baru per jam. Tunggu sebentar, lalu coba lagi.',
+        retryable: true,
+      };
+    case 'location_publish_rate_limit':
+      return {
+        code: 'rate_limited',
+        message:
+          'Lokasi belum dikirim karena terlalu sering. Tunggu beberapa detik; aplikasi akan mencoba lagi saat posisi berikutnya tersedia.',
+        retryable: true,
+      };
+    default:
+      break;
+  }
 
   switch (like.code) {
     case 'PGRST202':

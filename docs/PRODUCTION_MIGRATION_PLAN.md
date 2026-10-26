@@ -123,7 +123,8 @@ $env:EXPO_PUBLIC_SUPABASE_URL = 'https://<ref-staging>.supabase.co'
 $env:EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY = '<publishable-key-staging>'
 $env:DATABASE_URL = '<connection-string-staging>'
 
-npm run db:test                 # 11/11, seluruh transaksi ROLLBACK
+npm run db:test                 # 12/12, seluruh transaksi ROLLBACK
+npm run db:test:concurrency     # dua koneksi: kuota throttle tidak bisa dilewati
 npm run db:types:check
 npm run beta:preflight          # 8/8 bila pengaturan Auth staging = produksi
 ```
@@ -145,7 +146,7 @@ Batas runner yang harus dihormati (dibaca dari kode, bukan asumsi):
 Kriteria lulus rehearsal:
 
 - `migration list` tanpa selisih; `db:types:check` lulus;
-- `db:test` **11/11** di staging;
+- `db:test` **12/12** di staging; `db:test:concurrency` lulus;
 - `beta:preflight` **8/8** di staging (termasuk autoconfirm nonaktif). Bila SMTP
   staging belum ada, catat kegagalan itu sebagai temuan konfigurasi, bukan
   kegagalan migration;
@@ -193,7 +194,7 @@ minimal 30 hari, akses terbatas. Jangan meng-commit `backups/`.
    `SET session_replication_role = replica` di antara schema dan data, lalu
    restore riwayat `supabase_migrations`. Beberapa baris `OWNER TO
    supabase_admin`/grant role mungkin perlu dikomentari sesuai catatan resmi.
-3. Pada project scratch hasil restore, jalankan `npm run db:test` (11/11) dan
+3. Pada project scratch hasil restore, jalankan `npm run db:test` (12/12) dan
    `npm run db:types:check`. Suite SQL berjalan dalam transaksi `ROLLBACK`,
    tetapi jangan pernah menunjukkannya ke produksi; project scratch harus
    disposable dan tidak melayani pengguna.
@@ -264,7 +265,7 @@ keluarannya ke laporan publik. **Jangan** menjalankan `db:test`,
 
 ### 5.3 Setelah push
 
-- [ ] `migration list` **25 = 25** (atau jumlah aktual saat itu).
+- [ ] `migration list` **27 = 27** (atau jumlah aktual saat itu).
 - [ ] Tabel tombstone ada tepat satu; `deleted_at` terisi.
 - [ ] Ketiga bucket ada dan **privat** (preflight).
 - [ ] `delete-account` di-deploy, memakai key baru (bukan env legacy yang
@@ -466,7 +467,7 @@ role (hanya server).
 
 | Waktu | Langkah | Bukti yang disimpan |
 | --- | --- | --- |
-| T-7 | Tutup §0.1; putuskan §1; buat project staging; rehearsal §3 | fungsi key baru teruji; `db:test` staging 11/11; E2E dev 27/17/24; preflight 8/8 |
+| T-7 | Tutup §0.1; putuskan §1; buat project staging; rehearsal §3 | fungsi key baru teruji; `db:test` staging 12/12 + konkurensi; E2E dev 27/17/24; preflight 8/8 |
 | T-3 | Buat project produksi; siapkan SMTP, redirect URL, backup plan | tangkapan dashboard tanpa secret |
 | T-1 | Dump baseline; uji restore ke scratch; siapkan Environment `production` | log drill, hash dump |
 | T-0 | `db push` produksi → `db:types:check` → preflight → function + secret → Auth → web config → Pages | `migration list`, preflight 8/8, `page_url` |

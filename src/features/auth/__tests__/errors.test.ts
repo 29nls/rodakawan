@@ -1,4 +1,4 @@
-import { mapAuthError, mapProfileError, mapTableError } from '@/features/auth/errors';
+import { mapAuthError, mapProfileError, mapRpcError, mapTableError } from '@/features/auth/errors';
 
 describe('mapAuthError', () => {
   it('mengenali kegagalan jaringan dari beberapa bentuk error', () => {
@@ -103,6 +103,34 @@ describe('mapProfileError', () => {
 
   it('memberi pesan umum untuk error tak dikenal', () => {
     expect(mapProfileError({ code: 'XX000' }).code).toBe('unknown');
+  });
+});
+
+describe('mapRpcError — rate limit jalur tulis', () => {
+  it.each([
+    ['club_create_rate_limit', /10 klub baru per jam/],
+    ['ride_create_rate_limit', /10 perjalanan baru per jam/],
+    ['location_publish_rate_limit', /Lokasi belum dikirim/],
+  ])('memetakan %s menjadi pesan yang bisa ditindaklanjuti', (details, expected) => {
+    const error = mapRpcError({ code: 'P0001', details, message: 'raw database message' });
+
+    expect(error.code).toBe('rate_limited');
+    expect(error.retryable).toBe(true);
+    expect(error.message).toMatch(expected);
+    expect(error.message).toMatch(/Tunggu/);
+    expect(error.message).not.toMatch(
+      /P0001|club_create_rate_limit|ride_create_rate_limit|location_publish_rate_limit/,
+    );
+  });
+
+  it('menerima detail dalam bentuk detail (selain details PostgREST)', () => {
+    expect(mapRpcError({ code: 'P0001', detail: 'ride_create_rate_limit' }).code).toBe(
+      'rate_limited',
+    );
+  });
+
+  it('tidak mengubah rate limit lain yang tidak dikenal menjadi sukses', () => {
+    expect(mapRpcError({ code: 'P0001', details: 'tag_lain' }).code).toBe('unknown');
   });
 });
 

@@ -1,12 +1,13 @@
 # Audit keamanan & kesiapan rilis beta — Milestone 5 (P0)
 
-Tanggal audit: **27 Oktober 2026** · HEAD: `c882939` (`main`, setelah PR #21
-merge) · Branch kerja: `chore/m5-security-release-audit` · Project yang
+Tanggal audit: **27 Oktober 2026** · HEAD saat audit: `c882939` (`main`, setelah PR #21
+merge) · Branch kerja: `fix/beta-readiness-rate-limits` · Project yang
 diperiksa: **development** `xvmcpfkkveeaevfcvfug` saja.
 
 Scope: audit baca-saja, lalu perbaikan **hanya** untuk temuan Critical/High.
-Tidak ada fitur, dependency, izin Android, migration, atau perubahan perilaku
-yang ditambahkan. **Tidak ada migration yang diterapkan** pada audit ini.
+Tidak ada fitur, dependency, atau izin Android yang ditambahkan. Dua migration
+aditif untuk hardening AUD-14 (Medium) **diterapkan ke development** pada
+27 Oktober 2026; **tidak ada migration yang diterapkan ke beta atau produksi**.
 
 Istilah status mengikuti `AGENTS.md`: **Implemented**, **Passed locally**,
 **Passed against dev backend**, **Tested on physical device**, **Blocked**.
@@ -55,15 +56,15 @@ bukan kebocoran.
 
 | ID | Area | Severity | Bukti | Dampak | Rekomendasi | Status |
 | --- | --- | --- | --- | --- | --- | --- |
-| AUD-01 | RLS katalog | Info | `npm run db:test` **exit 0 — 11/11 berkas**, seluruh notice penanda diterima server. `rls_catalog_test.sql` menerima `UJI KATALOG RLS LULUS`; `rls_catalog_hardening_test.sql` menerima `UJI KATALOG HARDENING LULUS`; `rls_policy_guard_test.sql` menerima `UJI POLICY OWNER-GUARD LULUS`. `npm run beta:preflight`: **RLS aktif di semua 22 tabel public** | Tidak ada tabel `public` yang terbuka tanpa RLS | Pertahankan kedua uji katalog + pagar policy di CI | **Passed against dev backend** |
-| AUD-02 | Policy longgar | Info | Pemindaian seluruh 25 migration: **0** policy memakai `using (true)`/`with check (true)` dan **0** policy `to anon`; 81 `create policy` total. `rls_policy_guard_test.sql` lulus terhadap katalog | Tidak ada policy eksplisit yang membuka semua baris | Pertahankan pagar; jangan longgarkan policy demi UI | **Passed locally** (statis) + **Passed against dev backend** (katalog) |
+| AUD-01 | RLS katalog | Info | `npm run db:test` **exit 0 — 12/12 berkas** (27 Oktober 2026), seluruh notice penanda diterima server. `rls_catalog_test.sql` menerima `UJI KATALOG RLS LULUS`; `rls_catalog_hardening_test.sql` menerima `UJI KATALOG HARDENING LULUS`; `rls_policy_guard_test.sql` menerima `UJI POLICY OWNER-GUARD LULUS`. `npm run beta:preflight`: **RLS aktif di semua 22 tabel public** | Tidak ada tabel `public` yang terbuka tanpa RLS | Pertahankan kedua uji katalog + pagar policy di CI | **Passed against dev backend** |
+| AUD-02 | Policy longgar | Info | Pemindaian seluruh 27 migration: **0** policy memakai `using (true)`/`with check (true)` dan **0** policy `to anon`; 81 `create policy` total. `rls_policy_guard_test.sql` lulus terhadap katalog | Tidak ada policy eksplisit yang membuka semua baris | Pertahankan pagar; jangan longgarkan policy demi UI | **Passed locally** (statis) + **Passed against dev backend** (katalog) |
 | AUD-03 | Storage | Info | `npm run storage:test` **exit 0 — 27 langkah**, termasuk: unduhan langsung B ke objek A **HTTP 400**, unggah anon **400**, signed URL B untuk avatar A **400**, unggah B ke folder A **400**, hapus oleh pemilik **200**, signed URL objek terhapus **400**, kebersihan **0 objek/0 akun**. Preflight: bucket `avatars`, `vehicle-photos`, `club-logos` ada dan **privat**. `UJI KATALOG HARDENING LULUS` juga menegaskan **tidak ada bucket publik** | Tidak ada jalur baca/tulis lintas pengguna yang terbukti di Storage API | Pertahankan path-based policy dan uji HTTP ini | **Passed against dev backend** |
 | AUD-04 | Edge Function `delete-account` | Info | Preflight: request **tanpa JWT → 401** dan **hanya `apikey` → 401**. `npm run e2e:account-delete -- --yes` **exit 0 — 17 langkah**: Auth/profil/kendaraan/token A hilang, hazard/laporan/chat jadi tombstone dan diredaksi, logo klub dipindah, akun B utuh, JWT lama ditolak, job `completed`, 0 sisa | Tidak ada bentuk permintaan yang bisa menghapus akun orang lain; kegagalan parsial tidak dilaporkan sukses | Pertahankan lease ADR-078 dan verifikasi JWT di server | **Passed against dev backend** |
 | AUD-05 | Grant fungsi definer | Info | `UJI KATALOG RLS LULUS` + `UJI KATALOG HARDENING LULUS` lulus: tidak ada `security definer` yang dapat dieksekusi `PUBLIC`/`anon` di luar enam helper beralasan; **seluruh** definer memakai `search_path = ''` (daftar tunggu kosong); `anon` membaca **nol** baris `motorcycle_private_details`. Fungsi orkestrasi hapus akun hanya untuk `service_role` (`20261023004946_account_deletion_identity.sql:512-519`, `20261023120000_account_deletion_reliability.sql:314-322`) | Permukaan RPC tanpa sesi nol; klien tidak bisa memanggil `purge_account_data` | Pertahankan; uji katalog akan gagal bila fungsi definer baru lupa dikunci | **Passed against dev backend** |
 | AUD-06 | Data lokasi | Info | `npm run e2e:shared-ride` **exit 0 — 24 langkah**: A menerima lokasi B dalam **457 ms**, chat **415 ms**; C (non-anggota) **0 event** realtime dan tidak bisa membaca rides/chat/lokasi; A menyelesaikan perjalanan; **lokasi terakhir A dan B terhapus**. Satu-satunya jalur tulis `publish_ride_location`, `INSERT/UPDATE` tabel dicabut (`20261019120000_ride_workflow.sql:706-717`); trigger opt-out dan finish (`:720-763`) | Tidak ada lokasi presisi yang tersisa setelah opt-out/keluar/ride final di lapisan database; non-anggota tidak menerima event | Uji perangkat (PD-03…PD-08) tetap **Blocked** | **Passed against dev backend** |
 | AUD-07 | Rahasia — bundel & riwayat | Info | `npm run export:android` **exit 0**; `entry-59f75a3f81d0aa95ad299079c92531d4.hbc` (4,1 MB): JWT utuh **0**, `postgres://` **0**, nilai `sb_secret_` ≥30 karakter **0**, `SUPABASE_SERVICE_ROLE_KEY` **0**. Literal `service_role` **2** (regex klien + kode dependency). Riwayat: `git log --all --diff-filter=A -- '.env*'` hanya `.env.example`; `git log -S` menemukan `eyJhbGciOi` hanya di dokumen dan fixture 49 karakter, `sb_secret_` hanya di regex uji, `postgres://` hanya di dokumen/fixture | Tidak ada kredensial nyata di repo, riwayat, atau bundel | Ulangi pemindaian setiap kali `.env.local` berisi kredensial nyata | **Passed locally** |
 | AUD-08 | Rahasia — konfigurasi web/workflow | Info | `web/account-deletion/config.js` hanya memuat `supabaseUrl`, `publishableKey`, `supportUrl`, `privacyUrl`; tidak ada service-role/password/JWT. Workflow hanya memakai `secrets.*`; keystore ditulis ke `RUNNER_TEMP` dan dihapus (`android-release.yml:253-264,367-372`; `release-on-push.yml:318-329,367-372`) | Tidak ada secret di halaman statis atau log workflow | Jangan pernah mengisi `config.js` dengan secret; nilai dev saat ini **publik**, bukan kebocoran | **Passed locally** |
-| AUD-09 | Tipe database | Info | `npm run db:types:check` **exit 0**: `database.generated.ts` sama dengan skema development. `npx supabase migration list --linked`: **25 lokal = 25 remote** | Tipe klien cocok dengan skema yang berjalan | Regenerasi setiap migration baru | **Passed against dev backend** |
+| AUD-09 | Tipe database | Info | `npm run db:types:check` **exit 0**: `database.generated.ts` sama dengan skema development. `npx supabase migration list --linked`: **27 lokal = 27 remote** (27 Oktober 2026) | Tipe klien cocok dengan skema yang berjalan | Regenerasi setiap migration baru | **Passed against dev backend** |
 | AUD-18 | Realtime dua klien | Low | E2E `shared-ride` memakai dua klien supabase-js dengan JWT asli dan Postgres Changes; event diterima ≤5 detik, C nol event. Sisa yang belum diuji: reconnect jaringan nyata dan filter blokir di perangkat | Lapisan API terbukti; perilaku perangkat/OS tetap belum | Uji PD-09/PD-15 di HP | **Passed against dev backend**; perangkat **Blocked** |
 | AUD-24 | E2E hapus akun | Info | Runner permanen `npm run e2e:account-delete -- --yes` **17 langkah lulus**, 0 sisa | Bukti lintas Auth/Storage/DB dapat diulang | Jalankan ulang setiap perubahan orkestrasi | **Passed against dev backend** |
 | AUD-25 | Dependensi | Low | `npm ci` **exit 0** tetapi `npm audit` melaporkan **5 high, 3 moderate**. Seluruhnya jalur build/dev: `expo → @expo/cli → node-forge`, `zod` (lewat `@expo/cli` dan `eslint-config-expo`), `expo-router → query-string → decode-uri-component`. Tidak ada impor `zod`/`node-forge` di `src/`. "Fix" npm menurunkan `expo` ke **44.0.6** (merusak SDK 57) | Tidak ada kode rentan di bundel runtime; risikonya pada mesin build/CI | **Jangan** `npm audit fix --force`; pantau rilis Expo SDK 57 dan naikkan patch bila tersedia | **Open** (Low) |
@@ -71,7 +72,11 @@ bukan kebocoran.
 | AUD-27 | Kesiapan rilis — web | **Medium** | `web/account-deletion/config.js` kini menunjuk **project development** (`xvmcpfkkveeaevfcvfug.supabase.co`) + publishable key dev. Uji statis sengaja mengecualikan `config.js` dari larangan ref dev (`scripts/__tests__/web-static.test.mjs:196-206`). `web/README.md` menyatakan halaman **belum ter-deploy** | Bila diterbitkan apa adanya, pengguna publik akan menghapus akun di backend development, bukan backend rilis | Arahkan ke backend rilis sebelum Play Console; jangan klaim URL publik | **Open** — **Blocked** sampai project rilis & Pages aktif |
 | AUD-28 | CI halaman web | Low | Run Pages terakhir (`40180579692`, `946269b`) gagal di **Uji statis halaman publik** dengan `AssertionError: web/account-deletion/config.js memuat ref project development`. Uji lokal sekarang **11/11 lulus** karena `config.js` dikecualikan dari pemindaian (`d8697ec`) — bukan karena backend diganti. Job deploy belum pernah berjalan karena GitHub Pages belum diaktifkan | Tidak ada halaman publik; klaim URL akan salah; pengecualian uji membuat ref dev tidak lagi dicegah otomatis | Aktifkan Pages, arahkan config ke backend rilis, jalankan ulang workflow, verifikasi URL | **Passed locally**; deploy **Blocked** |
 
-## 4. Temuan yang DIBACA dari kode (belum dieksekusi)
+## 4. Temuan yang DIBACA dari kode
+
+Sebagian temuan di bagian ini sudah dikerjakan setelah audit; status per baris
+menunjukkan bukti terbaru. **AUD-14** adalah satu-satunya yang mendapat migration
+baru pada 27 Oktober 2026.
 
 | ID | Area | Severity | Temuan dan bukti | Dampak | Rekomendasi | Status |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -79,7 +84,7 @@ bukan kebocoran.
 | AUD-11 | Helper untuk `anon` | Low | Enam helper (`is_club_member`, `is_club_admin`, `is_ride_member`, `is_ride_host`, `is_ride_active_member`, `can_publish_ride_location`) masih dapat dieksekusi `anon`; semuanya memakai `auth.uid()` dan mengembalikan `false` tanpa sesi | Tidak ada data yang terbaca tanpa sesi; permukaan peran seharusnya nol | Cabut `EXECUTE` dari `anon` pada hardening M6 | **Open** |
 | AUD-12 | Batas input | Low | `motorcycle_private_details` punya CHECK panjang baru (`20261024011825`), tetapi `validate constraint` untuk baris lama belum dijalankan | Baris lama yang melanggar tidak diperiksa ulang | Periksa data lama lalu `validate constraint` | **Open** |
 | AUD-13 | Batas input path | Low | Kolom path (`avatar_url`, `logo_path`, `photo_path`, `media_path`) belum punya CHECK panjang di database | Penyimpangan data, bukan kebocoran | Tambah CHECK panjang aditif | **Open** |
-| AUD-14 | Rate limit jalur tulis | **Medium** | Sudah ada: follow 10/10 menit, laporan 10/10 menit, gabung klub 5/10 menit, chat 20/60 detik, hazard 5/10 menit, konfirmasi 10/jam. **Belum ada**: throttle `publish_ride_location`, `create_club`, `create_ride`, dan `update_ride` (grep pada migration klub/perjalanan: nol pemeriksaan laju) | Klien yang dimodifikasi dapat membanjiri DB (biaya/availability); tidak membuka data | Tambah batas berbasis `auth.uid()` pada RPC tersebut (M6) | **Open** |
+| AUD-14 | Rate limit jalur tulis | **Medium** | Follow 10/10 menit, laporan 10/10 menit, gabung klub 5/10 menit, chat 20/60 detik, hazard 5/10 menit, konfirmasi 10/jam. **Ditambahkan 26 Oktober 2026:** `create_club` 10/jam, `create_ride` 10/jam, `publish_ride_location` minimum 2 detik (migration `20261026184430_m5_write_throttles.sql`), lalu serialisasi `pg_advisory_xact_lock` per pengguna lewat trigger BEFORE INSERT (migration `20261026191105_m5_write_throttle_serialization.sql`). Bukti: `rls_write_throttles_test.sql` (allow/deny, penolakan tidak menulis, opt-out mereset throttle) + `db:test:concurrency` (dua koneksi; yang kedua menunggu lock lalu ditolak). `update_ride` **masih tanpa throttle** | Klien yang dimodifikasi dapat membanjiri DB (biaya/availability); tidak membuka data | Throttle `update_ride` (Low) sebelum M6; jangan turunkan batas tanpa uji ulang | **Fixed untuk 3 RPC — Passed against dev backend**; `update_ride` **Open** |
 | AUD-15 | CORS Edge Function | Info | `cors.mjs` fail-closed: `*` dibuang, hanya origin persis, `Vary: Origin`; permintaan tanpa `Origin` (Android) tetap dilayani | Tidak ada situs sembarang yang bisa memanggil fungsi dari browser | Uji browser setelah halaman terbit | **Implemented**; uji origin nyata **Blocked** (AUD-20) |
 | AUD-16 | Token setelah hapus akun | Info | Access token lama tetap sah sampai kedaluwarsa (ADR-077), tetapi profil/baris sudah hilang dan tulis ditolak FK; E2E membuktikan baca 0 baris dan login ulang gagal | Jendela token tanpa data | Bila perlu jaminan keras, validasi `session_id` pada operasi sensitif | **Open** (diterima) |
 | AUD-17 | Log/monitoring | Low | Log Edge Function/Postgres belum diamati pada beban nyata; tidak ada alert otomatis | Insiden tidak terdeteksi cepat | Pantau selama pilot; ikuti `docs/INCIDENT_RESPONSE.md` | **Open** |
@@ -91,20 +96,22 @@ bukan kebocoran.
 
 ## 5. Fase 2 — perbaikan terbatas
 
-**Tidak ada temuan Critical atau High**, jadi **tidak ada migration baru, uji SQL
-baru, atau regenerasi tipe** yang diwajibkan fase ini. Migration terakhir yang
-sudah diterapkan tetap `20261025013131_m5_rate_limits.sql`; **25 lokal = 25
-remote**, dan audit ini **tidak menjalankan `db push`**.
+**Tidak ada temuan Critical atau High.** Pada audit awal fase ini tidak ada migration baru.
+**Pembaruan 27 Oktober 2026:** AUD-14 (Medium) dikerjakan sebagai hardening terpisah.
+Dua migration aditif sudah diterapkan ke **development**: `20261026184430_m5_write_throttles.sql`
+dan `20261026191105_m5_write_throttle_serialization.sql`. **27 lokal = 27 remote**;
+`db:test` **12/12**; `db:test:concurrency` lulus; `db:types:check` exit 0.
+Migration yang sudah diterapkan **tidak disunting**; serialisasi ditambahkan lewat
+migration baru.
 
-Karena tidak ada migration, tidak ada perintah penerapan yang perlu dijalankan.
-Bila nanti ada migration baru dari temuan Medium, perintahnya tetap:
+Bila mempromosikan ke project lain, perintahnya tetap:
 
 ```bash
 npx supabase db push --linked --dry-run   # periksa daftar
 npx supabase db push --linked --yes       # hanya setelah persetujuan pemilik
 ```
 
-Alasan temuan Medium **tidak** diperbaiki di sini:
+Alasan temuan Medium lain **tidak** diperbaiki di sini:
 
 - **AUD-26** adalah pengaturan project (Dashboard/Management API), bukan kode;
   mengubahnya butuh keputusan pemilik dan kredensial.
@@ -124,24 +131,27 @@ Alasan temuan Medium **tidak** diperbaiki di sini:
 | `npm run typecheck` | **exit 0** |
 | `npm run lint` | **exit 0** |
 | `npm run format:check` | **exit 0** |
-| `npm test -- --ci` | **exit 0** — 48 suite / **518** test lulus |
+| `npm test -- --ci` | **exit 0** — 48 suite / **525** test lulus |
 | `npm run test:scripts` | **exit 0** — 94 suite / **395** test lulus |
 | `npm run db:test:lint` | **exit 0** |
-| `npm run db:test` | **exit 0** — **11/11** berkas lulus terhadap development |
+| `npm run db:test` | **exit 0** — **12/12** berkas lulus terhadap development |
+| `npm run db:test:concurrency` | **exit 0** — dua `create_club`/`create_ride` serentak; yang kedua menunggu lock lalu ditolak `P0001`; data uji bersih |
 | `npm run db:types:check` | **exit 0** — tipe sama dengan skema development |
 | `npm run storage:test` | **exit 0** — 27 langkah, 0 sisa |
 | `npm run e2e:account-delete -- --yes` | **exit 0** — 17 langkah, 0 sisa |
-| `npm run e2e:shared-ride` | **exit 0** — 24 langkah; event 457/415 ms; C 0 event; 0 sisa |
+| `npm run e2e:shared-ride` | **exit 0** — 24 langkah; event 384/344 ms; C 0 event; 0 sisa |
 | `npm run beta:preflight` | **exit 1** — 7 lulus, 1 gagal (**AUD-26 autoconfirm**) |
-| `npm run export:android` | **exit 0** — `entry-59f75a3f81d0aa95ad299079c92531d4.hbc` 4,1 MB; pemindaian rahasia 0/0/0 |
+| `npm run export:android` | **exit 0** — `entry-5b1e7578341af943a8c87db4569e242c.hbc` 4,1 MB; pemindaian 0 JWT / 0 `postgres://` / 0 `SUPABASE_SERVICE_ROLE_KEY`. Satu kecocokan regex `sb_secret_` adalah string komentar dependency `@supabase/functions-js` di tabel string bytecode, bukan nilai kunci |
 | `npm run doctor` | **exit 1 — Blocked**: `getaddrinfo EAI_AGAIN exp.host` (jaringan mesin, bukan temuan proyek) |
 
-Status GitHub saat audit: `npx supabase migration list --linked` **25 = 25**; CI
-`main` run `40261170789` **success**; Database RLS terakhir yang berjalan
-`40177112786` **success** (25 Oktober 2026, tidak ada perubahan `supabase/**`
-sejak itu); rilis terbaru `v0.1.0-build66` (pre-release, 26 Oktober 2026).
-Artefak APK rilis itu tidak diunduh ulang dan tanda tangannya tidak diverifikasi
-ulang pada audit ini.
+Status GitHub pada 27 Oktober 2026: `npx supabase migration list --linked` **27 = 27**;
+`main` HEAD `b504e8a` — CI dan Database RLS **success**. Release run `40382138910`
+(`b504e8a`) juga **success**, tetapi job Build APK **skipped**: gate
+`should-release.mjs` menilai perubahan tidak menyentuh isi aplikasi. Rilis APK
+terbaru tetap `v0.1.0-build68` (tag `9afb10b`, pre-release 26 Oktober 2026,
+SHA-256 `96cb58e3…`), yang dibuat **sebelum** migration throttle dan bukan APK
+untuk branch ini. Artefak itu tidak diunduh ulang dan tanda tangannya tidak
+diverifikasi ulang.
 
 ## 7. Risiko terbuka dan keputusan pemilik
 
@@ -159,7 +169,7 @@ ulang pada audit ini.
 5. **Keystore (AUD-22)** — verifikasi cadangan dan pemegang salinan.
 6. **Uji perangkat (AUD-19)** — dua HP + akun ketiga; status tetap **Blocked**
    sampai artefak PD-01…PD-20 diisi.
-7. **Throttle jalur tulis (AUD-14)** — jadwalkan untuk M6; bukan blocker pilot.
+7. **Throttle jalur tulis (AUD-14)** — tiga RPC sudah dibatasi dan diserialisasi di development; `update_ride` masih terbuka (Low). Bukan blocker pilot.
 8. **Dependensi toolchain (AUD-25)** — pantau patch Expo; jangan turunkan SDK.
 
 ## 8. Batasan audit

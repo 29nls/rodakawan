@@ -55,6 +55,7 @@ function buildMember(overrides: Partial<RideMemberRow> = {}): RideMemberRow {
     role: 'host',
     status: 'joined',
     joined_at: '2026-10-19T00:00:00.000Z',
+    last_location_published_at: null,
     last_seen_at: null,
     sharing_location: false,
     created_at: '2026-10-19T00:00:00.000Z',
@@ -230,6 +231,35 @@ describe('publishRideLocation', () => {
       p_recorded_at: '2026-10-19T10:00:00.000Z',
     });
     expect(result.ok).toBe(true);
+  });
+
+  it('memetakan throttle publikasi menjadi rate_limited yang bisa dicoba ulang', async () => {
+    const { client } = createQueryClient({ data: null });
+    attachRpc(client, async () => ({
+      data: null,
+      error: {
+        code: 'P0001',
+        details: 'location_publish_rate_limit',
+        message: 'raw database message',
+      },
+    }));
+
+    const result = await publishRideLocation(client as RideClient, RIDE_ID, {
+      latitude: -6.2,
+      longitude: 106.8,
+      accuracy: 12,
+      heading: null,
+      speed: null,
+      recordedAt: '2026-10-19T10:00:00.000Z',
+    });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe('rate_limited');
+      expect(result.error.retryable).toBe(true);
+      expect(result.error.message).toMatch(/Tunggu/);
+      expect(result.error.message).not.toMatch(/P0001|location_publish_rate_limit/);
+    }
   });
 });
 

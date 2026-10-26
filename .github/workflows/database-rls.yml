@@ -33,7 +33,7 @@ name: Database RLS
 # - Setiap berkas uji di `supabase/tests/` membungkus seluruh asersinya dalam
 #   transaksi yang di-ROLLBACK, sehingga menjalankannya ulang tidak menghapus atau
 #   meninggalkan data apa pun.
-# - `npm run db:test` menjalankan seluruh berkas di `DEFAULT_TEST_FILES` (saat ini 11), dan setiap
+# - `npm run db:test` menjalankan seluruh berkas di `DEFAULT_TEST_FILES` (saat ini 12), dan setiap
 #   berkas harus memancarkan notice penandanya sendiri. Berkas kedua adalah pagar katalog
 #   policy: gagal bila ada policy pada tabel wadah yang memberi akses lewat kolom kepemilikan
 #   (created_by/author_id/owner_id/…) tanpa penjaga keanggotaan. Detektornya diuji-diri di
@@ -147,6 +147,8 @@ jobs:
       #     pernah terkirim ke pemblokir (ADR-068, Milestone 4)
       #   - `UJI RATE LIMIT DATABASE LULUS` — batas follow, laporan moderasi, dan
       #     permintaan gabung klub per pengguna (AUD-14)
+      #   - `UJI RATE LIMIT TULIS M5 LULUS` — batas klub/ride per jam dan publikasi
+      #     lokasi 2 detik, termasuk data yang ditolak tidak tersimpan (AUD-14)
       #
       # Runner "hijau palsu" (mis. berkas uji terpotong) tidak bisa lolos karena
       # `scripts/db-test.mjs` hanya melaporkan lulus bila notice itu benar-benar diterima;
@@ -202,12 +204,25 @@ jobs:
             *"UJI RATE LIMIT DATABASE LULUS"*) ;;
             *) MISSING="${MISSING} UJI RATE LIMIT DATABASE LULUS" ;;
           esac
+          case "${OUTPUT}" in
+            *"UJI RATE LIMIT TULIS M5 LULUS"*) ;;
+            *) MISSING="${MISSING} UJI RATE LIMIT TULIS M5 LULUS" ;;
+          esac
           if [ -n "${MISSING}" ]; then
             echo "::error::Penanda lulus berikut tidak diterima:${MISSING}. Berkas uji berhenti sebelum seluruh asersi dijalankan."
             exit 1
           fi
           echo "Seluruh penanda lulus diterima dari server."
           exit "${STATUS:-0}"
+
+      # Uji SQL berjalan dalam satu transaksi, jadi tidak dapat membuktikan dua
+      # permintaan serentak. Langkah ini memakai dua koneksi dan dua transaksi
+      # paralel untuk membuktikan serialisasi throttle klub/ride, lalu menghapus
+      # akun dan data sintetisnya sendiri.
+      - name: Buktikan throttle jalur tulis terserialisasi
+        env:
+          DATABASE_URL: ${{ secrets.DB_TEST_DATABASE_URL }}
+        run: npm run db:test:concurrency
 
       # Diperiksa terhadap database yang sama dengan uji RLS: perubahan skema yang
       # sudah diterapkan tetapi belum diikuti `npm run db:types` akan membuat tipe

@@ -22,6 +22,7 @@ function member(overrides: Partial<RideMemberWithProfile> = {}): RideMemberWithP
     role: 'rider',
     status: 'joined',
     joined_at: '2026-10-20T09:00:00.000Z',
+    last_location_published_at: null,
     last_seen_at: null,
     sharing_location: true,
     created_at: '2026-10-20T09:00:00.000Z',

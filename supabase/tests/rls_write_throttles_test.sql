@@ -11,8 +11,16 @@
 --   3. Publikasi lokasi: publikasi pertama diterima, publikasi kedua yang
 --      terlalu cepat ditolak dan tidak menimpa koordinat lama; setelah jeda
 --      minimum, publikasi berikutnya diterima.
---   4. Reset throttle saat consent/keanggotaan berubah tidak menghapus lokasi
---      yang masih sah (dibuktikan oleh uji RLS perjalanan yang sudah ada).
+--   4. Reset throttle saat consent/keanggotaan berubah: mematikan berbagi
+--      menghapus lokasi terakhir dan mengosongkan last_location_published_at,
+--      sehingga menyalakan berbagi lagi dapat langsung memublikasikan posisi.
+--   5. Pembersihan saat peserta keluar dan perjalanan selesai tetap dibuktikan
+--      oleh `rls_rides_test.sql` (lokasi dan consent).
+--
+-- Serialisasi permintaan serentak TIDAK dapat dibuktikan dalam satu transaksi
+-- seperti berkas ini. Bukti terpisah ada di
+-- `scripts/db-write-throttle-concurrency.mjs` (`npm run db:test:concurrency`),
+-- yang memakai dua koneksi dan dua transaksi paralel lalu membersihkan data.
 --
 -- Seluruh asersi berjalan dalam satu transaksi dan diakhiri ROLLBACK, jadi
 -- tidak ada klub/ride/lokasi/pengguna uji yang tertinggal.
@@ -309,6 +317,47 @@ begin
 end;
 $$;
 
-raise notice 'UJI RATE LIMIT TULIS M5 LULUS: klub/ride/publikasi lokasi dibatasi per pengguna dan penolakan tidak menulis data.';
+-- 8. Opt-out mereset throttle: lokasi terakhir hilang, lalu sharing yang
+--    dinyalakan lagi dapat langsung mengirim posisi tanpa menunggu jendela
+--    publikasi sebelumnya.
+do $$
+declare
+  v_ride uuid;
+  v_location public.ride_locations;
+  v_rows int;
+  v_last timestamptz;
+begin
+  select id into v_ride from public.uji_m5_throttle_konteks where nama = 'ride_1';
+
+  perform public.set_ride_location_sharing(v_ride, false);
+
+  select count(*) into v_rows
+    from public.ride_locations
+   where ride_id = v_ride and user_id = auth.uid();
+  if v_rows <> 0 then
+    raise exception 'UJI GAGAL: lokasi tersisa setelah consent dimatikan (% baris)', v_rows;
+  end if;
+
+  select last_location_published_at into v_last
+    from public.ride_members
+   where ride_id = v_ride and user_id = auth.uid();
+  if v_last is not null then
+    raise exception 'UJI GAGAL: throttle lokasi tidak direset saat consent dimatikan';
+  end if;
+
+  perform public.set_ride_location_sharing(v_ride, true);
+  v_location := public.publish_ride_location(v_ride, -6.5, 107.1, 12, 90, 5, now());
+
+  if v_location.latitude <> -6.5 or v_location.longitude <> 107.1 then
+    raise exception 'UJI GAGAL: publikasi setelah opt-out lalu opt-in ditolak throttle lama';
+  end if;
+end;
+$$;
+
+do $$
+begin
+  raise notice 'UJI RATE LIMIT TULIS M5 LULUS: klub/ride/publikasi lokasi dibatasi per pengguna, penolakan tidak menulis data, dan opt-out mereset throttle.';
+end;
+$$;
 
 rollback;
