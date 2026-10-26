@@ -8,6 +8,20 @@ sedangkan build preview (`v<versi>-build<N>`) diringkas di dalam blok yang bisa 
 versi adalah tautan ke halaman rilisnya di GitHub, sehingga riwayat ini bisa dinavigasi langsung
 dari berkas.
 
+## [v0.1.0-build66](https://github.com/29nls/rodakawan/releases/tag/v0.1.0-build66) — 2026-10-26 · pratinjau
+
+<details>
+<summary>Catatan rilis pratinjau</summary>
+
+### Perubahan lain
+
+- selaraskan status dengan bukti gate kesiapan bersama-pakai (`3f88504`)
+- tambah runbook dan panduan peserta beta tertutup (`8bad99d`)
+- tambah preflight beta hanya-baca (beta:preflight) (`67e7ee3`)
+- tambah uji E2E dua pengguna + realtime shared-ride (`930120a`)
+
+</details>
+
 ## [v0.1.0-build64](https://github.com/29nls/rodakawan/releases/tag/v0.1.0-build64) — 2026-10-25 · pratinjau
 
 <details>
