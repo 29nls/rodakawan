@@ -218,10 +218,18 @@ dengan label live/basi/belum ada, bukan peta tiruan.
 - [x] Indikator live/basi/offline dan waktu pembaruan di layar detail.
 - [x] Stop task saat keluar/opt-out/ride berakhir; baris lokasi dihapus trigger.
 - [x] Migration, RPC, tipe generated, uji RLS/RPC, dan uji Jest.
+- [x] Uji E2E dua pengguna + realtime lewat API terhadap development — `npm run e2e:shared-ride`
+      **LULUS 25 Oktober 2026** (24 pemeriksaan: klub → persetujuan anggota → perjalanan → undang →
+      mulai → consent lokasi → event Postgres Changes diterima ≤5 detik [lokasi 208 ms, chat
+      593 ms] → pengguna non-anggota tidak menerima event dan tidak bisa membaca → menyelesaikan
+      perjalanan menghapus lokasi terakhir; tiga akun uji dibersihkan dengan verifikasi 0 sisa).
+      Ini melengkapi — bukan menggantikan — uji dua perangkat di bawah, yang tetap **Blocked**.
 - [ ] Map markers (setelah provider dipilih dan renderer diuji di development build). Kontrak
       renderer, atribusi, dan keadaan konfigurasi/gagal sudah disiapkan di `src/features/map/`
       (20 Oktober 2026) tanpa menambahkan dependency peta.
-- [ ] Test dua perangkat, GPS mati, mode pesawat, force-stop/reboot, dan baterai/network 30 menit.
+- [ ] Test dua perangkat fisik, GPS mati, mode pesawat, force-stop/reboot, dan baterai/network 30
+      menit. (Realtime lintas pengguna lewat API sudah dibuktikan `e2e:shared-ride` di atas; yang
+      belum adalah kombinasi izin OS + perilaku HP fisik.)
 
 **Exit criteria:** anggota sah melihat update lokasi; non-member dan `anon` ditolak; menolak berbagi
 tetap bisa ikut; izin ditolak/GPS mati/network drop dijelaskan; status final tidak bisa kembali
@@ -265,8 +273,10 @@ Database RLS run #19 terhadap project development (7 berkas, 7 lulus), bersama `
 diarahkan ke Session Pooler dan password development dirotasi — jadi backend M4 terbukti di dua jalur,
 lokal dan GitHub Actions.
 
-**Belum:** realtime lintas perangkat (dua HP di satu perjalanan), perilaku UI hazard/chat di perangkat,
-dan alur moderasi dengan akun nyata — daftar periksanya di `docs/QA_TEST_PLAN.md` bagian 8d.
+**Belum:** realtime lintas perangkat fisik (dua HP di satu perjalanan — lintas pengguna lewat API
+sudah dibuktikan `npm run e2e:shared-ride` LULUS 25 Oktober 2026: chat dan posisi diterima peserta
+lain ≤5 detik, non-anggota tidak menerima apa pun), perilaku UI hazard/chat di perangkat, dan alur
+moderasi dengan akun nyata — daftar periksanya di `docs/QA_TEST_PLAN.md` bagian 8d.
 
 **Exit criteria:** report kedaluwarsa tidak aktif; chat tidak dapat dibaca non-member; retry tidak
 membuat duplicate message; hanya host/admin klub yang dapat menghapus konten dan setiap penghapusan
@@ -293,6 +303,17 @@ Rencana terperinci, urutan prioritas, dan irisan vertikal pertama: [`docs/MILEST
       statisnya (`scripts/__tests__/web-static.test.mjs`). **URL publik belum ada (blocker deployment):**
       workflow belum pernah berjalan, Pages belum diaktifkan, dan config masih placeholder. Syarat Play
       Console belum bisa dicentang.
+- [x] Kesiapan beta tertutup — **Implemented · Passed against dev backend** (25 Oktober 2026):
+      `npm run e2e:shared-ride` (alur dua pengguna + realtime, lihat Milestone 3) dan
+      `npm run beta:preflight` (delapan pemeriksaan hanya-baca: sinkronisasi set versi migration,
+      RLS semua tabel public, bucket privat, penolakan `delete-account` tanpa JWT dan dengan apikey
+      saja, autoconfirm nonaktif, tidak ada akun uji sisa). Hasil preflight terhadap development:
+      **7 lulus, 1 gagal** — `mailer_autoconfirm` aktif; itu keputusan yang harus diambil sadar
+      untuk project beta, bukan kegagalan kode. Dokumen pemilik `docs/BETA_RUNBOOK.md` dan
+      panduan peserta `docs/BETA_GUIDE_PESERTA.md` ditulis.
+- [ ] Buka beta tertutup sungguhan — butuh project Supabase beta sendiri (preflight 8/8 di sana),
+      variabel build GitHub diarahkan ke beta, backup keystore, dan peserta nyata; langkahnya di
+      [`BETA_RUNBOOK.md`](BETA_RUNBOOK.md).
 - [ ] Security and release checklist — **sebagian**: pagar katalog hardening, uji statis web, dan
       matriks gerbang ada di [`BETA_READINESS.md`](BETA_READINESS.md); sisa blocker adalah URL web,
       acceptance perangkat, uji dua klien Realtime, retensi, dan project produksi.
