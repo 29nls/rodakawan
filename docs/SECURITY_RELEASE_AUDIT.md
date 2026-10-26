@@ -149,7 +149,10 @@ ulang pada audit ini.
    konfirmasi email + SMTP kustom, atau terima risiko tertulis.
 2. **Project rilis (AUD-21, AUD-27)** — backend produksi, promosi migration,
    backup/rollback, dan pengarahan `web/account-deletion/config.js` ke backend
-   rilis. Development hanya untuk pilot dengan akun sintetis.
+   rilis. Rencananya sudah tertulis di
+   [`PRODUCTION_MIGRATION_PLAN.md`](PRODUCTION_MIGRATION_PLAN.md); eksekusinya
+   tetap **Blocked** sampai project produksi dan keputusan §1 rencana itu ada.
+   Development hanya untuk pilot dengan akun sintetis.
 3. **Halaman web (AUD-20)** — aktifkan Pages, deploy, verifikasi URL; jangan
    mengklaim URL sebelum benar-benar terbuka.
 4. **Retensi data (AUD-23)** — sahkan kebijakan retensi hazard/audit/chat.
