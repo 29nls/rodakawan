@@ -90,7 +90,7 @@ Bagian ini adalah urutan yang sudah disesuaikan dengan kode di repo. Project dev
 
 ### 4.3 Jalankan migration
 
-Repository ini sekarang memuat **dua puluh dua** migration. Dua yang pertama adalah **sejarah penyiapan
+Repository ini sekarang memuat **dua puluh lima** migration. Dua yang pertama adalah **sejarah penyiapan
 awal** dan urutannya penting:
 
 1. `supabase/migrations/20261013022938_initial_schema.sql` — skema fondasi (migration awal).
@@ -98,7 +98,7 @@ awal** dan urutannya penting:
    username, dan trigger `updated_at`. Migration ini idempotent (`create or replace`,
    `drop trigger if exists`) sehingga aman dijalankan ulang dan tidak menghapus data.
 
-Dua puluh migration berikutnya bersifat aditif (privasi follow, detail privat kendaraan,
+Dua puluh tiga migration berikutnya bersifat aditif (privasi follow, detail privat kendaraan,
 keanggotaan klub, kendaraan utama, akses perjalanan, tiga bucket Storage, pagar policy, alur
 perjalanan M3 di `20261019120000_ride_workflow.sql`, lalu Milestone 4:
 `20261020090000_hazard_reports_m4.sql`, `20261020100000_convoy_chat_m4.sql`,

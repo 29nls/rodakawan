@@ -21,6 +21,10 @@ Daftar isi:
 9. [Rollback](#9-rollback)
 10. [Checklist ringkas](#10-checklist-ringkas)
 
+> Rencana untuk **project produksi** (bukan beta) ada di
+> [`PRODUCTION_MIGRATION_PLAN.md`](PRODUCTION_MIGRATION_PLAN.md): promosi migration, backup/restore,
+> rollback, dan pengarahan halaman web ke backend rilis.
+
 ## 1. Buat project Supabase beta
 
 1. Masuk https://supabase.com/dashboard → **New project** (jangan menyentuh project development
@@ -187,9 +191,11 @@ keytool -list -v -keystore rilis.jks -alias rilis   # harus berhasil dengan sand
 
 ## 9. Rollback
 
-**APK bermasalah:** bagikan lagi APK build sebelumnya dari halaman Releases (berkasnya masih ada,
-sepuluh build preview terbaru dipertahankan otomatis). Karena tanda tangan sama, peserta cukup
-memasang APK lama di atas yang baru — data aplikasi tidak hilang.
+**APK bermasalah:** Android **menolak** memasang APK dengan `versionCode` lebih rendah di atas versi
+terpasang (`INSTALL_FAILED_VERSION_DOWNGRADE`), jadi APK lama bukan rollback yang bisa dipakai
+peserta. Yang benar: terbitkan APK perbaikan dengan `versionCode` lebih tinggi secepat mungkin.
+Simpan APK lama hanya untuk instalasi bersih di perangkat yang belum memperbarui, atau untuk
+pembanding. Rencana produksi lengkap ada di [`PRODUCTION_MIGRATION_PLAN.md`](PRODUCTION_MIGRATION_PLAN.md).
 
 **Backend bermasalah:**
 

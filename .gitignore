@@ -32,6 +32,9 @@ supabase/.branches/
 # Bukti uji perangkat fisik (tangkapan layar, logcat, ringkasan): data pribadi, jangan di-commit
 bukti-perangkat/
 
+# Dump database/Storage untuk backup dan drill restore: berisi data pengguna, jangan di-commit
+backups/
+
 # Logs & caches
 *.log
 npm-debug.*
