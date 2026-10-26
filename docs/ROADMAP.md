@@ -301,7 +301,8 @@ Rencana terperinci, urutan prioritas, dan irisan vertikal pertama: [`docs/MILEST
 - [x] Jalur hapus akun web eksternal — halaman statis `web/account-deletion/` dan kebijakan
       `web/privacy/` dibuat, beserta workflow GitHub Pages yang hanya menerbitkan `web/` dan uji
       statisnya (`scripts/__tests__/web-static.test.mjs`). **URL publik belum ada (blocker deployment):**
-      workflow belum pernah berjalan, Pages belum diaktifkan, dan config masih placeholder. Syarat Play
+      workflow build-nya sudah berjalan (run `40180579692` gagal di uji statis lama; uji lokal kini
+      11/11 lulus), Pages belum diaktifkan, dan config masih menunjuk project development. Syarat Play
       Console belum bisa dicentang.
 - [x] Kesiapan beta tertutup — **Implemented · Passed against dev backend** (25 Oktober 2026):
       `npm run e2e:shared-ride` (alur dua pengguna + realtime, lihat Milestone 3) dan

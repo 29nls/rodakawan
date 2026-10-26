@@ -125,7 +125,7 @@ Irisan ini **selesai dan diuji end-to-end terhadap project development** untuk j
 | Uji SQL | `supabase/tests/rls_account_delete_test.sql` | ADR-077 dan uji lease ADR-078 lulus pada `db:test` **8/8** (24 Oktober 2026, setelah migration diterapkan) |
 | Layanan klien | `src/features/account/api.ts`, `errors.ts` | 13 test di `src/features/account/__tests__/api.test.ts` |
 | Layar | `src/app/account-delete.tsx`, `src/app/privacy.tsx` | 4 test layar di `src/__tests__/account-delete.test.tsx` |
-| Web publik | `web/account-deletion/`, `web/privacy/`, `.github/workflows/pages.yml` | halaman statis + workflow Pages + uji statis (11 test); **belum live** — Pages belum diaktifkan, config masih placeholder |
+| Web publik | `web/account-deletion/`, `web/privacy/`, `.github/workflows/pages.yml` | halaman statis + workflow Pages + uji statis (11 test); **belum live** — Pages belum diaktifkan, config masih menunjuk project development |
 | Uji E2E Auth/Storage | `scripts/account-deletion-e2e.mjs` (`npm run e2e:account-delete -- --yes`) | **Implemented** (runner permanen) dan **Passed against dev backend** (25 Oktober 2026, 17 langkah): Auth user A hilang, profil/media pribadi hilang, hazard, laporan, dan chat menjadi tombstone/diredaksi, logo klub pindah, akun B utuh, JWT lama ditolak, login ulang gagal, job completed, cleanup 0 sisa |
 
 Perintah yang benar-benar dijalankan (24 Oktober 2026): `npm test -- --ci` **0** (45 suite / 500 test),

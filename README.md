@@ -113,7 +113,7 @@ akun yang sudah dihapus gagal. Kebijakan privasi (retensi per jenis data, apa ya
 dipertahankan, kontak dukungan) tersedia di `/privacy`, `web/privacy/`, dan
 [`docs/SECURITY_PRIVACY.md`](docs/SECURITY_PRIVACY.md) bagian 8.4. Halaman web hapus akun sudah ada
 di `web/account-deletion/` beserta workflow GitHub Pages yang hanya menerbitkan `web/`, tetapi
-**belum ter-deploy** (Pages belum diaktifkan, config masih placeholder) sehingga URL publiknya masih
+**belum ter-deploy** (Pages belum diaktifkan, config masih menunjuk project development) sehingga URL publiknya masih
 blocker. Status gerbang beta ada di [`docs/BETA_READINESS.md`](docs/BETA_READINESS.md).
 
 **Unggah foto kendaraan, logo klub, dan foto profil sudah berfungsi.** `vehicle-photos`,
