@@ -13,12 +13,44 @@ Android, atau migration baru yang ditambahkan oleh rencana ini.
 | Hal | Keputusan | Konsekuensi bila salah |
 | --- | --- | --- |
 | Data beta | **Tidak dipindahkan.** Produksi mulai kosong; hanya tombstone `00000000-0000-4000-8000-000000000001` yang dibuat migration. | Menyalin data beta berarti membawa akun sintetis/media uji ke produksi. |
+| Peta | `EXPO_PUBLIC_MAP_STYLE_URL` adalah variabel build ketiga dan juga dibakar. Nilai produksi harus gaya peta yang sah; bila provider belum diputuskan, biarkan kosong dan jangan klaim peta siap. | Build produksi memakai gaya peta dev/uji atau menampilkan peta kosong. |
 | Schema | Hanya lewat `supabase/migrations/` di repo, tidak pernah SQL manual. | Riwayat remote dan repo berbeda; `db push` berikutnya berbahaya. |
 | Identitas APK | Paket dan keystore **sama** dengan beta (`com.rodakawan.app`). | Mengganti paket setelah unggah Play = aplikasi baru. |
 | Backend APK | `EXPO_PUBLIC_*` **dibakar saat build**; tidak bisa diganti runtime. | APK dev tidak bisa diarahkan ke produksi tanpa build ulang. |
 | Web | Satu halaman statis menunjuk **satu** project. | Halaman yang masih menunjuk development tidak boleh dipublikasikan. |
 | Migration rollback | Tidak ada down migration; perbaikan = migration baru. | "Rollback" dengan menghapus migration merusak riwayat. |
 | APK rollback | `versionCode` tidak boleh turun. | APK lama tidak bisa dipasang di atas yang lebih baru. |
+
+## 0.1 Blocker P0 yang harus ditutup sebelum produksi
+
+Ditemukan saat menyusun rencana ini, **belum diperbaiki** karena berada di luar
+lingkup dokumen (butuh perubahan kode Edge Function). Ini **tidak terlihat**
+pada audit development karena project development masih memiliki key legacy:
+
+- `supabase/functions/delete-account/index.ts:102-104` membaca
+  `SUPABASE_ANON_KEY` dan `SUPABASE_SERVICE_ROLE_KEY`. **Project Supabase baru
+  tidak lagi menyediakan key legacy itu**; yang ada adalah
+  `SUPABASE_PUBLISHABLE_KEYS` dan `SUPABASE_SECRET_KEYS` berbentuk JSON
+  (`{"default":"..."}`). Dokumentasi Supabase juga menyatakan `verify_jwt`
+  platform tidak memahami key baru.
+- Akibatnya, bila project produksi baru tidak menyediakan env legacy (default
+  untuk project baru), fungsi membalas **503 `account_deletion_unavailable`**
+  dan halaman web tidak bisa menghapus akun. Ini bukan masalah RLS atau
+  migration. Periksa **Edge Functions → Secrets** project produksi sebelum
+  cutover; jangan berasumsi key legacy ada.
+- Perbaikan yang harus dilakukan **sebelum** cutover, sebagai commit terpisah:
+  1. baca key baru dengan fallback legacy (parse JSON, ambil `default`), dan
+     pastikan klien admin mengirim secret pada header `apikey` — bukan
+     `Authorization: Bearer` yang membuat platform mencoba mem-parse-nya
+     sebagai JWT (atau pakai `@supabase/server`);
+  2. tambahkan `supabase/config.toml` dengan
+     `[functions.delete-account]` dan `verify_jwt = false` — fungsi tetap
+     memverifikasi token lewat `auth.getUser`, jadi ini tidak membuka akses;
+  3. uji ulang `e2e:account-delete` (17) di development dan satu akun uji di
+     staging, termasuk request tanpa token (401) dan akun lain (tidak bisa
+     dihapus).
+- Tanpa langkah ini, jangan membuat klaim “produksi siap” meskipun preflight
+  produksi lulus.
 
 ## 1. Prasyarat yang harus diputuskan pemilik
 
@@ -83,29 +115,43 @@ npx supabase functions deploy delete-account --project-ref <ref-staging>
 npx supabase secrets set WEB_ALLOWED_ORIGINS="https://<owner>.github.io" --project-ref <ref-staging>
 ```
 
-Lalu arahkan environment ke staging dan jalankan **seluruh** uji yang membuat
-data:
+Lalu arahkan environment ke staging dan jalankan uji yang memang bisa
+menargetkan project mana pun:
 
 ```powershell
 $env:EXPO_PUBLIC_SUPABASE_URL = 'https://<ref-staging>.supabase.co'
 $env:EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY = '<publishable-key-staging>'
 $env:DATABASE_URL = '<connection-string-staging>'
 
-npm run beta:preflight
-npm run db:test                 # 11/11
+npm run db:test                 # 11/11, seluruh transaksi ROLLBACK
 npm run db:types:check
-npm run storage:test            # 27 langkah
-npm run e2e:account-delete -- --yes
-npm run e2e:shared-ride
+npm run beta:preflight          # 8/8 bila pengaturan Auth staging = produksi
 ```
+
+Batas runner yang harus dihormati (dibaca dari kode, bukan asumsi):
+
+- `e2e:account-delete` dan `e2e:shared-ride` **mengunci ref development**
+  (`scripts/account-deletion-e2e.mjs:53,164`,
+  `scripts/shared-ride-e2e.mjs:237`). Keduanya tidak bisa diarahkan ke staging;
+  bukti E2E tetap berasal dari development pada commit yang sama. Jangan
+  memaksa dengan menyunting guard.
+- `storage:test` tidak mengunci ref, tetapi dokumentasinya menyebut project
+  development dan memakai ID tetap. Jalankan di development. Untuk staging,
+  buktikan policy Storage secara manual dengan dua akun uji (unggah/unduh/hapus
+  lintas akun), lalu bersihkan.
+- `db:test` berjalan dalam transaksi dan `ROLLBACK`, jadi aman pada staging
+  kosong; **jangan** menjalankannya pada produksi meski rollback.
 
 Kriteria lulus rehearsal:
 
-- `migration list` tanpa selisih;
-- `db:test` **11/11**, `storage:test` **27**, `e2e:account-delete` **17**,
-  `e2e:shared-ride` **24**;
-- `beta:preflight` **8/8** (termasuk autoconfirm nonaktif);
-- tidak ada akun/objek uji tersisa; `db:types:check` lulus.
+- `migration list` tanpa selisih; `db:types:check` lulus;
+- `db:test` **11/11** di staging;
+- `beta:preflight` **8/8** di staging (termasuk autoconfirm nonaktif). Bila SMTP
+  staging belum ada, catat kegagalan itu sebagai temuan konfigurasi, bukan
+  kegagalan migration;
+- bukti E2E development pada commit yang sama: `storage:test` **27**,
+  `e2e:account-delete` **17**, `e2e:shared-ride` **24**;
+- tidak ada akun/objek uji tersisa di staging maupun development.
 
 Hapus project staging setelah rehearsal (atau biarkan kosong) supaya tidak
 menjadi backend kedua yang lupa dipantau. Catat hasilnya di laporan rilis.
@@ -148,12 +194,20 @@ minimal 30 hari, akses terbatas. Jangan meng-commit `backups/`.
    restore riwayat `supabase_migrations`. Beberapa baris `OWNER TO
    supabase_admin`/grant role mungkin perlu dikomentari sesuai catatan resmi.
 3. Pada project scratch hasil restore, jalankan `npm run db:test` (11/11) dan
-   `npm run db:types:check`. Ini membuktikan schema, policy, dan data pulih.
-4. Hapus project scratch setelah drill; catat tanggal, durasi, dan temuan.
+   `npm run db:types:check`. Suite SQL berjalan dalam transaksi `ROLLBACK`,
+   tetapi jangan pernah menunjukkannya ke produksi; project scratch harus
+   disposable dan tidak melayani pengguna.
+4. Bandingkan jumlah baris tabel utama dan jumlah objek Storage dengan sumber.
+   Restore database tidak memulihkan berkas; selisih objek adalah temuan yang
+   harus dicatat, bukan diabaikan.
+5. Hapus project scratch setelah drill; catat tanggal, durasi, dan temuan.
 
-Alternatif yang lebih aman untuk produksi: **Duplicate Project** dari backup
-(platform menyalin encryption key dan objek terkait), lalu arahkan environment
-ke duplikat. Baca batasannya di dokumentasi Supabase sebelum mengandalkannya.
+Alternatif yang lebih aman untuk produksi: **Restore to a New Project**
+(Duplicate Project) dari backup. Yang ikut: schema, seluruh data, role, data
+Auth (termasuk hash kata sandi), dan encryption root key. Yang **tidak** ikut:
+objek/bucket Storage, Edge Functions, pengaturan Auth/API key, Realtime, dan
+extension. Setelah clone, deploy ulang `delete-account`, set secret, dan salin
+objek Storage secara terpisah — jangan menganggap clone = produksi lengkap.
 
 ### 4.4 Objek Storage
 
@@ -176,6 +230,7 @@ dikembalikan oleh restore database; hanya salinan objek yang bisa.
 - [ ] Commit yang akan dirilis lulus **CI** dan **Database RLS** di `main`.
 - [ ] `git status` bersih; tidak ada migration yang belum di-commit.
 - [ ] `npm ci` + gerbang lokal lulus (lihat `AGENTS.md`).
+- [ ] **Blocker §0.1 sudah ditutup** (fungsi membaca key baru + `verify_jwt = false`).
 - [ ] Rehearsal staging §3 lulus pada commit yang sama.
 - [ ] Backup §4.2 (untuk produksi yang sudah berisi data) selesai dan
       diverifikasi.
@@ -212,7 +267,10 @@ keluarannya ke laporan publik. **Jangan** menjalankan `db:test`,
 - [ ] `migration list` **25 = 25** (atau jumlah aktual saat itu).
 - [ ] Tabel tombstone ada tepat satu; `deleted_at` terisi.
 - [ ] Ketiga bucket ada dan **privat** (preflight).
-- [ ] `delete-account` di-deploy dan menolak request tanpa JWT/apikey (401).
+- [ ] `delete-account` di-deploy, memakai key baru (bukan env legacy yang
+      kosong), dan menolak request tanpa JWT/apikey (401).
+- [ ] Satu akun uji produksi berhasil dihapus penuh lewat halaman web; bukan
+      hanya 401 yang diperiksa.
 - [ ] Redirect URL `rodakawan://auth/callback` terdaftar; Site URL benar.
 - [ ] SMTP teruji: konfirmasi pendaftaran dan reset password benar-benar
       sampai (bukan hanya "dashboard hijau").
@@ -289,10 +347,16 @@ Lakukan **setelah** preflight produksi 8/8 dan sebelum APK produksi disebar.
 
    ```powershell
    node --test scripts/__tests__/web-static.test.mjs   # 11/11
+   if (Select-String -Path web/account-deletion/config.js -Pattern 'xvmcpfkkveeaevfcvfug' -Quiet) {
+     throw 'config.js masih menunjuk project development'
+   }
    ```
 
-   Uji ini menolak ref project development dan secret; publishable key
-   produksi boleh ada karena memang publik.
+   Perhatikan batas uji itu: `config.js` **dikecualikan** dari pemindaian ref
+   development (`scripts/__tests__/web-static.test.mjs`), justru karena berkas
+   ini memang harus memuat URL project. Karena itu langkah `grep` di atas wajib:
+   tanpa itu, lupa mengganti URL tetap lolos 11/11. publishable key produksi
+   boleh ada karena memang publik; service role tidak pernah boleh.
 3. Set origin halaman di Edge Function produksi, lalu deploy ulang bila perlu:
 
    ```powershell
@@ -315,6 +379,14 @@ Lakukan **setelah** preflight produksi 8/8 dan sebelum APK produksi disebar.
      -H "Access-Control-Request-Method: POST"
    # harapan: 403 origin_not_allowed
    ```
+
+   Bila gateway membalas **401 sebelum fungsi berjalan** (kemungkinan karena
+   `verify_jwt` default true dan preflight tidak membawa token), browser akan
+   memblokir panggilan. Jangan menerbitkan halaman dan jangan melemahkan
+   verifikasi; catat sebagai **Blocked**, lalu putuskan `verify_jwt = false`
+   khusus fungsi ini (fungsi tetap memverifikasi `auth.getUser`) atau pola
+   gateway yang didukung. `supabase/config.toml` belum ada di repo (C-01), jadi
+   pengaturan platform harus diperiksa di Dashboard dan dicatat di laporan.
 5. Aktifkan **Settings → Pages → Source: GitHub Actions**. Push perubahan
    `config.js` ke `main` (trigger `web/**`) atau jalankan
    `gh workflow run pages.yml`. Catat `page_url` dari ringkasan run.
@@ -343,12 +415,17 @@ produksi, build preview ikut menunjuk produksi. Pilihan:
 
 - **Disarankan:** tambahkan `environment: production` pada job `build-apk`
   `android-release.yml`, lalu isi **Environment variables** `production`
-  dengan URL + publishable key produksi. Biarkan repository variables untuk
-  build preview/development. Environment juga bisa diberi protection rule
-  (reviewer wajib) sebelum job berjalan.
+  dengan **ketiga** nilai: `EXPO_PUBLIC_SUPABASE_URL`,
+  `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, dan `EXPO_PUBLIC_MAP_STYLE_URL`.
+  Biarkan repository variables untuk build preview/development. Environment
+  juga bisa diberi protection rule (reviewer wajib) sebelum job berjalan.
 - **Alternatif tanpa mengubah workflow:** ganti repository variables tepat
   saat cutover, build, lalu kembalikan. Risikonya build lain yang berjalan
   bersamaan ikut memakai produksi — hindari.
+
+`EXPO_PUBLIC_MAP_STYLE_URL` sering memuat kunci penyedia peta. Walaupun
+nilainya masuk bundel dan bukan rahasia server, nilai itu tetap tidak boleh
+ditaruh di repo; simpan di environment build seperti dua variabel lain.
 
 Jangan memindahkan `EXPO_PUBLIC_*` ke `secrets`; nilainya tetap masuk bundel,
 jadi bukan rahasia. Yang wajib rahasia tetap `ANDROID_KEYSTORE_*` dan service
@@ -389,7 +466,7 @@ role (hanya server).
 
 | Waktu | Langkah | Bukti yang disimpan |
 | --- | --- | --- |
-| T-7 | Putuskan §1; buat project staging; rehearsal §3 | hasil 11/11, 27, 17, 24, preflight 8/8 |
+| T-7 | Tutup §0.1; putuskan §1; buat project staging; rehearsal §3 | fungsi key baru teruji; `db:test` staging 11/11; E2E dev 27/17/24; preflight 8/8 |
 | T-3 | Buat project produksi; siapkan SMTP, redirect URL, backup plan | tangkapan dashboard tanpa secret |
 | T-1 | Dump baseline; uji restore ke scratch; siapkan Environment `production` | log drill, hash dump |
 | T-0 | `db push` produksi → `db:types:check` → preflight → function + secret → Auth → web config → Pages | `migration list`, preflight 8/8, `page_url` |
@@ -419,6 +496,7 @@ baris yang sama selesai.
 | Risiko | Dampak | Mitigasi |
 | --- | --- | --- |
 | Migration tidak bisa dibalik | Schema rusak | Rehearsal staging/clone, backup + drill, forward-fix |
+| Edge Function memakai env key legacy | Hapus akun gagal 503 di project baru | Tutup §0.1 sebelum cutover; uji hapus akun nyata di staging |
 | Backup DB tidak memuat Storage | Foto/logo hilang permanen | Salinan objek terpisah + uji restore bucket |
 | Repository variables dipakai bersama | Build dev menunjuk produksi | Environment `production` khusus job rilis |
 | `EXPO_PUBLIC_*` dibakar | Tidak bisa ganti backend tanpa build | Rilis baru; jangan tukar variabel saat runtime |

@@ -76,6 +76,8 @@ menyeluruh sebelum rilis.
 
 Bagian ini adalah urutan yang sudah disesuaikan dengan kode di repo. Project development RodaKawan **sudah dibuat dan seluruh migration sudah diterapkan** (13 Oktober 2026, ADR-035), jadi langkah di bawah adalah panduan lengkap untuk project baru — staging, produksi, atau mesin developer lain.
 
+> **Untuk project produksi**, jangan langsung mengeksekusi §4.3: lakukan rehearsal di staging, siapkan backup dan drill restore, lalu ikuti urutan cutover di [`PRODUCTION_MIGRATION_PLAN.md`](PRODUCTION_MIGRATION_PLAN.md). Menjalankan `db push` pertama kali ke produksi tanpa rehearsal dan backup adalah tindakan yang tidak boleh dilakukan.
+
 ### 4.1 Buat project development
 
 1. Masuk ke https://supabase.com/dashboard lalu buat project baru khusus pengembangan (jangan pakai project produksi).
