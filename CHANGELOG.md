@@ -8,6 +8,20 @@ sedangkan build preview (`v<versi>-build<N>`) diringkas di dalam blok yang bisa 
 versi adalah tautan ke halaman rilisnya di GitHub, sehingga riwayat ini bisa dinavigasi langsung
 dari berkas.
 
+## [v0.1.0-build70](https://github.com/29nls/rodakawan/releases/tag/v0.1.0-build70) — 2026-10-27 · pratinjau
+
+<details>
+<summary>Catatan rilis pratinjau</summary>
+
+### Perubahan lain
+
+- Perjelas status beta tertutup dan variabel build (`3c3384a`)
+- Samakan fungsi throttle development dan perkuat uji balapan (`f184468`)
+- Perkuat throttle jalur tulis dan pemetaan galat beta (`9661241`)
+- Implement write throttling for clubs and rides, including rate limits and testing - Added SQL migration for write throttles on club and ride creation, enforcing limits of 10 per hour per user. - Introduced functions to manage throttling logic for creating clubs, rides, and publishing locations. - Updated documentation to reflect new production migration plans and setup guidelines. - Created tests to validate throttling behavior, ensuring limits are enforced and appropriate errors are raised. (`3f4f2ef`)
+
+</details>
+
 ## [v0.1.0-build68](https://github.com/29nls/rodakawan/releases/tag/v0.1.0-build68) — 2026-10-26 · pratinjau
 
 <details>
