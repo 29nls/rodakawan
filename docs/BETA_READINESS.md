@@ -17,7 +17,7 @@ pemilik/produk/legal) dan **tidak diketahui** (tidak ada bukti yang cukup untuk 
 
 | Pertanyaan | Jawaban |
 | --- | --- |
-| Apakah beta publik bisa dimulai sekarang? | **Belum.** Tiga blocker utama: halaman web belum ter-deploy (syarat internal/project pribadi), acceptance perangkat belum dijalankan, dan retensi data belum disahkan. |
+| Apakah beta tertutup bisa dimulai sekarang? | **Belum.** Belum ada project Supabase beta terpisah (B-12 masih menunjuk development), APK beta belum dibangun dari variabel beta, dan acceptance perangkat PD-01…PD-20 belum dijalankan. Untuk rilis publik, halaman web dan retensi data juga masih menjadi blocker. |
 | Apakah ada temuan Critical/High baru? | **Tidak.** Audit 24–25 Oktober 2026 tidak menemukan Critical/High; temuan Medium yang tersisa tercatat di §5 dan `SECURITY_RELEASE_AUDIT.md`. |
 | Apakah ada perubahan dependency/izin Android? | **Tidak.** Perubahan 27 Oktober: satu migration aditif (serialisasi throttle), pemetaan galat rate limit, uji, workflow, dan dokumentasi. |
 | Apakah halaman web sudah live? | **Belum.** Job build workflow Pages sudah berhasil pada percobaan pertama (uji statis + unggah artefak), tetapi job deploy tidak dilakukan karena ini proyek internal/private; `config.js` sudah divalidasi dengan benar. Untuk konteks pengguna pribadi 5 orang, pengecekan deploy GitHub Pages tidak diperlukan. |
@@ -38,6 +38,7 @@ pemilik/produk/legal) dan **tidak diketahui** (tidak ada bukti yang cukup untuk 
 | B-09 | Play Console: Data safety, content rating, app access, ads | **Blocked** | Formulir belum diisi; Data safety membutuhkan URL hapus akun (B-03), retensi (§6), dan backend final (B-04). Bisa diisi untuk internal testing saja. | Isi sebelum menandai rilis internal |
 | B-10 | Rilis hanya dari commit yang lulus CI + Database RLS | **Implemented**; **tidak diverifikasi untuk branch ini** | `release-on-push.yml` mensyaratkan run CI sukses untuk SHA; run terakhir yang hijau adalah commit yang sudah di-merge, bukan branch ini. Bisa dipakai untuk internal CI. |
 | B-11 | APK baru untuk perubahan ini | **Tidak berlaku** untuk rilis publik | `web/**`, `scripts/**`, `.github/**`, `docs/**`, `supabase/tests/**` diabaikan gate `should-release.mjs`; tidak ada perubahan `src/**`/`app.json`. Bisa dibuat development build untuk internal testing. |
+| B-12 | Variabel build GitHub | **Blocked** | Repo variable `EXPO_PUBLIC_SUPABASE_URL` saat ini menunjuk project **development**, dan workflow juga membaca publishable key serta `EXPO_PUBLIC_MAP_STYLE_URL` dari repo variables. APK yang dibangun hari ini akan membundel backend development. Ganti ke project beta setelah project beta dan kuncinya tersedia; jangan mencantumkan nilai rahasia di dokumen ini. |
 
 ## 3. Gerbang keamanan dan data
 
