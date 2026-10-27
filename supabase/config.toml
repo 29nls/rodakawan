@@ -1,0 +1,16 @@
+# Konfigurasi Supabase CLI untuk repository ini.
+#
+# `verify_jwt = false` pada `delete-account` TIDAK menghapus autentikasi.
+# Fungsi itu tetap memverifikasi access token pengguna sendiri lewat
+# `auth.getUser(token)` sebelum menjalankan langkah apa pun, dan tetap
+# membalas 401 untuk permintaan tanpa token maupun dengan token yang tidak
+# sah. Pemeriksaan platform hanya dinonaktifkan supaya fungsi tidak
+# bergantung pada pemahaman platform terhadap suatu format key tertentu
+# saat memanggil handler.
+#
+# Lihat docs/PRODUCTION_MIGRATION_PLAN.md bagian 0.1.
+
+version = "1"
+
+[functions.delete-account]
+verify_jwt = false

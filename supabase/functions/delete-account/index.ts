@@ -11,7 +11,12 @@
  * `public.account_deletion_jobs` sehingga retry melanjutkan langkah yang gagal.
  *
  * Variabel lingkungan yang disediakan Supabase otomatis:
- *   SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY.
+ *   SUPABASE_URL, dan salah satu (atau keduanya) pasangan berikut:
+ *   - format baru: SUPABASE_PUBLISHABLE_KEYS / SUPABASE_SECRET_KEYS (JSON
+ *     `{"default":"..."}`);
+ *   - format legacy: SUPABASE_ANON_KEY / SUPABASE_SERVICE_ROLE_KEY.
+ * Kedua format hidup berdampingan selama masa migrasi API key Supabase, jadi
+ * fungsi ini membaca yang baru dulu lalu jatuh ke nama legacy.
  * Tidak ada rahasia yang ditulis ke kode, log, atau respons.
  */
 
@@ -83,6 +88,38 @@ function detailsOf(error: { details?: unknown; message?: unknown } | null): stri
   return '';
 }
 
+/**
+ * Baca kredensial project dari environment.
+ *
+ * Supabase menyuntikkan dua bentuk nama variabel: format baru
+ * `SUPABASE_PUBLISHABLE_KEYS` / `SUPABASE_SECRET_KEYS` berupa JSON
+ * (`{"default":"..."}`), dan format legacy `SUPABASE_ANON_KEY` /
+ * `SUPABASE_SERVICE_ROLE_KEY`. Project baru dan lama memuatnya dalam kombinasi
+ * yang berbeda, dan key legacy memang sedang didepresiasi (target akhir 2026),
+ * jadi bacalah format baru lebih dahulu lalu jatuh ke nama legacy.
+ *
+ * Nilai tidak pernah dicetak; hanya keberhasilannya yang dilaporkan.
+ */
+function readKey(newName: string, legacyName: string): string | null {
+  const raw = Deno.env.get(newName);
+  if (raw && raw.trim().length > 0) {
+    try {
+      const parsed: unknown = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        const bag = parsed as Record<string, unknown>;
+        const candidate = bag.default ?? bag.legacy ?? Object.values(bag)[0];
+        if (typeof candidate === 'string' && candidate.length > 0) return candidate;
+      }
+    } catch {
+      // Bukan JSON — perlakukan sebagai nilai tunggal.
+    }
+    return raw.trim();
+  }
+
+  const legacy = Deno.env.get(legacyName);
+  return legacy && legacy.length > 0 ? legacy : null;
+}
+
 Deno.serve(async (request: Request) => {
   // Allowlist per-origin: hanya halaman yang terdaftar boleh memanggil dari
   // browser; permintaan native tanpa `Origin` tetap dilayani. Default-nya
@@ -100,10 +137,10 @@ Deno.serve(async (request: Request) => {
   }
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
-  const anonKey = Deno.env.get('SUPABASE_ANON_KEY');
-  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  const publishableKey = readKey('SUPABASE_PUBLISHABLE_KEYS', 'SUPABASE_ANON_KEY');
+  const secretKey = readKey('SUPABASE_SECRET_KEYS', 'SUPABASE_SERVICE_ROLE_KEY');
 
-  if (!supabaseUrl || !anonKey || !serviceKey) {
+  if (!supabaseUrl || !publishableKey || !secretKey) {
     // Konfigurasi platform, bukan kesalahan pengguna. Jangan bocorkan nama nilai.
     console.error('[delete-account] konfigurasi platform tidak lengkap');
     return json({ error: 'account_deletion_unavailable' }, 503, corsHeaders);
@@ -132,7 +169,7 @@ Deno.serve(async (request: Request) => {
     }
   }
 
-  const userClient = createClient(supabaseUrl, anonKey, {
+  const userClient = createClient(supabaseUrl, publishableKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
@@ -143,7 +180,9 @@ Deno.serve(async (request: Request) => {
   }
 
   const userId = userData.user.id;
-  const admin = createClient(supabaseUrl, serviceKey, {
+  // Klien admin memakai kredensial server. supabase-js mengirimkannya lewat
+  // header `apikey`, bukan sebagai Bearer JWT — key format baru memang bukan JWT.
+  const admin = createClient(supabaseUrl, secretKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 

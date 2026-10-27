@@ -74,8 +74,17 @@ Catatan penting:
 
 ## 3. Deploy Edge Function `delete-account`
 
-`delete-account` adalah satu-satunya jalur hapus akun penuh; Supabase menyuntikkan URL dan service
-role key ke fungsi otomatis, jadi tidak ada secret yang perlu disalin dari development.
+`delete-account` adalah satu-satunya jalur hapus akun penuh; Supabase menyuntikkan URL dan
+kredensialnya ke fungsi otomatis, jadi tidak ada secret yang perlu disalin dari development.
+
+Fungsi ini membaca **kedua format** key yang disediakan platform: format baru
+(`SUPABASE_PUBLISHABLE_KEYS` / `SUPABASE_SECRET_KEYS`, JSON `{"default":"..."}`) lebih dahulu,
+lalu jatuh ke nama legacy (`SUPABASE_ANON_KEY` / `SUPABASE_SERVICE_ROLE_KEY`). Jadi project
+baru maupun lama bisa dipakai tanpa mengubah kode. `supabase/config.toml` menyetel
+`verify_jwt = false` untuk fungsi ini **tanpa** melemahkan autentikasi: fungsi tetap
+memverifikasi access token pengguna sendiri lewat `auth.getUser` dan tetap membalas 401 tanpa
+token atau dengan token yang tidak sah. Setelah deploy, jalankan `npm run beta:preflight` dan
+pastikan kedua probe `delete-account` tetap 401.
 
 ```powershell
 npx supabase functions deploy delete-account --project-ref <ref-beta>
