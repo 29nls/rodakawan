@@ -21,36 +21,49 @@ Android, atau migration baru yang ditambahkan oleh rencana ini.
 | Migration rollback | Tidak ada down migration; perbaikan = migration baru. | "Rollback" dengan menghapus migration merusak riwayat. |
 | APK rollback | `versionCode` tidak boleh turun. | APK lama tidak bisa dipasang di atas yang lebih baru. |
 
-## 0.1 Blocker P0 yang harus ditutup sebelum produksi
+## 0.1 Kompatibilitas key Edge Function — sudah ditutup
 
-Ditemukan saat menyusun rencana ini, **belum diperbaiki** karena berada di luar
-lingkup dokumen (butuh perubahan kode Edge Function). Ini **tidak terlihat**
-pada audit development karena project development masih memiliki key legacy:
+Temuan awal menyatakan fungsi hapus akun hanya membaca env legacy
+(`SUPABASE_ANON_KEY` / `SUPABASE_SERVICE_ROLE_KEY`) dan bahwa project baru tidak
+lagi menyediakannya, sehingga fungsi akan membalas 503. **Sebagian dari premis
+ini ternyata keliru** dan dikoreksi setelah diperiksa terhadap dokumentasi
+Supabase resmi (27 Oktober 2026):
 
-- `supabase/functions/delete-account/index.ts:102-104` membaca
-  `SUPABASE_ANON_KEY` dan `SUPABASE_SERVICE_ROLE_KEY`. **Project Supabase baru
-  tidak lagi menyediakan key legacy itu**; yang ada adalah
-  `SUPABASE_PUBLISHABLE_KEYS` dan `SUPABASE_SECRET_KEYS` berbentuk JSON
-  (`{"default":"..."}`). Dokumentasi Supabase juga menyatakan `verify_jwt`
-  platform tidak memahami key baru.
-- Akibatnya, bila project produksi baru tidak menyediakan env legacy (default
-  untuk project baru), fungsi membalas **503 `account_deletion_unavailable`**
-  dan halaman web tidak bisa menghapus akun. Ini bukan masalah RLS atau
-  migration. Periksa **Edge Functions → Secrets** project produksi sebelum
-  cutover; jangan berasumsi key legacy ada.
-- Perbaikan yang harus dilakukan **sebelum** cutover, sebagai commit terpisah:
-  1. baca key baru dengan fallback legacy (parse JSON, ambil `default`), dan
-     pastikan klien admin mengirim secret pada header `apikey` — bukan
-     `Authorization: Bearer` yang membuat platform mencoba mem-parse-nya
-     sebagai JWT (atau pakai `@supabase/server`);
-  2. tambahkan `supabase/config.toml` dengan
-     `[functions.delete-account]` dan `verify_jwt = false` — fungsi tetap
-     memverifikasi token lewat `auth.getUser`, jadi ini tidak membuka akses;
-  3. uji ulang `e2e:account-delete` (17) di development dan satu akun uji di
-     staging, termasuk request tanpa token (401) dan akun lain (tidak bisa
-     dihapus).
-- Tanpa langkah ini, jangan membuat klaim “produksi siap” meskipun preflight
-  produksi lulus.
+- Dokumentasi resmi **masih mencantumkan** `SUPABASE_ANON_KEY` dan
+  `SUPABASE_SERVICE_ROLE_KEY` sebagai variabel yang disuntikkan ke runtime Edge
+  Functions, dan panduan API key menyatakan keduanya "masih ada di runtime".
+  Variabel baru (`SUPABASE_PUBLISHABLE_KEYS` / `SUPABASE_SECRET_KEYS`) ditambahkan
+  **di samping** nama lama, bukan menggantikannya.
+- Yang benar adalah **timeline**: key legacy didepresiasi dan dijadwalkan
+  berakhir **akhir 2026**. Karena itu ketergantungan pada nama legacy tetap
+  risiko, bukan kegagalan sesaat.
+- Dokumentasi **tidak konsisten** soal `verify_jwt`: satu panduan menyatakan
+  pemeriksaan platform hanya memahami key lama, panduan yang lebih baru menyatakan
+  ia menerima key publishable/secret demi kompatibilitas migrasi. Panduan yang
+  konsisten di semua versi: **jangan mengandalkan `verify_jwt` sendiri untuk
+  mengautentikasi pemanggil yang hanya membawa API key.**
+
+Yang dikerjakan (commit pada fase ini):
+
+1. `supabase/functions/delete-account/index.ts` membaca key baru lebih dahulu
+   (`SUPABASE_PUBLISHABLE_KEYS` / `SUPABASE_SECRET_KEYS`, parse JSON, ambil
+   `default`) lalu **jatuh ke nama legacy**. Klien admin memakai `createClient(url,
+   key)`, yang mengirim kredensial lewat header `apikey` — bukan sebagai Bearer
+   JWT, karena key format baru memang bukan JWT.
+2. `supabase/config.toml` menambahkan `[functions.delete-account]` dengan
+   `verify_jwt = false`. **Ini tidak menghapus autentikasi**: fungsi tetap
+   memverifikasi access token pengguna lewat `auth.getUser(token)` dan tetap
+   membalas 401 tanpa token maupun dengan token yang tidak sah — dibuktikan uji
+   negatif pada `npm run e2e:account-delete`.
+3. Uji ulang `e2e:account-delete` di development: **21 langkah lulus**, termasuk
+   permintaan tanpa token (401), token tidak valid (401), dan token yang hanya
+   menghapus akunnya sendiri.
+
+Verifikasi yang masih membutuhkan project baru sungguhan: jalankan
+`beta:preflight` terhadap project beta/produksi dan pastikan probe
+`delete-account` tetap 401 tanpa JWT dan dengan apikey saja. Jangan mengklaim
+"produksi siap" hanya karena preflight lulus — periksa juga **Edge Functions →
+Secrets** project target dan jangan berasumsi format key tertentu ada.
 
 ## 1. Prasyarat yang harus diputuskan pemilik
 
@@ -231,7 +244,9 @@ dikembalikan oleh restore database; hanya salinan objek yang bisa.
 - [ ] Commit yang akan dirilis lulus **CI** dan **Database RLS** di `main`.
 - [ ] `git status` bersih; tidak ada migration yang belum di-commit.
 - [ ] `npm ci` + gerbang lokal lulus (lihat `AGENTS.md`).
-- [ ] **Blocker §0.1 sudah ditutup** (fungsi membaca key baru + `verify_jwt = false`).
+- [x] **Blocker §0.1 sudah ditutup** (27 Oktober 2026): fungsi membaca key baru
+      dengan fallback legacy, `verify_jwt = false` dengan autentikasi tetap di
+      handler, dan `e2e:account-delete` 21 langkah lulus di development.
 - [ ] Rehearsal staging §3 lulus pada commit yang sama.
 - [ ] Backup §4.2 (untuk produksi yang sudah berisi data) selesai dan
       diverifikasi.

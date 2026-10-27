@@ -312,7 +312,7 @@ runner test script (ADR-072) + perbaikan lokal yang belum di-commit saat tabel i
 | `npm run db:test` | **Exit 0 — 8/8 berkas lulus** (23 Oktober 2026, `.env.db` menunjuk Session Pooler project development). Seluruh notice penanda diterima, termasuk keempat berkas M4 dan `rls_account_delete_test.sql`. |
 | `npm run db:types:check` | **Exit 0** — `src/lib/supabase/database.generated.ts` sama dengan skema database (22 Oktober 2026, target session pooler project development). |
 | `npm run storage:test` | **Exit 0 — 27 langkah lulus** (23 Oktober 2026), termasuk verifikasi kebersihan objek/akun uji. |
-| `npm run e2e:account-delete -- --yes` | **Exit 0 — 17 langkah lulus** (25 Oktober 2026): Auth user/profil/media pribadi A hilang, hazard/laporan/chat tombstone, logo klub pindah, akun B utuh, JWT lama ditolak, login ulang gagal, job `completed`, 0 objek/baris sisa. Tanpa service_role. |
+| `npm run e2e:account-delete -- --yes` | **Exit 0 — 21 langkah lulus** (27 Oktober 2026): Auth user/profil/media pribadi A hilang, hazard/laporan/chat tombstone, logo klub pindah, akun B utuh, JWT lama ditolak, login ulang gagal, job `completed`, 0 objek/baris sisa. Tanpa service_role. Termasuk kasus negatif: tanpa token → 401, token tidak valid → 401, dan token hanya menghapus akunnya sendiri. |
 
 Hasil historis pada commit `749424c` (19 Oktober 2026, Node 24.18.1, npm 12.0.2):
 
@@ -329,7 +329,7 @@ terkini. Uji RLS terakhir yang tercatat di GitHub Actions adalah **Database RLS 
 **Diperbarui 27 Oktober 2026 (branch `fix/beta-readiness-rate-limits`):** `npm test -- --ci`
 **48 suite / 525 test**; `npm run test:scripts` **94 suite / 395 test**; `npm run db:test`
 **12/12** berkas; `db:test:lint` **12 berkas uji / 28 migration**; `db:types:check` exit 0;
-`storage:test` **27 langkah**; `e2e:account-delete` **17 langkah**; `e2e:shared-ride`
+`storage:test` **27 langkah**; `e2e:account-delete` **21 langkah**; `e2e:shared-ride`
 **24 pemeriksaan**; `export:android` exit 0. `db:test:concurrency` baru membuktikan dua
 `create_club`/`create_ride` serentak tidak melampaui kuota. `npm run doctor` tetap **Blocked**
 saja karena `EAI_AGAIN exp.host` (jaringan mesin, bukan temuan proyek).

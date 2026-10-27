@@ -491,6 +491,79 @@ async function main() {
     );
     check(objekAwal === 4, `objek awal tidak lengkap (${objekAwal}/4).`);
 
+    /* 3b. Kasus negatif: identitas target selalu diambil dari token, bukan dari
+          body/query, jadi tidak ada bentuk permintaan yang menghapus akun orang
+          lain. Dijalankan sebelum A benar-benar dihapus. */
+    const tanpaToken = await request(`${apiBase}/delete-account`, {
+      method: 'POST',
+      headers: { apikey: publishableKey },
+    });
+    check(
+      tanpaToken.status === 401,
+      `permintaan tanpa token tidak ditolak 401 (HTTP ${tanpaToken.status}).`,
+    );
+    ok('permintaan tanpa token ditolak 401');
+
+    const tokenRusak = await request(`${apiBase}/delete-account`, {
+      method: 'POST',
+      headers: authHeaders('bukan-jwt-yang-sah'),
+    });
+    check(
+      tokenRusak.status === 401,
+      `token tidak valid tidak ditolak 401 (HTTP ${tokenRusak.status}).`,
+    );
+    ok('token tidak valid ditolak 401');
+
+    // Akun pemantau: bila identitas memang diambil dari token, akun inilah yang
+    // terhapus — bukan A/B/C yang sedang diuji.
+    const idD = randomUUID();
+    const emailD = `e2e.hapus.d.${suffix}@contoh.test`;
+    const passwordD = randomBytes(18).toString('base64url');
+    await sql(
+      `insert into auth.users (
+         id, instance_id, aud, role, email, encrypted_password, email_confirmed_at,
+         confirmation_token, recovery_token, email_change, email_change_token_new,
+         email_change_token_current, phone_change, phone_change_token,
+         reauthentication_token, raw_app_meta_data, raw_user_meta_data,
+         created_at, updated_at
+       ) values ($1, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated',
+         $2, crypt($3, gen_salt('bf')), now(), '', '', '', '', '', '', '', '',
+         '{"provider":"email","providers":["email"]}', $4::jsonb, now(), now())`,
+      [
+        idD,
+        emailD,
+        passwordD,
+        JSON.stringify({ username: `e2e_hapus_d_${suffix}`, display_name: 'E2E Hapus D' }),
+      ],
+    );
+
+    const tokenD = await signIn('D', emailD, passwordD);
+    const lintasAkun = await request(`${apiBase}/delete-account`, {
+      method: 'POST',
+      headers: {
+        ...authHeaders(tokenD),
+        'content-type': 'application/json',
+        'content-length': '0',
+      },
+    });
+    const hasilLintas = await jsonBody(lintasAkun);
+    check(
+      lintasAkun.status === 200 && hasilLintas.json?.status === 'completed',
+      `penghapusan dengan token D tidak selesai (HTTP ${lintasAkun.status}).`,
+    );
+
+    const sisaABC = await scalar(
+      `select (select count(*) from auth.users where id = any($1::uuid[]))
+            + (select count(*) from public.profiles where id = any($1::uuid[])) as count`,
+      [[id.a, id.b, id.c]],
+    );
+    check(sisaABC === 6, `token D menghapus data akun lain (sisa ${sisaABC}/6).`);
+    check(
+      (await scalar(`select count(*) from auth.users where id = $1`, [idD])) === 0,
+      'akun pemantau tidak terhapus oleh tokennya sendiri.',
+    );
+    ok('token hanya menghapus akunnya sendiri; akun lain tetap utuh');
+
     /* 4. Panggil Edge Function dengan JWT A. Body kosong; target tidak pernah
           berasal dari body. */
     const hapus = await request(`${apiBase}/delete-account`, {
