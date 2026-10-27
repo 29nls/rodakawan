@@ -341,8 +341,10 @@ bagian 🔒 Verifikasi berkas di halaman rilis. Dua perangkat berbeda vendor min
 | PD-16 | | | A, B | Laporan bahaya: buat, duplikat 50 m/10 menit, rate limit 5/10 menit, konfirmasi "masih ada", ubah/hapus dalam 15 menit, kedaluwarsa 24 jam | Perilaku sesuai aturan database dengan pesan yang dapat dipahami; tidak ada data ganda | | | **Blocked** |
 | PD-17 | | | A (host), B (pelapor) | Alur moderasi 8b di perangkat: laporkan konten, tinjau di `/moderation`, hapus/abaikan, jejak audit | Antrean, aksi, dan audit tampil benar di perangkat | | | **Blocked** |
 | PD-18 | | | A, B | Unggah avatar, foto kendaraan, logo klub; coba akses media akun lain (mis. lewat tautan yang dibagikan) | Unggah/ganti/hapus berfungsi; media orang lain tidak terbaca; signed URL mati setelah diganti | | | **Blocked** |
-| PD-19 | | | A | Hapus akun lewat tab Profil di perangkat (satu skenario dengan jaringan dipotus di tengah lalu dicoba lagi) | Tidak ada klaim sukses sebelum server selesai; hasil retensi sesuai ADR-077; retry aman | | | **Blocked** |
+| PD-19 | | | A | Hapus akun lewat tab Profil di perangkat (satu skenario dengan jaringan diputus di tengah lalu dicoba lagi) | Tidak ada klaim sukses sebelum server selesai; hasil retensi sesuai ADR-077; retry aman | | | **Blocked** |
 | PD-20 | | | semua | Ulangi PD-02…PD-05 dan PD-09 di perangkat vendor kedua | Hasil dicatat terpisah per perangkat; perbedaan vendor ditulis apa adanya | | | **Blocked** |
+| PD-21 | | | A, B, C | C bukan anggota perjalanan A/B: buka tautan perjalanan, coba baca lokasi/chat lewat UI dan rekaman jaringan | C tidak melihat baris/lokasi/chat, tidak menerima event realtime, dan tidak dapat mengirim pesan; pesan galat tidak membocorkan detail internal | | | **Blocked** |
+| PD-22 | | | A, B | Kirim chat berulang saat jaringan buruk lalu pulihkan; pantau publikasi lokasi setelah throttle sementara | Retry pesan tidak menggandakan; penolakan throttle lokasi hanya menunda, tidak mematikan sharing permanen; status layar jujur | | | **Blocked** |
 
 Dua perangkat lebih dulu (PD-01…PD-05, PD-09, PD-13…PD-15) sudah cukup untuk menyatakan pilot
 berfungsi; sisanya menaikkan keyakinan sebelum meluas. Selama ada satu baris Blocked yang relevan
@@ -375,7 +377,10 @@ Yang **sudah otomatis** (`npm test`, jaringan dimatikan; client Supabase diganti
 | `src/__tests__/ride-new.test.tsx` | Formulir buat/ubah perjalanan: render & label aksesibilitas, validasi judul/klub/jadwal, payload `createRide`/`updateRide`, mode ubah (hanya host, hanya `planned`), pesan galat, retry, dan pencegahan kiriman ganda. |
 | `src/components/ui/__tests__/*` | Perilaku dasar komponen yang dipakai form (tombol, field). |
 
-Hasil terakhir dijalankan (19 Oktober 2026, Node 24.18.1, npm 12.0.2, setelah `npm ci` dari
+> Hasil terbaru 27 Oktober 2026 ada di [`BETA_READINESS.md`](BETA_READINESS.md) §7b:
+> 48 suite / 525 test, `db:test` 12/12, dan `db:test:concurrency` lulus.
+
+Hasil historis 19 Oktober 2026 (Node 24.18.1, npm 12.0.2, setelah `npm ci` dari
 `package-lock.json`):
 `npm test -- --ci` → **35 suite, 386 test lulus** (20 Oktober 2026; termasuk suite perjalanan Milestone 3, 11 test komponen formulir perjalanan, 22 test lapisan peta, dan 2 test siklus task lokasi, 14 test kompresi foto, 18 test
 pembersihan objek yatim, dan 17 test foto profil: 12 API + 5 komponen layar); `npm run test:scripts`

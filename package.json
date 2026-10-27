@@ -19,6 +19,7 @@
     "deps:check": "node scripts/check-editor-ts.mjs && node scripts/check-expo-deps.mjs",
     "check:editor-ts": "node scripts/check-editor-ts.mjs",
     "db:test": "node --env-file-if-exists=.env.db scripts/db-test.mjs",
+    "db:test:concurrency": "node --env-file-if-exists=.env.db scripts/db-write-throttle-concurrency.mjs",
     "db:test:lint": "node scripts/check-test-uuid-literals.mjs",
     "storage:test": "node --env-file-if-exists=.env.local --env-file-if-exists=.env.db scripts/storage-test.mjs",
     "e2e:account-delete": "node --env-file-if-exists=.env.local --env-file-if-exists=.env.db scripts/account-deletion-e2e.mjs",

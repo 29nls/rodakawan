@@ -90,6 +90,7 @@ function buildDetails(overrides: Partial<RideDetails> = {}): RideDetails {
     role: 'host' as const,
     status: 'joined' as const,
     joined_at: '2026-10-19T00:00:00.000Z',
+    last_location_published_at: null,
     last_seen_at: null,
     sharing_location: false,
     created_at: '2026-10-19T00:00:00.000Z',

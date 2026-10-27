@@ -1,4 +1,10 @@
-import { getClubDetails, listClubMembers, listClubs, updateClub } from '@/features/clubs/api';
+import {
+  createClub,
+  getClubDetails,
+  listClubMembers,
+  listClubs,
+  updateClub,
+} from '@/features/clubs/api';
 import type { ClubMemberRow, ClubRow } from '@/lib/supabase/database.types';
 import { createQueryClient } from '@/test-support/fakeSupabase';
 
@@ -33,6 +39,32 @@ function buildMember(overrides: Partial<ClubMemberRow> = {}): ClubMemberRow {
     ...overrides,
   };
 }
+
+describe('createClub', () => {
+  it('memetakan throttle pembuatan klub tanpa menampilkan detail database', async () => {
+    const { client } = createQueryClient({ data: null });
+    const rpc = jest.fn(async () => ({
+      data: null,
+      error: { code: 'P0001', details: 'club_create_rate_limit', message: 'raw database' },
+    }));
+    (client as unknown as { rpc: jest.Mock }).rpc = rpc;
+
+    const result = await createClub(client, {
+      name: 'Klub Uji',
+      description: null,
+      visibility: 'private',
+      join_policy: 'approval',
+    });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe('rate_limited');
+      expect(result.error.retryable).toBe(true);
+      expect(result.error.message).toMatch(/10 klub baru per jam/);
+      expect(result.error.message).not.toMatch(/P0001|club_create_rate_limit/);
+    }
+  });
+});
 
 describe('listClubs', () => {
   it('hanya mengambil klub publik, terbaru lebih dulu', async () => {

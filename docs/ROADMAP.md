@@ -148,6 +148,10 @@ Status: **Implemented · Passed locally · Passed against dev backend** (13 Okto
       layar daftar permintaan, dan apakah follow ke profil publik juga perlu persetujuan.
 - [x] Rate limit permintaan follow di database — **Implemented** dan **Passed against dev backend**
       (10 follow/10 menit, migration `20261025013131_m5_rate_limits.sql`, diterapkan 25 Oktober 2026; `db:test` 10/10).
+- [x] Throttle klub/ride/publikasi lokasi — **Implemented** dan **Passed against dev backend**
+      (10 klub/jam, 10 ride/jam, lokasi minimum 2 detik; `20261026184430_m5_write_throttles.sql`),
+      termasuk serialisasi permintaan serentak lewat advisory lock
+      (`20261026191105_m5_write_throttle_serialization.sql`, `npm run db:test:concurrency`).
 - [ ] Penolakan permintaan follow dari akun yang diblokir (`user_blocks` hanya terlihat oleh pihak
       yang memblokir, jadi butuh helper tersendiri).
 - [ ] UI persetujuan follow (daftar permintaan masuk) — aturan database sudah ada, layarnya belum.

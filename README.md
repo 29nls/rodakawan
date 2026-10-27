@@ -50,7 +50,7 @@ Istilah status dipakai konsisten di seluruh dokumentasi:
 HP fisik. Status **Ya** pada kolom perangkat Milestone 2 berasal dari laporan pemilik aplikasi
 (owner-reported) bahwa build sudah dicoba di HP tanpa error yang teramati; tidak ada log, rekaman,
 atau tag rilis per kasus yang disertakan. Project Supabase development **sudah ada**
-sejak 13 Oktober 2026. Seluruh **25** migration sudah ada di repository dan **25** di antaranya sudah diterapkan ke project development (terakhir `20261025013131_m5_rate_limits.sql` pada 25 Oktober 2026), jadi `npx supabase migration list --linked` menunjukkan 25 lokal = 25 remote — diverifikasi ulang oleh `npm run beta:preflight` pada 25 Oktober 2026.
+sejak 13 Oktober 2026. Seluruh **28** migration sudah ada di repository dan **28/28** sudah diterapkan ke project development (terakhir `20261026195421_m5_write_throttle_function_parity.sql` pada 26 Oktober 2026), jadi `npx supabase migration list --linked` menunjukkan **28 lokal = 28 remote** — diverifikasi ulang pada 27 Oktober 2026. Throttle klub/ride/lokasi dari `20261026184430_m5_write_throttles.sql` dan serialisasi konkurensinya (`pg_advisory_xact_lock`) sudah aktif di development; migration paritas memastikan fungsi di development sama dengan repo.
 Uji RLS sudah lulus (ADR-035), dan lubang privasi follow serta integritas detail privat kendaraan
 sudah diperbaiki dengan uji allow/deny (ADR-039, ADR-040). Empat migration Milestone 4 —
 `20261020090000_hazard_reports_m4.sql`, `20261020100000_convoy_chat_m4.sql`,
@@ -325,6 +325,14 @@ pemeriksaan skema `app.json` yang butuh `exp.host` (DNS lingkungan ini, `ENOTFOU
 proyek. Angka yang lebih lama di tabel ini adalah hasil saat perintah itu dijalankan, bukan status
 terkini. Uji RLS terakhir yang tercatat di GitHub Actions adalah **Database RLS #22** (run
 `39850754772`, 8 berkas lulus) dan **CI #57** (run `39850755047`) pada `afe908e`; commit `afb133d` dan branch `fix/adr-078-hardening` sudah di-merge lewat PR #8 (`48d7a37`), tetapi run Database RLS-nya gagal karena migration ADR-078 belum diterapkan; run berikutnya dijalankan dari branch `fix/apply-adr-078-migration` setelah migration itu diterapkan.
+
+**Diperbarui 27 Oktober 2026 (branch `fix/beta-readiness-rate-limits`):** `npm test -- --ci`
+**48 suite / 525 test**; `npm run test:scripts` **94 suite / 395 test**; `npm run db:test`
+**12/12** berkas; `db:test:lint` **12 berkas uji / 28 migration**; `db:types:check` exit 0;
+`storage:test` **27 langkah**; `e2e:account-delete` **17 langkah**; `e2e:shared-ride`
+**24 pemeriksaan**; `export:android` exit 0. `db:test:concurrency` baru membuktikan dua
+`create_club`/`create_ride` serentak tidak melampaui kuota. `npm run doctor` tetap **Blocked**
+saja karena `EAI_AGAIN exp.host` (jaringan mesin, bukan temuan proyek).
 
 | Perintah               | Hasil                                                        |
 | ---------------------- | ------------------------------------------------------------ |
@@ -736,13 +744,11 @@ scripts/        # generate-assets.mjs, db-test.mjs (runner uji RLS), verify-apk.
                 # preview lama)
 docs/           # sumber kebenaran produk
 supabase/
-  migrations/   # dua puluh dua migration: dua berkas fondasi awal
+  migrations/   # dua puluh delapan migration: dua berkas fondasi awal
                 # (20261013022938_initial_schema.sql, 20261013023038_auth_profile_bootstrap.sql)
-                # + delapan belas migration aditif (privasi, klub, garasi, Storage, perjalanan M3,
-                # empat migration M4: hazard, chat konvoi, dashboard moderasi, filter blokir)
-                # + empat migration M5: anonimisasi awal, perbaikan Storage, pemisahan identitas
-                #   login + tombstone + purge (20261023004946_account_deletion_identity.sql), dan
-                #   lease/checkpoint reliabilitas (20261023120000_account_deletion_reliability.sql)
+                # + dua puluh enam migration aditif (privasi, klub, garasi, Storage, perjalanan M3,
+                #   empat migration M4, dan hardening M5 termasuk hapus akun, rate limit, serta
+                #   throttle jalur tulis yang diserialisasi per pengguna)
   tests/        # delapan berkas uji RLS/RPC; rls_profiles_test.sql (dua akun + kontrol positif),
                 # rls_policy_guard_test.sql (pagar policy wadah), rls_rides_test.sql, empat
                 # berkas M4 (hazard, chat, moderasi, filter blokir), dan rls_account_delete_test.sql

@@ -53,7 +53,7 @@ DATABASE_URL=postgresql://postgres.<ref-beta>:<password>@aws-0-<region>.pooler.s
 
 ## 2. Terapkan migration ke beta
 
-Seluruh migration di `supabase/migrations/` (25 berkas saat penulisan ini — jumlah pastinya
+Seluruh migration di `supabase/migrations/` (28 berkas saat penulisan ini — jumlah pastinya
 `ls supabase/migrations/*.sql | Measure-Object`) diterapkan ke database **kosong** beta:
 
 ```powershell

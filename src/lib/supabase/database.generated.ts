@@ -468,14 +468,14 @@ isOneToOne: false
                   ]
                 },"ride_members": {
                   Row: {
-                    "created_at": string,"joined_at": string | null,"last_seen_at": string | null,"ride_id": string,"role": string,"sharing_location": boolean,"status": string,"updated_at": string,"user_id": string
+                    "created_at": string,"joined_at": string | null,"last_location_published_at": string | null,"last_seen_at": string | null,"ride_id": string,"role": string,"sharing_location": boolean,"status": string,"updated_at": string,"user_id": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "created_at"?: string,"joined_at"?: string | null,"last_seen_at"?: string | null,"ride_id": string,"role"?: string,"sharing_location"?: boolean,"status"?: string,"updated_at"?: string,"user_id": string
+                    "created_at"?: string,"joined_at"?: string | null,"last_location_published_at"?: string | null,"last_seen_at"?: string | null,"ride_id": string,"role"?: string,"sharing_location"?: boolean,"status"?: string,"updated_at"?: string,"user_id": string
                   }
                   Update: {
-                    "created_at"?: string,"joined_at"?: string | null,"last_seen_at"?: string | null,"ride_id"?: string,"role"?: string,"sharing_location"?: boolean,"status"?: string,"updated_at"?: string,"user_id"?: string
+                    "created_at"?: string,"joined_at"?: string | null,"last_location_published_at"?: string | null,"last_seen_at"?: string | null,"ride_id"?: string,"role"?: string,"sharing_location"?: boolean,"status"?: string,"updated_at"?: string,"user_id"?: string
                   }
                   Relationships: [
                     {
