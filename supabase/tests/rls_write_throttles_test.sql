@@ -1,7 +1,7 @@
 -- db:test notice: UJI RATE LIMIT TULIS M5 LULUS
 -- ============================================================================
 -- Uji throttle jalur tulis AUD-14 lanjutan
--- (`20261026184430_m5_write_throttles.sql`).
+-- (`20261026184430_m5_write_throttles.sql` dan migration update_ride).
 -- ============================================================================
 -- Yang dibuktikan:
 --   1. Pembuatan klub: 10 klub pertama diterima, ke-11 ditolak P0001 dengan
@@ -14,7 +14,9 @@
 --   4. Reset throttle saat consent/keanggotaan berubah: mematikan berbagi
 --      menghapus lokasi terakhir dan mengosongkan last_location_published_at,
 --      sehingga menyalakan berbagi lagi dapat langsung memublikasikan posisi.
---   5. Pembersihan saat peserta keluar dan perjalanan selesai tetap dibuktikan
+--   5. Update metadata perjalanan dibatasi 20 kali per 10 menit per host;
+--      percobaan ke-21 ditolak dan tidak mengubah ride, window pulih setelah batas.
+--   6. Pembersihan saat peserta keluar dan perjalanan selesai tetap dibuktikan
 --      oleh `rls_rides_test.sql` (lokasi dan consent).
 --
 -- Serialisasi permintaan serentak TIDAK dapat dibuktikan dalam satu transaksi
@@ -39,6 +41,33 @@ begin
        and column_name = 'last_location_published_at'
   ) then
     raise exception 'UJI GAGAL (migration throttle belum diterapkan): kolom public.ride_members.last_location_published_at belum ada. Terapkan supabase/migrations/20261026184430_m5_write_throttles.sql lebih dulu.';
+  end if;
+
+  if to_regclass('public.ride_update_throttle_windows') is null
+     or to_regprocedure('public.enforce_ride_update_rate_limit()') is null
+     or not exists (
+       select 1
+         from pg_trigger t
+         join pg_class c on c.oid = t.tgrelid
+         join pg_namespace n on n.oid = c.relnamespace
+        where n.nspname = 'public'
+          and c.relname = 'rides'
+          and t.tgname = 'rides_update_rate_limit'
+          and not t.tgisinternal
+     ) then
+    raise exception 'UJI GAGAL (migration update_ride throttle belum diterapkan): objek throttle perjalanan belum ada.';
+  end if;
+
+  if not exists (
+    select 1
+      from pg_constraint c
+     where c.conrelid = 'public.ride_update_throttle_windows'::regclass
+       and c.conname = 'ride_update_throttle_windows_user_id_fkey'
+       and c.contype = 'f'
+       and c.confdeltype = 'c'
+       and c.convalidated
+  ) then
+    raise exception 'UJI GAGAL (migration pembersihan throttle belum diterapkan): penghapusan profil tidak membersihkan jendela throttle.';
   end if;
 end;
 $$;
@@ -233,7 +262,89 @@ begin
 end;
 $$;
 
--- 6. Lokasi: publikasi pertama diterima, pengulangan terlalu cepat ditolak.
+-- 6. Update metadata: 20 perubahan diterima, ke-21 ditolak tanpa mengubah ride.
+set local request.jwt.claims = '{"sub":"c8000000-0000-4000-8000-000000000001","role":"authenticated"}';
+
+do $$
+declare
+  v_ride public.rides;
+  v_before_title text;
+  v_state text := null;
+  v_detail text := null;
+  v_denied boolean := false;
+  v_i int;
+begin
+  select id into v_ride.id from public.uji_m5_throttle_konteks where nama = 'ride_1';
+
+  for v_i in 1..20 loop
+    v_ride := public.update_ride(
+      v_ride.id,
+      'Ride edit ' || v_i::text,
+      null,
+      now() + interval '2 hours',
+      'Titik kumpul',
+      'Tujuan'
+    );
+  end loop;
+  v_before_title := v_ride.title;
+
+  -- Tandai transaksi primer selesai agar counter update-19 tersimpan; trigger
+  -- memakai lock transaksi sehingga seluruh pemanggilan ini diserialisasi.
+  -- Seluruh tes tetap dalam transaksi luar yang akan di-ROLLBACK.
+  begin
+    perform public.update_ride(
+      v_ride.id,
+      'Ride edit ke-21 ditolak',
+      null,
+      now() + interval '2 hours',
+      'Titik kumpul',
+      'Tujuan'
+    );
+  exception when others then
+    v_denied := true;
+    get stacked diagnostics v_state = RETURNED_SQLSTATE, v_detail = PG_EXCEPTION_DETAIL;
+  end;
+
+  if not v_denied or v_state is distinct from 'P0001'
+     or v_detail is distinct from 'ride_update_rate_limit' then
+    raise exception 'UJI GAGAL: perubahan perjalanan ke-21 tidak ditolak dengan tag throttle yang benar (state=%, detail=%)', v_state, v_detail;
+  end if;
+
+  select title into v_before_title from public.rides where id = v_ride.id;
+  if v_before_title <> v_ride.title then
+    raise exception 'UJI GAGAL: update_ride yang ditolak tetap mengubah judul';
+  end if;
+end;
+$$;
+
+-- Majukan awal window sebagai owner agar dapat membuktikan pemulihan tanpa jeda.
+reset role;
+do $$
+begin
+  update public.ride_update_throttle_windows
+     set window_started_at = now() - interval '11 minutes'
+   where ride_id = (select id from public.uji_m5_throttle_konteks where nama = 'ride_1')
+     and user_id = 'c8000000-0000-4000-8000-000000000001';
+end;
+$$;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"c8000000-0000-4000-8000-000000000001","role":"authenticated"}';
+do $$
+declare
+  v_ride_id uuid := (select id from public.uji_m5_throttle_konteks where nama = 'ride_1');
+  v_ride public.rides;
+begin
+  v_ride := public.update_ride(v_ride_id, 'Ride edit pulih', null, now() + interval '3 hours', 'Titik kumpul', 'Tujuan');
+  if v_ride.title <> 'Ride edit pulih' then
+    raise exception 'UJI GAGAL: update_ride tidak pulih setelah window berakhir';
+  end if;
+end;
+$$;
+
+-- Buktikan update konkurensial yang berhadapan dengan batas 20/10 menit
+-- di runner dua-koneksi `npm run db:test:concurrency`.
+
+-- 7. Lokasi: publikasi pertama diterima, pengulangan terlalu cepat ditolak.
 set local request.jwt.claims = '{"sub":"c8000000-0000-4000-8000-000000000001","role":"authenticated"}';
 
 do $$
@@ -281,7 +392,7 @@ begin
 end;
 $$;
 
--- 7. Setelah jeda minimum, publikasi berikutnya diterima. Timestamp dimajukan
+-- 8. Setelah jeda minimum, publikasi berikutnya diterima. Timestamp dimajukan
 --    sebagai owner database (bukan lewat REST) supaya uji tidak memperlambat
 --    suite dengan pg_sleep.
 reset role;
@@ -317,7 +428,7 @@ begin
 end;
 $$;
 
--- 8. Opt-out mereset throttle: lokasi terakhir hilang, lalu sharing yang
+-- 9. Opt-out mereset throttle: lokasi terakhir hilang, lalu sharing yang
 --    dinyalakan lagi dapat langsung mengirim posisi tanpa menunggu jendela
 --    publikasi sebelumnya.
 do $$
@@ -356,7 +467,7 @@ $$;
 
 do $$
 begin
-  raise notice 'UJI RATE LIMIT TULIS M5 LULUS: klub/ride/publikasi lokasi dibatasi per pengguna, penolakan tidak menulis data, dan opt-out mereset throttle.';
+  raise notice 'UJI RATE LIMIT TULIS M5 LULUS: klub/ride/update_ride/publikasi lokasi dibatasi per pengguna, penolakan tidak menulis data, window pulih, dan opt-out mereset throttle.';
 end;
 $$;
 

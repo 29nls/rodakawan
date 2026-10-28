@@ -30,6 +30,57 @@ export function isDevProjectUrl(rawUrl) {
   return projectRefFromUrl(rawUrl) === DEV_PROJECT_REF;
 }
 
+/** Ref project dari nama pengguna koneksi pooler atau host DB langsung Supabase. */
+export function projectRefFromDatabaseUrl(rawUrl) {
+  if (typeof rawUrl !== 'string' || rawUrl.length === 0) return null;
+
+  try {
+    const url = new URL(rawUrl);
+    if (url.protocol !== 'postgres:' && url.protocol !== 'postgresql:') return null;
+
+    const hostRef = /^db\.([a-z0-9]+)\.supabase\.co$/.exec(url.hostname);
+    if (hostRef) return hostRef[1];
+
+    const isSupabasePooler = /^[a-z0-9]+(?:-[a-z0-9]+)*\.pooler\.supabase\.com$/.test(url.hostname);
+    if (!isSupabasePooler) return null;
+
+    const usernameRef = /^postgres\.([a-z0-9]+)$/.exec(decodeURIComponent(url.username));
+    return usernameRef?.[1] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** Pastikan URL konfigurasi aplikasi menunjuk ref beta eksplisit, bukan development. */
+export function validateBetaProjectUrl(supabaseUrl, expectedProjectRef) {
+  const reasons = [];
+  const expected = typeof expectedProjectRef === 'string' ? expectedProjectRef.trim() : '';
+  const actual = projectRefFromUrl(supabaseUrl);
+
+  if (!/^[a-z0-9]+$/.test(expected)) reasons.push('expected_project_ref_missing_or_invalid');
+  if (expected === DEV_PROJECT_REF) reasons.push('development_project_ref_forbidden');
+  if (!actual) reasons.push('supabase_url_invalid');
+  else if (actual === DEV_PROJECT_REF) reasons.push('development_project_forbidden');
+  if (actual && expected && actual !== expected) reasons.push('supabase_project_ref_mismatch');
+
+  return { ok: reasons.length === 0, reasons, projectRef: actual };
+}
+
+/** Pastikan URL API dan koneksi database mengarah ke project beta yang sama. */
+export function evaluateBetaTarget({ supabaseUrl, databaseUrl, expectedProjectRef }) {
+  const api = validateBetaProjectUrl(supabaseUrl, expectedProjectRef);
+  const reasons = [...api.reasons];
+  const databaseRef = projectRefFromDatabaseUrl(databaseUrl);
+
+  if (!databaseRef) reasons.push('database_project_ref_unverifiable');
+  else if (databaseRef === DEV_PROJECT_REF) reasons.push('development_database_forbidden');
+  else if (api.projectRef && databaseRef !== api.projectRef) {
+    reasons.push('database_project_ref_mismatch');
+  }
+
+  return { ok: reasons.length === 0, reasons, projectRef: api.projectRef };
+}
+
 /**
  * Ganti nilai sensitif dengan placeholder sebelum dicetak. Dipakai untuk pesan
  * galat dari SDK/database yang kadang memuat URL atau token.

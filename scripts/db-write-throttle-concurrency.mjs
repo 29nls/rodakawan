@@ -6,10 +6,11 @@
  * - Berkas SQL `supabase/tests/*.sql` berjalan dalam SATU transaksi, sehingga
  *   dua permintaan tidak mungkin benar-benar bersamaan. Uji ini memakai dua
  *   koneksi terpisah dan dua transaksi yang benar-benar paralel.
- * - Yang dibuktikan: dua `create_club` (dan dua `create_ride`) serentak dari
- *   akun yang sama tidak dapat melampaui kuota 10/jam. Permintaan kedua
- *   menunggu advisory lock trigger, lalu ditolak `P0001` dengan detail yang
- *   dipetakan klien.
+ * - Yang dibuktikan: dua `create_club` dan `create_ride` serentak tidak dapat
+ *   melampaui kuota 10/jam, serta dua `update_ride` di batas 20/10 menit
+ *   terserialisasi. RPC create menunggu advisory lock trigger; `update_ride`
+ *   mengunci baris ride lebih dahulu. Pemanggilan kedua ditolak `P0001`
+ *   dengan detail yang dipetakan klien.
  *
  * Keamanan:
  * - Hanya menerima DATABASE_URL project DEVELOPMENT
@@ -135,6 +136,14 @@ async function seedRideContext(admin) {
     [clubId, USER_ID, RIDE_TITLE_PREFIX],
   );
 
+  await admin.query(
+    `insert into public.ride_members (ride_id, user_id, role, status, joined_at)
+     select id, $1, 'host', 'joined', now()
+       from public.rides
+      where created_by = $1`,
+    [USER_ID],
+  );
+
   return clubId;
 }
 
@@ -154,6 +163,9 @@ async function cleanup(admin) {
       where ride_id in (select id from public.rides where created_by = $1)`,
     [USER_ID],
   );
+  await admin.query('delete from public.ride_update_throttle_windows where user_id = $1', [
+    USER_ID,
+  ]);
   await admin.query('delete from public.rides where created_by = $1', [USER_ID]);
   await admin.query('delete from public.clubs where created_by = $1', [USER_ID]);
   // Trigger auth_users_purge_profile menghapus profil; jangan hapus manual agar
@@ -166,7 +178,11 @@ async function cleanup(admin) {
  * pemanggil kedua terbukti menunggu, lalu commit. Pemanggil kedua harus
  * ditolak dengan P0001 + detail yang diharapkan.
  */
-async function proveSerialization(admin, config, { label, sql, params, expectedDetail }) {
+async function proveSerialization(
+  admin,
+  config,
+  { label, sql, params, expectedDetail, expectedWaitEvent = 'advisory' },
+) {
   const first = await connect(config);
   const second = await connect(config);
   let secondSettled = false;
@@ -205,7 +221,7 @@ async function proveSerialization(admin, config, { label, sql, params, expectedD
       if (
         activity?.state === 'active' &&
         activity?.wait_event_type === 'Lock' &&
-        activity?.wait_event === 'advisory'
+        activity?.wait_event === expectedWaitEvent
       ) {
         blocked = true;
         break;
@@ -215,7 +231,7 @@ async function proveSerialization(admin, config, { label, sql, params, expectedD
 
     if (!blocked) {
       throw new Error(
-        `${label}: koneksi kedua tidak teramati menunggu advisory lock (activity=${JSON.stringify(lastActivity)}) — serialisasi tidak terbukti`,
+        `${label}: koneksi kedua tidak teramati menunggu lock ${expectedWaitEvent} (activity=${JSON.stringify(lastActivity)}) — serialisasi tidak terbukti`,
       );
     }
 
@@ -289,8 +305,47 @@ async function main() {
       throw new Error(`jumlah ride setelah uji ${rides.rows[0].total}, seharusnya 10`);
     }
 
+    const { rows: rideRows } = await admin.query(
+      'select id from public.rides where created_by = $1 order by created_at limit 1',
+      [USER_ID],
+    );
+    const rideId = rideRows[0]?.id;
+    if (!rideId) throw new Error('ride uji untuk throttle update tidak terbentuk');
+
+    const primer = await connect(config);
+    try {
+      await beginAs(primer, USER_ID);
+      for (let index = 1; index < 20; index += 1) {
+        await primer.query(
+          `select public.update_ride(
+             $1, $2, null, now() + interval '2 hours', 'Titik kumpul', 'Tujuan'
+           )`,
+          [rideId, `Uji edit metadata ${index}`],
+        );
+      }
+      await primer.query('commit');
+    } finally {
+      await primer.query('rollback').catch(() => {});
+      await primer.end().catch(() => {});
+    }
+
+    await proveSerialization(admin, config, {
+      label: 'update_ride',
+      sql: `select public.update_ride(
+        $1, $2, null, now() + interval '2 hours', 'Titik kumpul', 'Tujuan'
+      )`,
+      params: [
+        [rideId, 'Uji edit metadata ke-20'],
+        [rideId, 'Uji edit metadata ke-21'],
+      ],
+      expectedDetail: 'ride_update_rate_limit',
+      // update_ride mengunci baris rides sebelum trigger berjalan, sehingga
+      // koneksi kedua tertahan pada row lock PostgreSQL (transactionid).
+      expectedWaitEvent: 'transactionid',
+    });
+
     console.log(
-      '[uji-konkurensi] LULUS: dua permintaan serentak tidak dapat melampaui kuota 10/jam untuk klub dan ride.',
+      '[uji-konkurensi] LULUS: permintaan serentak tidak melewati kuota klub/perjalanan 10 per jam atau update_ride 20 per 10 menit.',
     );
   } finally {
     if (cleanupNeeded) {

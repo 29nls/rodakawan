@@ -25,8 +25,9 @@
  *   npm run beta:preflight
  *   node --env-file-if-exists=.env.local --env-file-if-exists=.env.db scripts/beta-preflight.mjs
  *
- * Environment: EXPO_PUBLIC_SUPABASE_URL (wajib), DATABASE_URL atau
- * SUPABASE_DB_URL (wajib), EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY (opsional,
+ * Environment: BETA_SUPABASE_PROJECT_REF (wajib), EXPO_PUBLIC_SUPABASE_URL
+ * (wajib), DATABASE_URL atau SUPABASE_DB_URL (wajib),
+ * EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY (opsional,
  * untuk probe penolakan kedua yang menyertakan apikey).
  *
  * Keluaran: daftar LULUS/GAGAL per butir. Tidak pernah mencetak JWT, kunci,
@@ -48,7 +49,8 @@ import {
   migrationVersionFromFilename,
   summarizeMigrationSync,
 } from './lib/beta-preflight.mjs';
-import { describeDatabaseTarget, projectRefFromUrl, redactSensitive } from './lib/shared-ride.mjs';
+import { evaluateBetaTarget } from './lib/shared-ride.mjs';
+import { projectRefFromUrl, redactSensitive } from './lib/shared-ride.mjs';
 
 const MIGRATIONS_DIR = fileURLToPath(new URL('../supabase/migrations', import.meta.url));
 const HTTP_TIMEOUT_MS = 15_000;
@@ -60,8 +62,9 @@ Pemakaian:
   node --env-file-if-exists=.env.local --env-file-if-exists=.env.db scripts/beta-preflight.mjs
 
 Environment:
-  EXPO_PUBLIC_SUPABASE_URL            URL project target (wajib)
-  DATABASE_URL atau SUPABASE_DB_URL   koneksi database project target (wajib)
+  BETA_SUPABASE_PROJECT_REF           ref project beta yang disetujui (wajib)
+  EXPO_PUBLIC_SUPABASE_URL            URL project beta (wajib)
+  DATABASE_URL atau SUPABASE_DB_URL   koneksi database project beta (wajib)
   EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY  opsional; dipakai probe penolakan Edge Function
 
 Skrip ini tidak pernah menulis data. Keluaran 0 = semua lulus, 1 = ada
@@ -139,7 +142,9 @@ async function main() {
   const publishableKey = process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? '';
   const connectionString = process.env.DATABASE_URL ?? process.env.SUPABASE_DB_URL;
 
+  const expectedProjectRef = process.env.BETA_SUPABASE_PROJECT_REF ?? '';
   const kurang = [];
+  if (!expectedProjectRef) kurang.push('BETA_SUPABASE_PROJECT_REF');
   if (!supabaseUrl) kurang.push('EXPO_PUBLIC_SUPABASE_URL');
   if (!connectionString) kurang.push('DATABASE_URL');
 
@@ -157,8 +162,20 @@ async function main() {
     return 2;
   }
 
-  console.log(`[beta:preflight] Project : ${projectRef}`);
-  console.log(`[beta:preflight] Database: ${describeDatabaseTarget(connectionString)}`);
+  const target = evaluateBetaTarget({
+    supabaseUrl,
+    databaseUrl: connectionString,
+    expectedProjectRef,
+  });
+  if (!target.ok) {
+    console.error(
+      `[beta:preflight] Target ditolak (${target.reasons.join(', ')}); gunakan URL dan database beta dengan ref yang sama, bukan project development.`,
+    );
+    return 2;
+  }
+
+  console.log(`[beta:preflight] Project : ${projectRef} (beta; ref API dan database cocok)`);
+  console.log('[beta:preflight] Database: ref project terverifikasi; endpoint tidak ditampilkan');
   console.log('[beta:preflight] Mode    : hanya-baca (SELECT + probe penolakan tanpa otorisasi)');
 
   const client = new pg.Client({

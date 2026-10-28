@@ -15,7 +15,13 @@ import os from 'node:os';
 import path from 'node:path';
 import { describe, it } from 'node:test';
 
-import { APP_ENV_VARS, appEnvFile, collectAppEnv, writtenAppEnv } from '../write-app-env.mjs';
+import {
+  APP_ENV_VARS,
+  appEnvFile,
+  collectAppEnv,
+  collectBuildAppEnv,
+  writtenAppEnv,
+} from '../write-app-env.mjs';
 import { runScript } from './support/git-repo.mjs';
 
 const LENGKAP = {
@@ -95,6 +101,34 @@ describe('writtenAppEnv', () => {
 
   it('menulis dua variabel bila peta custom tidak diisi', () => {
     assert.equal(writtenAppEnv(tanpaPeta()).length, 2);
+  });
+});
+
+describe('collectBuildAppEnv — beta guard', () => {
+  it('memerlukan ref beta eksplisit yang sama dengan URL dan menolak development', () => {
+    assert.deepEqual(collectBuildAppEnv(LENGKAP, 'beta'), null);
+    assert.deepEqual(
+      collectBuildAppEnv(
+        {
+          ...LENGKAP,
+          EXPO_PUBLIC_SUPABASE_URL: 'https://beta123.supabase.co',
+          BETA_SUPABASE_PROJECT_REF: 'beta123',
+        },
+        'beta',
+      ),
+      { ...LENGKAP, EXPO_PUBLIC_SUPABASE_URL: 'https://beta123.supabase.co' },
+    );
+    assert.deepEqual(
+      collectBuildAppEnv(
+        {
+          ...LENGKAP,
+          EXPO_PUBLIC_SUPABASE_URL: 'https://xvmcpfkkveeaevfcvfug.supabase.co',
+          BETA_SUPABASE_PROJECT_REF: 'xvmcpfkkveeaevfcvfug',
+        },
+        'beta',
+      ),
+      null,
+    );
   });
 });
 
@@ -222,6 +256,48 @@ describe('CLI write-app-env.mjs', () => {
     assert.equal(isi.includes(LENGKAP.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY), true);
     // Map style url dengan spasi tidak ikut ditulis (filter di collectAppEnv)
     assert.equal(isi.includes('EXPO_PUBLIC_MAP_STYLE_URL'), false);
+  });
+
+  it('menolak ref development atau ref project yang tidak cocok pada target beta', (t) => {
+    const dir = dirSementara(t);
+    const dev = runScript(dir, 'write-app-env.mjs', ['--environment', 'beta'], {
+      env: {
+        ...LENGKAP,
+        EXPO_PUBLIC_SUPABASE_URL: 'https://xvmcpfkkveeaevfcvfug.supabase.co',
+        BETA_SUPABASE_PROJECT_REF: 'xvmcpfkkveeaevfcvfug',
+      },
+    });
+    const mismatch = runScript(dir, 'write-app-env.mjs', ['--environment', 'beta'], {
+      env: { ...LENGKAP, BETA_SUPABASE_PROJECT_REF: 'other-project' },
+    });
+
+    for (const hasil of [dev, mismatch]) {
+      assert.equal(hasil.code, 1);
+      assert.match(hasil.stderr, /Target beta tidak valid/);
+      assert.equal(fs.existsSync(path.join(dir, '.env.local')), false);
+    }
+  });
+
+  it('menerima ref beta eksplisit yang cocok tanpa mencetak nilainya', (t) => {
+    const dir = dirSementara(t);
+    const betaEnv = {
+      ...LENGKAP,
+      EXPO_PUBLIC_SUPABASE_URL: 'https://beta123.supabase.co',
+      BETA_SUPABASE_PROJECT_REF: 'beta123',
+    };
+    const hasil = runScript(dir, 'write-app-env.mjs', ['--environment', 'beta'], {
+      env: betaEnv,
+    });
+
+    assert.equal(hasil.code, 0, hasil.stderr);
+    assert.equal(
+      fs
+        .readFileSync(path.join(dir, '.env.local'), 'utf8')
+        .includes(betaEnv.EXPO_PUBLIC_SUPABASE_URL),
+      true,
+    );
+    assert.equal(hasil.stdout.includes(betaEnv.EXPO_PUBLIC_SUPABASE_URL), false);
+    assert.equal(hasil.stderr.includes(betaEnv.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY), false);
   });
 
   it('menghormati --out', (t) => {

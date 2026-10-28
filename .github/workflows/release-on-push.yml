@@ -86,6 +86,14 @@ on:
         description: 'SHA, nama branch, atau tag commit yang dirilis (kosongkan untuk commit tempat workflow ini dijalankan).'
         required: false
         type: string
+      environment:
+        description: 'Environment target build.'
+        required: true
+        default: development
+        type: choice
+        options:
+          - development
+          - beta
 
 # Grup global (bukan per-ref) supaya dua build tidak berjalan bersamaan —
 # sama seperti android-release.yml. Dispatch manual masuk ke grup yang sama,
@@ -225,6 +233,7 @@ jobs:
 
   build-apk:
     name: Build APK (Gradle lokal)
+    environment: ${{ inputs.environment || 'development' }}
     needs: plan
     # Seluruh syarat "boleh build atau tidak" sudah diperiksa job `plan` (pemicu yang
     # sah, commit yang sudah lulus CI, dan perubahan yang memang perlu dirilis).
@@ -291,12 +300,57 @@ jobs:
       # tampil dengan banner "konfigurasi belum tersedia" dan tidak menyentuh
       # backend. Karena itu variabelnya diperiksa lebih dulu, sebelum menit build
       # dipakai.
-      - name: Tulis konfigurasi publik aplikasi (EXPO_PUBLIC_*)
+      - name: Tulis konfigurasi publik development (EXPO_PUBLIC_*)
+        if: inputs.environment != 'beta'
         env:
           EXPO_PUBLIC_SUPABASE_URL: ${{ vars.EXPO_PUBLIC_SUPABASE_URL }}
           EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ vars.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
           EXPO_PUBLIC_MAP_STYLE_URL: ${{ vars.EXPO_PUBLIC_MAP_STYLE_URL }}
-        run: node scripts/write-app-env.mjs
+        run: node scripts/write-app-env.mjs --environment development --out .env.local
+
+      # Nama variables beta berbeda dari variables repository development. Karena
+      # GitHub mewariskan variables tingkat repository ke job environment, nama
+      # khusus ini membuat konfigurasi beta tidak mengambil fallback development.
+      - name: Tulis konfigurasi publik beta (EXPO_PUBLIC_*)
+        if: inputs.environment == 'beta'
+        env:
+          EXPO_PUBLIC_SUPABASE_URL: ${{ vars.BETA_SUPABASE_URL }}
+          EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ vars.BETA_SUPABASE_PUBLISHABLE_KEY }}
+          EXPO_PUBLIC_MAP_STYLE_URL: ${{ vars.BETA_MAP_STYLE_URL }}
+          BETA_SUPABASE_PROJECT_REF: ${{ vars.BETA_SUPABASE_PROJECT_REF }}
+        run: node scripts/write-app-env.mjs --environment beta --out .env.local
+
+      - name: Tolak project development pada target beta
+        if: inputs.environment == 'beta'
+        env:
+          DATABASE_URL: ${{ secrets.BETA_SUPABASE_DATABASE_URL }}
+          EXPO_PUBLIC_SUPABASE_URL: ${{ vars.BETA_SUPABASE_URL }}
+          BETA_SUPABASE_PROJECT_REF: ${{ vars.BETA_SUPABASE_PROJECT_REF }}
+        run: |
+          node --input-type=module <<'NODE'
+          import process from 'node:process';
+          import { evaluateBetaTarget } from './scripts/lib/shared-ride.mjs';
+
+          const target = evaluateBetaTarget({
+            supabaseUrl: process.env.EXPO_PUBLIC_SUPABASE_URL,
+            databaseUrl: process.env.DATABASE_URL,
+            expectedProjectRef: process.env.BETA_SUPABASE_PROJECT_REF,
+          });
+          if (!target.ok) {
+            console.error(`::error::Target beta ditolak (${target.reasons.join(', ')}). Periksa GitHub Environment beta tanpa mencetak nilainya.`);
+            process.exit(1);
+          }
+          console.log('Target beta dan database cocok; nilai konfigurasi tidak dicetak.');
+          NODE
+
+      - name: Jalankan beta preflight hanya-baca
+        if: inputs.environment == 'beta'
+        env:
+          DATABASE_URL: ${{ secrets.BETA_SUPABASE_DATABASE_URL }}
+          BETA_SUPABASE_PROJECT_REF: ${{ vars.BETA_SUPABASE_PROJECT_REF }}
+          EXPO_PUBLIC_SUPABASE_URL: ${{ vars.BETA_SUPABASE_URL }}
+          EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ vars.BETA_SUPABASE_PUBLISHABLE_KEY }}
+        run: npm run beta:preflight
 
       # Gradle mengunduh NDK yang dipin proyek (RN 0.86 memakai 27.1.x, sedangkan
       # image runner menyediakan versi lain) dan CMake untuk modul native seperti
@@ -413,8 +467,8 @@ jobs:
 
   smoke-test:
     name: Uji nyala APK di emulator
-    # Berjalan sebelum `release`: pratinjau ini yang dipasang manusia dari halaman
-    # Releases, jadi APK yang crash saat dibuka tidak boleh sempat terbit.
+    # Wajib untuk preview maupun beta sebelum artefak didistribusikan. Uji ini
+    # membuktikan install/launch di emulator saja, bukan alur UI lengkap.
     # Bila `plan` memutuskan tidak perlu build, job ini ikut dilewati (rantai
     # `needs`), sehingga push dokumentasi tidak memakai emulator sama sekali.
     needs: [plan, build-apk]
@@ -507,6 +561,9 @@ jobs:
 
   release:
     name: Tag dan GitHub Release
+    # Build beta tertutup hanya menghasilkan Actions artifact; jangan membuat
+    # tag atau menerbitkan APK beta sebagai GitHub Release.
+    if: inputs.environment != 'beta'
     # `plan` ikut disebut karena SHA-nya diambil dari sana; `build-apk` sudah
     # bergantung pada `plan`, jadi urutannya tidak berubah.
     needs: [plan, build-apk, smoke-test]
@@ -650,6 +707,7 @@ jobs:
 
   prune:
     name: Rapikan rilis preview lama
+    if: inputs.environment != 'beta'
     # Berjalan setelah rilisnya ada; `plan`, `build-apk`, dan `smoke-test` sudah
     # terlewati lewat `release`, dan bila `plan` memutuskan tidak perlu build, job
     # ini ikut dilewati (rantai `needs`). Pemangkasan tidak menghapus riwayat:
@@ -696,6 +754,7 @@ jobs:
 
   changelog:
     name: Catat rilis di CHANGELOG.md
+    if: inputs.environment != 'beta'
     # Setelah release GitHub-nya benar-benar ada: CHANGELOG.md mencatat rilis yang
     # sudah terbit, bukan percobaan yang gagal di tengah jalan.
     needs: [plan, release]

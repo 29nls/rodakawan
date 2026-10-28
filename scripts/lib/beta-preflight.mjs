@@ -5,11 +5,15 @@
  * diuji `node:test` tanpa project Supabase. Aturan yang dijaga:
  * - perbandingan migration memakai set versi, bukan hanya jumlah;
  * - penilaian RLS/bucket/settings tidak pernah memuat secret;
+ * - target preflight wajib URL API dan database project beta yang sama, dan
+ *   menolak project development sebelum membuka koneksi atau mengirim probe;
  * - surel uji dikenali dari domain `contoh.test` yang dipakai seluruh skrip uji.
  */
 
 /** Domain khusus akun uji; surel pengguna nyata tidak memakainya. */
 export const TEST_EMAIL_DOMAIN = 'contoh.test';
+
+export { evaluateBetaTarget } from './shared-ride.mjs';
 
 /** Bucket yang wajib ada dan privat sebelum beta dibuka. */
 export const REQUIRED_BUCKETS = ['avatars', 'vehicle-photos', 'club-logos'];

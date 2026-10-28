@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
+import { projectRefFromDatabaseUrl } from '../lib/shared-ride.mjs';
 import {
   evaluateAuthSettings,
+  evaluateBetaTarget,
   evaluateBuckets,
   evaluateFunctionAuth,
   evaluateRls,
@@ -10,6 +12,73 @@ import {
   migrationVersionFromFilename,
   summarizeMigrationSync,
 } from '../lib/beta-preflight.mjs';
+
+describe('projectRefFromDatabaseUrl', () => {
+  it('menerima ref hanya dari host Supabase langsung atau pooler yang valid', () => {
+    assert.equal(
+      projectRefFromDatabaseUrl(
+        'postgresql://postgres.beta123:password@aws-0-ap-southeast-1.pooler.supabase.com:5432/postgres',
+      ),
+      'beta123',
+    );
+    assert.equal(
+      projectRefFromDatabaseUrl('postgres://user:password@db.beta123.supabase.co/postgres'),
+      'beta123',
+    );
+    assert.equal(
+      projectRefFromDatabaseUrl('postgresql://postgres.beta123:password@attacker.example/postgres'),
+      null,
+    );
+    assert.equal(
+      projectRefFromDatabaseUrl(
+        'https://postgres.beta123@aws-0-region.pooler.supabase.com/postgres',
+      ),
+      null,
+    );
+  });
+});
+
+describe('evaluateBetaTarget', () => {
+  const supabaseUrl = 'https://beta123.supabase.co';
+  const databaseUrl =
+    'postgresql://postgres.beta123:password@aws-0-region.pooler.supabase.com:5432/postgres';
+
+  it('menerima URL API dan database dengan ref beta yang cocok dan eksplisit', () => {
+    assert.deepEqual(
+      evaluateBetaTarget({ supabaseUrl, databaseUrl, expectedProjectRef: 'beta123' }),
+      { ok: true, reasons: [], projectRef: 'beta123' },
+    );
+  });
+
+  it('menolak project development, ref tidak cocok, dan ref database tak terbaca', () => {
+    const devUrl = 'https://xvmcpfkkveeaevfcvfug.supabase.co';
+    const devDatabaseUrl =
+      'postgresql://postgres.xvmcpfkkveeaevfcvfug:password@aws-0-region.pooler.supabase.com:5432/postgres';
+
+    assert.equal(
+      evaluateBetaTarget({
+        supabaseUrl: devUrl,
+        databaseUrl: devDatabaseUrl,
+        expectedProjectRef: 'xvmcpfkkveeaevfcvfug',
+      }).ok,
+      false,
+    );
+    assert.ok(
+      evaluateBetaTarget({
+        supabaseUrl,
+        databaseUrl,
+        expectedProjectRef: 'other123',
+      }).reasons.includes('supabase_project_ref_mismatch'),
+    );
+    assert.ok(
+      evaluateBetaTarget({
+        supabaseUrl,
+        databaseUrl: 'postgresql://user:password@db.example.test/postgres',
+        expectedProjectRef: 'beta123',
+      }).reasons.includes('database_project_ref_unverifiable'),
+    );
+  });
+});
 
 describe('migrationVersionFromFilename', () => {
   it('mengambil versi dari nama berkas migration Supabase', () => {

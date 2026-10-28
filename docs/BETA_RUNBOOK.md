@@ -53,8 +53,16 @@ DATABASE_URL=postgresql://postgres.<ref-beta>:<password>@aws-0-<region>.pooler.s
 
 ## 2. Terapkan migration ke beta
 
-Seluruh migration di `supabase/migrations/` (28 berkas saat penulisan ini — jumlah pastinya
-`ls supabase/migrations/*.sql | Measure-Object`) diterapkan ke database **kosong** beta:
+Seluruh migration di `supabase/migrations/` diterapkan berurutan ke database **kosong** beta.
+Hitung daftar aktual sebelum menerapkan, karena berkas migration baru ditambahkan secara aditif:
+
+```powershell
+(Get-ChildItem supabase/migrations/*.sql).Count
+```
+
+Pada branch `feat/closed-beta-safe-build` saat 28 Oktober 2026, jumlah lokal adalah **30**;
+project development yang terhubung mencatat kedua migration throttle `update_ride` sudah diterapkan.
+Jangan mulai beta dari salinan folder migration lama.
 
 ```powershell
 npx supabase link --project-ref <ref-beta>   # menanyakan password sekali
@@ -145,27 +153,33 @@ APK beta memakai **keystore dan id paket yang sama** dengan rilis (`com.rodakawa
 bisa diperbarui mengikuti rilis berikutnya tanpa uninstall. Yang berbeda hanya nilai
 `EXPO_PUBLIC_*` yang dibakar ke bundel.
 
-Jalur termudah adalah variabel repository (Settings → Secrets and variables → Actions →
-**Variables**):
+Sebelum workflow beta dipakai, pemilik membuat GitHub Environment bernama `beta` (Settings →
+Environments) dan mengisinya tanpa mengubah variables/secrets repository atau environment lain:
 
-| Variable | Nilai untuk beta |
-|---|---|
-| `EXPO_PUBLIC_SUPABASE_URL` | `https://<ref-beta>.supabase.co` |
-| `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | publishable key project beta |
-| `EXPO_PUBLIC_MAP_STYLE_URL` | kosongkan (peta belum dipilih, ADR-064) |
+| Jenis | Nama di Environment `beta` | Nilai |
+|---|---|---|
+| Variable | `BETA_SUPABASE_PROJECT_REF` | ref project beta, bukan `xvmcpfkkveeaevfcvfug` |
+| Variable | `BETA_SUPABASE_URL` | `https://<ref-beta>.supabase.co` |
+| Variable | `BETA_SUPABASE_PUBLISHABLE_KEY` | publishable key project beta |
+| Variable | `BETA_MAP_STYLE_URL` | kosongkan; ADR-064 belum diputuskan |
+| Secret | `BETA_SUPABASE_DATABASE_URL` | session-pooler connection string project beta |
 
-Lalu jalankan workflow rilis dari commit yang diinginkan (bagian 6.7 SETUP_GUIDE):
+Pastikan `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, dan
+`ANDROID_KEY_PASSWORD` tersedia sebagai secrets repository yang sudah dipakai rilis. Nilai
+`EXPO_PUBLIC_*` bersifat publik dan masuk APK; database URL tetap secret. Jalur build memverifikasi
+ref API dan host/user DB cocok, menolak ref development, menjalankan `beta:preflight`, membangun,
+memverifikasi SHA-256/tanda tangan, dan menjalankan smoke test emulator. Build beta hanya menjadi
+**Actions artifact** 30 hari; workflow tidak membuat tag atau GitHub Release.
+
+Setelah workflow ini tersedia pada branch default, jalankan dengan commit yang sudah lulus CI:
 
 ```powershell
-gh workflow run release-on-push.yml --ref main   # atau -f commit=<sha>
+gh workflow run release-on-push.yml --ref main -f environment=beta -f commit=<sha-yang-sudah-lulus-ci>
 ```
 
-Karena APK beta memakai id paket yang sama, peserta **tidak bisa** memasang APK beta dan APK
-rilis berdampingan — itu disengaja. Setelah beta selesai, kembalikan ketiga variabel ke nilai
-project development/produksi yang benar sebelum rilis berikutnya.
-
-Alternatif build lokal (tanpa GitHub) ada di SETUP_GUIDE bagian 6.1 — rangkaiannya sama:
-`expo prebuild` → `configure-android-release.mjs` → `assembleRelease` → `verify-apk.mjs`.
+Unduh APK hanya bila workflow selesai sukses dan smoke test emulator lulus. Karena APK beta memakai
+id paket dan keystore yang sama, peserta **tidak bisa** memasang APK beta dan APK lain berdampingan;
+bangun ulang untuk mengganti backend. Jangan mengubah variables repository bersama.
 
 ## 7. Backup keystore
 
@@ -189,10 +203,11 @@ keytool -list -v -keystore rilis.jks -alias rilis   # harus berhasil dengan sand
 
 ## 8. Sebar APK ke peserta
 
-1. Ambil APK dari halaman **GitHub Releases** (atau Artifacts run workflow) — bukan dari
-   perkiraan lokal.
-2. Cocokkan **SHA-256** berkasnya dengan bagian **🔒 Verifikasi berkas** di badan rilis itu
-   (SETUP_GUIDE bagian 6.10). Yang dibagikan adalah berkas yang sudah cocok.
+1. Untuk beta, unduh APK dari **Actions artifact** pada run beta yang sukses; jangan mencari
+   GitHub Release karena workflow beta tidak menerbitkannya. Jangan memakai artifact sebelum
+   job smoke test emulator lulus.
+2. Cocokkan **SHA-256** berkas dengan log verifikasi APK pada run/summary Actions dan catat nilai
+   tersebut pada lembar eksekusi pilot. Tolak unduhan jika nilainya berbeda.
 3. Bagikan tautan unduhan **plus** [`BETA_GUIDE_PESERTA.md`](BETA_GUIDE_PESERTA.md) — peserta
    membutuhkan panduan izin lokasi/baterai dan cara lapor masalah.
 4. Batasi jumlah peserta awal (5–15 orang) dan kanal masukan (grup obrolan kecil), supaya umpan
@@ -209,8 +224,9 @@ pembanding. Rencana produksi lengkap ada di [`PRODUCTION_MIGRATION_PLAN.md`](PRO
 **Backend bermasalah:**
 
 - Migration bersifat **aditif**; jangan pernah menghapus atau menyunting migration yang sudah
-  diterapkan. Perbaikan = migration **baru** yang diterapkan ke beta, lalu `beta:preflight` dan
-  `npm run e2e:shared-ride` (dengan env beta) dijalankan ulang.
+  diterapkan. Perbaikan = migration **baru** diterapkan ke beta, lalu jalankan `beta:preflight`
+  (hanya-baca) dan ulangi kasus pilot manual yang terdampak. `db:test`, `storage:test`, serta
+  runner `e2e:*` ditujukan ke development dan tidak boleh diarahkan ke beta.
 - Project beta rusak parah/tercampur: buat project beta **baru** yang bersih (bagian 1–2) dan
   arahkan variabel build ke ref baru. Kehilangan data beta bisa diterima — beta adalah lingkungan
   uji, bukan data pengguna produksi.
@@ -229,7 +245,8 @@ SMTP) — perubahan itu live, tidak butuh build baru.
 - [ ] Redirect URLs memuat `rodakawan://auth/callback`.
 - [ ] Keputusan Confirm email diambil sadar; SMTP kustom dipasang bila konfirmasi menyala.
 - [ ] `npm run beta:preflight` keluar 0 (atau keputusan autoconfirm tercatat).
-- [ ] Variabel GitHub diarahkan ke beta; APK dibangun; SHA-256 cocok dengan halaman rilis.
+- [ ] GitHub Environment `beta` memakai `BETA_*` variables/secrets khusus; variables repo development tidak diubah.
+- [ ] Workflow beta selesai sukses termasuk smoke test emulator; APK Actions artifact diverifikasi SHA-256 dan sertifikatnya.
 - [ ] Backup keystore diverifikasi `keytool -list`.
 - [ ] APK + `BETA_GUIDE_PESERTA.md` dibagikan ke peserta terpilih; kanal masukan siap.
 - [ ] Setelah beta: variabel build dikembalikan; project beta ditutup/dibiarkan sesuai kebutuhan

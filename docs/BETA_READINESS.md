@@ -1,8 +1,7 @@
 # Kesiapan beta Milestone 5 — matriks gerbang
 
-Tanggal: 27 Oktober 2026 · Branch: `fix/beta-readiness-rate-limits` · Lingkup: penutupan butir P0
-Milestone 5 yang **tidak** membutuhkan perangkat, vendor, atau dependency native baru.
-Pembaruan terakhir: hardening rate limit jalur tulis + serialisasi konkurensi (AUD-14).
+Tanggal: 28 Oktober 2026 · Branch: `feat/closed-beta-safe-build` · Lingkup: persiapan closed beta dan penutupan throttle `update_ride`.
+Pembaruan terakhir: pemisahan konfigurasi build beta, preflight target beta, rencana pilot, serta throttle metadata perjalanan. Bagian 7b tetap mencatat bukti historis 27 Oktober; hasil terbaru ada di §7c.
 
 Dokumen ini bukan klaim bahwa beta siap. Ia memetakan setiap syarat ke status, bukti,
 dan pihak yang harus bertindak. Butir yang belum punya bukti ditulis apa adanya —
@@ -36,25 +35,25 @@ pemilik/produk/legal) dan **tidak diketahui** (tidak ada bukti yang cukup untuk 
 | B-07 | Nama paket Android | **Needs decision** | `com.rodakawan.app` masih sementara (ADR-015) | Tetapkan sebelum unggah pertama ke Play; menggantinya setelah rilis berarti aplikasi baru. Bisa pakai development build Expo. |
 | B-08 | Versi Android minimum dan perangkat yang didukung | **tidak diketahui** | PRD §13 menunda keputusan ini sampai tes perangkat; tidak ada angka di repo. Uji dengan 5 perangkat fisik internal. |
 | B-09 | Play Console: Data safety, content rating, app access, ads | **Blocked** | Formulir belum diisi; Data safety membutuhkan URL hapus akun (B-03), retensi (§6), dan backend final (B-04). Bisa diisi untuk internal testing saja. | Isi sebelum menandai rilis internal |
-| B-10 | Rilis hanya dari commit yang lulus CI + Database RLS | **Implemented**; **tidak diverifikasi untuk branch ini** | `release-on-push.yml` mensyaratkan run CI sukses untuk SHA; run terakhir yang hijau adalah commit yang sudah di-merge, bukan branch ini. Bisa dipakai untuk internal CI. |
+| B-10 | Rilis hanya dari commit yang lulus CI + Database RLS | **Implemented**; perubahan branch ini menunggu CI GitHub | Workflow beta memakai rencana commit yang lulus CI dan membangun hanya setelah gate; tidak ada run CI untuk branch ini sebelum PR. |
 | B-11 | APK baru untuk perubahan ini | **Tidak berlaku** untuk rilis publik | `web/**`, `scripts/**`, `.github/**`, `docs/**`, `supabase/tests/**` diabaikan gate `should-release.mjs`; tidak ada perubahan `src/**`/`app.json`. Bisa dibuat development build untuk internal testing. |
-| B-12 | Variabel build GitHub | **Blocked** | Repo variable `EXPO_PUBLIC_SUPABASE_URL` saat ini menunjuk project **development**, dan workflow juga membaca publishable key serta `EXPO_PUBLIC_MAP_STYLE_URL` dari repo variables. APK yang dibangun hari ini akan membundel backend development. Ganti ke project beta setelah project beta dan kuncinya tersedia; jangan mencantumkan nilai rahasia di dokumen ini. |
+| B-12 | Variabel build GitHub | **Blocked** untuk menjalankan build beta; pemisahan konfigurasi **Implemented** di branch | Workflow menerima `environment=beta`, memakai `BETA_*` variables/secrets khusus, memeriksa ref API+DB dan menolak development. Repository belum memiliki Environment `beta` maupun backend beta terverifikasi; APK beta belum dibuat. |
 
 ## 3. Gerbang keamanan dan data
 
 | ID | Butir (`SECURITY_PRIVACY.md` §9) | Status | Bukti | Tindakan |
 | --- | --- | --- | --- | --- |
-| S-01 | RLS aktif pada semua tabel/API yang terekspos | **Passed against dev backend** | `npm run db:test` **12/12** lulus (27 Oktober 2026); `rls_catalog_test.sql` + `rls_catalog_hardening_test.sql` | Pertahankan kedua pagar di CI |
+| S-01 | RLS aktif pada semua tabel/API yang terekspos | **Passed against dev backend** | `npm run db:test` **12/12** lulus (28 Oktober 2026); `rls_catalog_test.sql` + `rls_catalog_hardening_test.sql` | Pertahankan kedua pagar di CI |
 | S-02 | `security definer` mengunci `search_path = ''`; view memakai `security_invoker` | **Passed against dev backend** | Pagar katalog + hardening; tidak ada pelanggaran di katalog development (tidak ada view tanpa `security_invoker`). Bisa disesuaikan untuk 5 pengguna. | Migration/view baru wajib mengikuti pola ini |
 | S-03 | Fungsi publik tidak terbuka ke `PUBLIC`/`anon` tanpa alasan | **Passed against dev backend** dengan **7 pengecualian beralasan** | `rls_catalog_hardening_test.sql`: 6 helper RLS + `touch_updated_at()` masih dapat dieksekusi `anon`; detektor diuji-diri dan daftar diperiksa anti-usang. Bisa disesuaikan untuk 5 pengguna internal. | Risiko diterima (AUD-11); cabut grant pada hardening berikut bila jalur anon tidak lagi membutuhkannya |
 | S-04 | Bucket Storage tetap privat | **Passed against dev backend** | Hardening test: tepat 3 bucket (`avatars`, `club-logos`, `vehicle-photos`), `public = false`; probe bucket publik tertangkap. Aturan ini tetap dihormati walaupun internal (5 pengguna). | Jangan menambah bucket publik |
 | S-05 | Policy Storage memakai path sebagai otorisasi | **Passed against dev backend** | `rls_profiles_test.sql` bagian 13; bucket privat, owner-only foto kendaraan/avatar, logo per peran, CHECK path. Bisa disesuaikan untuk 5 pengguna internal. | Unggahan HTTP nyata tetap **Blocked** (GAR-05/CLUB-11) |
 | S-06 | Data sensitif tidak terbaca `anon` | **Passed against dev backend** | Hardening test membuat satu baris `motorcycle_private_details`; pemilik membaca 1, `anon` membaca 0. Bisa dikonfigurasi untuk 5 pengguna internal. | Ulangi bila policy berubah |
-| S-07 | Rate limit endpoint publik | **Implemented**; **Passed against dev backend** untuk klub/ride/lokasi; `update_ride` dan rate limit Auth masih terbuka | Follow/laporan/gabung klub lulus `rls_rate_limits_test.sql`; `create_club` 10/jam, `create_ride` 10/jam, `publish_ride_location` 2 detik lulus `rls_write_throttles_test.sql`; serialisasi dua koneksi lulus `db:test:concurrency` (27 Oktober 2026). Rate limit Auth bergantung dashboard (**tidak diketahui**). | Throttle `update_ride` (Low) dan periksa rate limit Auth di dashboard sebelum beta |
-| S-08 | E2E hapus akun lintas Auth/Storage/DB | **Passed against dev backend** (27 Oktober 2026) | `npm run e2e:account-delete -- --yes`: **exit 0 — 21 langkah**, 0 objek/baris sisa. Runner permanen `scripts/account-deletion-e2e.mjs`. Langkah 10–13 kasus negatif baru: tanpa token → 401, token tidak valid → 401, dan token hanya menghapus akun pemantau sendiri (akun lain utuh). | Bisa diulang untuk 5 pengguna internal. |
+| S-07 | Rate limit endpoint publik | **Implemented**; **Passed against dev backend** untuk klub/ride/lokasi/update_ride | Follow/laporan/gabung klub lulus `rls_rate_limits_test.sql`; `create_club` 10/jam, `create_ride` 10/jam, `publish_ride_location` 2 detik, serta `update_ride` 20 perubahan/10 menit lulus tes RLS. `db:test:concurrency` membuktikan tiga jalur terserialisasi (28 Oktober 2026). Rate limit Auth bergantung dashboard (**tidak diketahui**). | Periksa rate limit Auth di dashboard sebelum beta |
+| S-08 | E2E hapus akun lintas Auth/Storage/DB | **Passed against dev backend** (28 Oktober 2026) | `npm run e2e:account-delete -- --yes`: **exit 0 — 21 langkah**, 0 objek/baris sisa. Runner permanen `scripts/account-deletion-e2e.mjs`. Langkah 10–13 kasus negatif baru: tanpa token → 401, token tidak valid → 401, dan token hanya menghapus akun pemantau sendiri (akun lain utuh). | Bisa diulang untuk 5 pengguna internal. |
 | S-09 | Lease/checkpoint hapus akun aman terhadap crash dan duplikasi | **Passed locally** + **Passed against dev backend** | 19 test Node (`scripts/__tests__/account-deletion.test.mjs`); uji SQL lease; migration ADR-078 diterapkan | Reconcile job masih manual; jadwalkan operator |
 | S-10 | Uji perangkat fisik | **Blocked** | Tidak ada perangkat pada sesi ini; APK terakhir dari audit sebelumnya, bukan dari branch ini. Dapat dijadwinkan dengan 5 perangkat fisik internal. | Jadwinkan ACC-01..08 + QA 8d untuk 5 perangkat internal. |
-| S-11 | Realtime dua klien (terima/tolak, reconnect, filter blokir) | **Passed against dev backend** untuk dua klien nyata; **Blocked** di perangkat | `npm run e2e:shared-ride` dijalankan ulang 27 Oktober 2026 (24 pemeriksaan): lokasi B diterima A dalam **384 ms**, chat **344 ms**; C menerima 0 event dan membaca 0 baris; ride selesai menghapus lokasi. Sisa yang masih **Blocked**: reconnect saat jaringan putus/pulih dan filter blokir di perangkat (QA 8d/8f, PD-09/PD-15) | Jalankan PD-09 + PD-15 di 8f |
+| S-11 | Realtime dua klien (terima/tolak, reconnect, filter blokir) | **Passed against dev backend** untuk dua klien nyata; **Blocked** di perangkat | `npm run e2e:shared-ride` dijalankan ulang 28 Oktober 2026 (24 pemeriksaan): lokasi B diterima A dalam **856 ms**, chat **464 ms**; C menerima 0 event dan membaca 0 baris; ride selesai menghapus lokasi. Sisa yang masih **Blocked**: reconnect saat jaringan putus/pulih dan filter blokir di perangkat (QA 8d/8f, PD-09/PD-15) | Jalankan PD-09 + PD-15 di 8f |
 | S-12 | Tidak ada service role/private key di bundel | **Passed locally** | `npm run export:android` exit 0; `entry-6419….hbc`: JWT utuh 0, `postgres://` 0, nilai `sb_secret_` ≥30 karakter 0 (literal `service_role` 2× = regex klien + kode dependency). Bisa diverifikasi tanpa secret di bundel internal. | Ulangi setiap kali `.env.local` berisi kredensial nyata |
 | S-13 | Tidak ada secret di repo/riwayat | **Passed locally** (audit 24 Oktober 2026; tidak ada kredensial baru) | `git log --all --diff-filter=A -- '.env*'` hanya `.env.example`; pemindaian tree/riwayat. Bisa diverifikasi untuk internal. | Ulangi sebelum rilis publik |
 | S-14 | Konfigurasi web hanya URL + publishable key | **Passed locally** | `web-static.test.mjs`: kunci config dibatasi 4; JWT hanya boleh di `config.js` dengan payload `role = anon`; tidak ada ref development/secret di `web/`. Bisa diisi dengan URL internal. | Isi config dengan nilai publik saat deploy |
@@ -99,7 +98,7 @@ pemilik/produk/legal) dan **tidak diketahui** (tidak ada bukti yang cukup untuk 
 | D-01 | Aktifkan GitHub Pages dan tentukan backend yang ditunjuk `config.js` (development untuk uji, produksi untuk Play) | Tanpa URL live, syarat Play Console dan uji halaman tidak terpenuhi | Pemilik repository |
 D-01a (personal): Untuk 5 pengguna internal, tetap pakai development project `xvmcpfkkveeaevfcvfug`. Aktifkan GitHub Pages hanya jika dibutuhkan untuk internal testing; tidak memerlukan publik. | D-02 | Sahkan retensi laporan bahaya, audit moderasi, pesan yang diredaksi, dan metadata job | Kebijakan publik saat ini menyebut "disimpan selama diperlukan" tanpa periode; cleanup otomatis belum boleh dibuat sebelum dasar hukumnya jelas | Produk + legal |
 | D-03 | Buat project Supabase produksi, backup, dan prosedur rollback | Beta publik tidak boleh berjalan di project development | Pemilik + engineering |
-D-03a (personal): Untuk 5 pengguna internal, masih pakai development project `xvmcpfkkveeaevfcvfug` yang sudah memiliki 28 migration dan 12/12 RLS test lulus (27 Oktober 2026). Tidak ada kebutuhan project produksi terpisah untuk penggunaan pribadi. | D-04 | Tetapkan jadwal cadangan/verifikasi keystore | Keystore hilang = APK terpasang tidak bisa diperbarui | Pemilik |
+D-03a (personal): Untuk 5 pengguna internal, masih pakai development project `xvmcpfkkveeaevfcvfug`. Pada 28 Oktober 2026, project ini mencatat 30 migration dan 12/12 RLS test lulus; tidak ada kebutuhan project produksi terpisah untuk penggunaan pribadi. | D-04 | Tetapkan jadwal cadangan/verifikasi keystore | Keystore hilang = APK terpasang tidak bisa diperbarui | Pemilik |
 | D-05 | Tetapkan nama paket final (`com.rodakawan.app` masih sementara, ADR-015) | Tidak bisa diubah setelah unggah pertama Play | Pemilik produk |
 | D-06 | Setujui/tolak ADR-064 (penyedia peta) | Marker peta dan P-03 tidak bisa diklaim selesai | Pemilik produk |
 | D-07 | Ratifikasi model persetujuan follow (ADR-039) | Fitur sosial M6, bukan blocker beta inti | Pemilik produk |
@@ -148,9 +147,33 @@ atau produksi. Tidak ada APK baru dan tidak ada klaim uji perangkat.
 | `npx supabase migration list --linked` | **28 lokal = 28 remote** (development) |
 | Paritas fungsi development | Migration `20261026195421` mengembalikan `create_club`/`create_ride` ke definisi repo; sebelumnya development masih memakai revisi antara dengan row lock `profiles`. Perbedaan ini ditemukan saat uji konkurensi diperkuat. |
 
+## 7c. Verifikasi ulang 28 Oktober 2026 (branch `feat/closed-beta-safe-build`)
+
+Uji database hanya menulis ke project development (`xvmcpfkkveeaevfcvfug`); tidak ada uji ke beta atau production. Branch ini belum didorong saat catatan dibuat, sehingga status CI/PR untuk perubahan baru belum tersedia.
+
+| Perintah / bukti | Hasil |
+| --- | --- |
+| `npm ci` | exit 0; audit dependency melaporkan **20 kerentanan** (13 low, 3 moderate, 4 high) setelah instalasi. Tidak ada dependency/lockfile yang diubah. |
+| `npm run deps:check`, `npm run typecheck`, `npm run lint`, `npm run format:check` | exit 0 |
+| `npm test -- --ci` | exit 0 — **48 suite / 526 test** |
+| `npm run test:scripts` | exit 0 — **97 suite / 401 test** |
+| `npm run db:test:lint` | exit 0 — **12 berkas uji / 30 migration** |
+| `npm run db:test` | exit 0 — **12/12** berkas RLS lulus |
+| `npm run db:test:concurrency` | exit 0 — create_club, create_ride, update_ride ditolak tepat di kuota setelah request kedua terbukti menunggu lock; cleanup akun uji lulus |
+| `npm run db:types:check` | exit 0 — tipe sama dengan schema development |
+| `npm run storage:test` | exit 0 — **27 langkah**, 0 objek/akun sisa |
+| `npm run e2e:account-delete -- --yes` | exit 0 — **21 langkah**, 0 sisa |
+| `npm run e2e:shared-ride` | exit 0 — **24 pemeriksaan**, non-member tidak menerima event, 0 baris uji tersisa |
+| `npm run export:android` | exit 0 — bundel Android berhasil dibuat; bukan APK signed/release dan memakai environment lokal development |
+| `npm run doctor` | **exit 1 — Blocked**: `getaddrinfo EAI_AGAIN exp.host` saat cek schema Expo; blocker jaringan |
+| `npm run beta:preflight` | **exit 2 — Blocked**: tidak ada `BETA_SUPABASE_PROJECT_REF`/project beta yang dikonfigurasi; preflight berhenti sebelum koneksi |
+| Migration lokal ↔ development | **30 lokal = 30 remote**; migration `ride_metadata_update_throttle` dan `ride_update_throttle_cleanup` tercatat remote. Foreign key cleanup tervalidasi sehingga penghapusan profil menghapus window. |
+| GitHub CI / Database RLS / release | Untuk `main` pada SHA `e248d2595a057e081fdda0e79cb20e45a909a12a`, CI, Database RLS, dan seluruh job release build71 selesai sukses. Itu bukti baseline sebelumnya, bukan CI untuk branch ini. |
+| Environment beta / APK beta / uji fisik | **Belum ada** Environment `beta`, backend beta, APK beta, atau bukti penerimaan perangkat fisik. Tetap **Blocked**. |
+
 ## 8. Perintah verifikasi (historis, 25 Oktober 2026)
 
-> Angka di tabel ini adalah hasil saat itu. Hasil terbaru ada di §7b.
+> Angka di tabel ini adalah hasil saat itu. Pembaruan 27 Oktober tercatat di §7b; hasil terbaru ada di §7c.
 
 | Perintah | Hasil |
 | --- | --- |
