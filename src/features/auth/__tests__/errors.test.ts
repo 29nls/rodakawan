@@ -111,6 +111,7 @@ describe('mapRpcError — rate limit jalur tulis', () => {
     ['club_create_rate_limit', /10 klub baru per jam/],
     ['ride_create_rate_limit', /10 perjalanan baru per jam/],
     ['location_publish_rate_limit', /Lokasi belum dikirim/],
+    ['ride_update_rate_limit', /Perubahan perjalanan terlalu sering/],
   ])('memetakan %s menjadi pesan yang bisa ditindaklanjuti', (details, expected) => {
     const error = mapRpcError({ code: 'P0001', details, message: 'raw database message' });
 
@@ -119,7 +120,7 @@ describe('mapRpcError — rate limit jalur tulis', () => {
     expect(error.message).toMatch(expected);
     expect(error.message).toMatch(/Tunggu/);
     expect(error.message).not.toMatch(
-      /P0001|club_create_rate_limit|ride_create_rate_limit|location_publish_rate_limit/,
+      /P0001|club_create_rate_limit|ride_create_rate_limit|location_publish_rate_limit|ride_update_rate_limit/,
     );
   });
 

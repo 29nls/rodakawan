@@ -323,13 +323,14 @@ berkas di halaman rilis. Isi **Waktu uji** dengan waktu lokal saat kasus dijalan
 bukti tanpa waktu tidak dapat ditelusuri saat insiden). Dua perangkat berbeda vendor minimal; lima
 lebih baik.
 
-APK yang dipakai pilot saat ini adalah **`v0.1.0-build70`** (commit `78ac989`, 27 Oktober 2026),
-`app-preview.apk` 106.638.791 byte, SHA-256
-`2a968438f6b033c93e7d7062badf720ce3ec15abbb6f96dca2c9d6f085f299ce`, sertifikat penandatangan
-`3ea8bb4745b638be8fddf71e15edd9786d45aac65c0384b87be8fa2c32b3b14d`. **APK ini masih menunjuk
-backend development**, jadi sah dipakai untuk pilot internal di lingkungan development, tetapi
-**bukan** APK beta. Bila pilot pindah ke project beta, bangun ulang dengan variabel GitHub yang
-sudah diarahkan dan ganti nilai kolom Versi APK di seluruh baris.
+Audit unduhan 27 Oktober 2026 mencocokkan APK **`v0.1.0-build71`** pada commit `e248d2595a057e081fdda0e79cb20e45a909a12a`:
+`app-preview.apk`, 106.638.791 byte, SHA-256
+`62151d6371cad99a78a478ec274c88929ad02877a5b10764a49c79722fe16462`, sertifikat penandatangan
+`3ea8bb4745b638be8fddf71e15edd9786d45aac65c0384b87be8fa2c32b3b14d`. Metadata asset GitHub
+Release dan workflow verifikasi build71 cocok. **APK ini masih menunjuk backend development**;
+statusnya hanya bukti smoke-test emulator, bukan penerimaan perangkat fisik maupun APK beta.
+Untuk pilot beta, kosongkan kolom Versi APK sampai build beta selesai; catat artifact baru beserta
+SHA-256 dan sertifikat dari run-nya. Jangan salin build71 sebagai hasil uji beta.
 
 Aturan bukti yang aman: tangkapan layar dan log **jangan** memuat koordinat GPS akurat milik
 orang nyata, token/JWT, kata sandi, connection string, maupun alamat email pribadi peserta.
@@ -361,9 +362,12 @@ menjelaskan perilaku yang diuji.
 | PD-21 |  |  |  | A, B, C | C bukan anggota perjalanan A/B: buka tautan perjalanan, coba baca lokasi/chat lewat UI dan rekaman jaringan | C tidak melihat baris/lokasi/chat, tidak menerima event realtime, dan tidak dapat mengirim pesan; pesan galat tidak membocorkan detail internal |  |  | **Blocked** |
 | PD-22 |  |  |  | A, B | Kirim chat berulang saat jaringan buruk lalu pulihkan; pantau publikasi lokasi setelah throttle sementara | Retry pesan tidak menggandakan; penolakan throttle lokasi hanya menunda, tidak mematikan sharing permanen; status layar jujur |  |  | **Blocked** |
 
-Dua perangkat lebih dulu (PD-01…PD-05, PD-09, PD-13…PD-15) sudah cukup untuk menyatakan pilot
-berfungsi; sisanya menaikkan keyakinan sebelum meluas. Selama ada satu baris Blocked yang relevan
-untuk fitur itu, fitur tersebut tidak boleh dilaporkan "lulus di perangkat".
+Urutan minimum dua perangkat untuk mulai pilot: PD-01…PD-05, PD-09, PD-13…PD-15, serta PD-21
+(non-member). Sisanya menaikkan keyakinan sebelum meluas. Kasus PD-16…PD-19 mencakup hazard,
+moderasi, Storage, dan hapus akun; jalankan sebelum menyatakan cakupan itu diterima. Selama ada satu
+baris **Blocked** yang relevan untuk fitur itu, fitur tersebut tidak boleh dilaporkan "lulus di
+perangkat". Catat akun C sebagai non-member terpisah dari A (host) dan B (peserta); jangan gunakan
+data lokasi atau akun pribadi.
 
 ## 9. Status otomatisasi dan verifikasi (Milestone 1–3)
 
@@ -392,8 +396,8 @@ Yang **sudah otomatis** (`npm test`, jaringan dimatikan; client Supabase diganti
 | `src/__tests__/ride-new.test.tsx` | Formulir buat/ubah perjalanan: render & label aksesibilitas, validasi judul/klub/jadwal, payload `createRide`/`updateRide`, mode ubah (hanya host, hanya `planned`), pesan galat, retry, dan pencegahan kiriman ganda. |
 | `src/components/ui/__tests__/*` | Perilaku dasar komponen yang dipakai form (tombol, field). |
 
-> Hasil terbaru 27 Oktober 2026 ada di [`BETA_READINESS.md`](BETA_READINESS.md) §7b:
-> 48 suite / 525 test, `db:test` 12/12, dan `db:test:concurrency` lulus.
+> Hasil terbaru 28 Oktober 2026 ada di [`BETA_READINESS.md`](BETA_READINESS.md) §7c:
+> 48 suite / 526 test, `db:test` 12/12, dan `db:test:concurrency` lulus.
 
 Hasil historis 19 Oktober 2026 (Node 24.18.1, npm 12.0.2, setelah `npm ci` dari
 `package-lock.json`):

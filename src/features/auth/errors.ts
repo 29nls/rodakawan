@@ -429,6 +429,13 @@ export function mapRpcError(error: unknown): AppError {
           'Lokasi belum dikirim karena terlalu sering. Tunggu beberapa detik; aplikasi akan mencoba lagi saat posisi berikutnya tersedia.',
         retryable: true,
       };
+    case 'ride_update_rate_limit':
+      return {
+        code: 'rate_limited',
+        message:
+          'Perubahan perjalanan terlalu sering. Tunggu beberapa menit, lalu coba simpan kembali.',
+        retryable: true,
+      };
     default:
       break;
   }

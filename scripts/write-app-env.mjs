@@ -13,14 +13,13 @@
  * hanya oleh orang yang memasangnya, jadi variabel yang hilang di sini dihentikan
  * lebih dulu, bukan dibiarkan lewat.
  *
- * Nilainya bukan rahasia: semuanya dikirim ke dalam bundel aplikasi dan ikut
- * terpasang di perangkat siapa pun yang memegang APK-nya. Karena itu ia dibaca dari
- * *variables* repository, bukan dari secrets — agar bisa diperiksa tanpa membuka
- * nilai rahasia dan tanpa pernah dicetak ke log.
+ * Nilai EXPO_PUBLIC bukan rahasia: semuanya masuk ke bundel aplikasi dan APK.
+ * Untuk beta, sumbernya wajib GitHub Environment `beta` agar variables development
+ * repository tidak menjadi fallback. Isi konfigurasi tidak pernah dicetak ke log.
  *
  * Pemakaian:
- *   node scripts/write-app-env.mjs                # tulis .env.local
- *   node scripts/write-app-env.mjs --out .env.local
+ *   node scripts/write-app-env.mjs                # tulis .env.local untuk development
+ *   node scripts/write-app-env.mjs --environment beta --out .env.local
  *
  * Keluar dengan kode 0 bila berkasnya tertulis; selain itu kode 1 dengan pesan
  * `::error::…`. Isi variabelnya tidak pernah ditampilkan.
@@ -30,8 +29,10 @@ import fs from 'node:fs';
 import { pathToFileURL } from 'node:url';
 
 import { fail, parseOptions } from './lib/cli.mjs';
+import { validateBetaProjectUrl } from './lib/shared-ride.mjs';
 
-const USAGE = 'Pemakaian: node scripts/write-app-env.mjs [--out <berkas>]';
+const USAGE =
+  'Pemakaian: node scripts/write-app-env.mjs [--out <berkas>] [--environment <development|beta|production>]';
 
 /**
  * Variabel yang wajib ada. Daftarnya sengaja tetap (bukan semua `EXPO_PUBLIC_*` yang
@@ -91,7 +92,7 @@ export function collectAppEnv(env) {
     return fail(
       `Konfigurasi publik aplikasi belum lengkap: ${kosongWajib.join(', ')} belum diisi.`,
       [
-        'Atur sebagai *variables* repository — Settings → Secrets and variables → Actions → Variables — dengan nama persis seperti di atas.',
+        'Atur sebagai GitHub Actions variables pada environment build yang dipilih dengan nama persis seperti di atas; gunakan environment `beta` untuk build beta.',
         'Bila `EXPO_PUBLIC_MAP_STYLE_URL` dibiarkan kosong, APK-nya tetap berjalan tanpa peta custom.',
         'Nilai contoh beserta penjelasannya: .env.example dan docs/SETUP_GUIDE.md bagian 5.3.',
       ],
@@ -112,14 +113,47 @@ export function collectAppEnv(env) {
   return result;
 }
 
+export function collectBuildAppEnv(env, environment) {
+  const supportedEnvironments = ['development', 'beta', 'production'];
+  if (!supportedEnvironments.includes(environment)) {
+    return fail('Environment build tidak dikenal.', [USAGE]);
+  }
+
+  const values = collectAppEnv(env);
+  if (values === null) return null;
+
+  if (environment === 'beta') {
+    const check = validateBetaProjectUrl(
+      values.EXPO_PUBLIC_SUPABASE_URL,
+      env.BETA_SUPABASE_PROJECT_REF,
+    );
+    if (!check.ok) return null;
+  }
+
+  return values;
+}
+
 function main() {
   const options = parseOptions(process.argv.slice(2), {
     usage: USAGE,
-    values: { '--out': 'berkas tujuan' },
+    values: {
+      '--out': 'berkas tujuan',
+      '--environment': 'development, beta, atau production',
+    },
   });
 
+  const environment = options['--environment'] ?? 'development';
   const out = options['--out'] ?? '.env.local';
-  const values = collectAppEnv(process.env);
+  const values = collectBuildAppEnv(process.env, environment);
+  if (!values) {
+    if (environment === 'beta') {
+      fail('Target beta tidak valid; build ditolak sebelum konfigurasi ditulis.', [
+        'Atur BETA_SUPABASE_PROJECT_REF, EXPO_PUBLIC_SUPABASE_URL, dan EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY pada GitHub Environment beta.',
+        'Pastikan URL menggunakan ref yang sama, berbeda dari project development, lalu jalankan ulang workflow beta.',
+      ]);
+    }
+    return;
+  }
   const written = writtenAppEnv(values);
 
   fs.writeFileSync(out, appEnvFile(values), { mode: 0o600 });

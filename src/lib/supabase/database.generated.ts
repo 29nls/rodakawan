@@ -492,6 +492,32 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"ride_update_throttle_windows": {
+                  Row: {
+                    "ride_id": string,"update_count": number,"user_id": string,"window_started_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "ride_id": string,"update_count": number,"user_id": string,"window_started_at": string
+                  }
+                  Update: {
+                    "ride_id"?: string,"update_count"?: number,"user_id"?: string,"window_started_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "ride_update_throttle_windows_ride_id_fkey"
+      columns: ["ride_id"]
+isOneToOne: false
+      referencedRelation: "rides"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "ride_update_throttle_windows_user_id_fkey"
+      columns: ["user_id"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"rides": {
                   Row: {
                     "activity_type": string,"club_id": string | null,"created_at": string,"created_by": string,"description": string | null,"destination_label": string | null,"destination_lat": number | null,"destination_lng": number | null,"ended_at": string | null,"id": string,"invite_code": string | null,"meeting_label": string | null,"meeting_lat": number | null,"meeting_lng": number | null,"started_at": string | null,"starts_at": string | null,"status": string,"title": string,"updated_at": string,"visibility": string
