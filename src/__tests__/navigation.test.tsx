@@ -30,6 +30,11 @@ jest.mock('@/lib/supabase/client', () => ({
   resetSupabaseClientForTests: () => undefined,
 }));
 
+jest.mock('@maplibre/maplibre-react-native', () =>
+  jest.requireActual('@/test-support/mapLibreMock'),
+);
+jest.mock('react-native-svg/css', () => jest.requireActual('@/test-support/mapLibreMock'));
+
 jest.mock('@/features/auth/session', () => {
   const actual = jest.requireActual('@/features/auth/session');
   return { ...actual, useAuthSession: jest.fn() };
