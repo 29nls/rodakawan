@@ -27,7 +27,7 @@
     "beta:preflight": "node --env-file-if-exists=.env.local --env-file-if-exists=.env.db scripts/beta-preflight.mjs",
     "db:types": "node --env-file-if-exists=.env.db scripts/db-types.mjs",
     "db:types:check": "node --env-file-if-exists=.env.db scripts/db-types.mjs --check",
-    "doctor": "npx expo-doctor",
+    "doctor": "expo-doctor",
     "export:android": "expo export --platform android",
     "assets:generate": "node scripts/generate-assets.mjs"
   },
@@ -66,13 +66,18 @@
     "eslint-config-expo": "~57.0.2",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.5.6",
+    "expo-doctor": "1.21.5",
     "jest": "^29.7.0",
     "jest-expo": "~57.0.6",
     "pg": "^8.23.1",
     "prettier": "^3.9.10",
+    "test-renderer": "1.2.0",
     "typescript": "~6.0.3"
   },
   "engines": {
     "node": ">=22.13.0"
+  },
+  "overrides": {
+    "node-forge": "1.4.1"
   }
 }
