@@ -8,6 +8,18 @@ sedangkan build preview (`v<versi>-build<N>`) diringkas di dalam blok yang bisa 
 versi adalah tautan ke halaman rilisnya di GitHub, sehingga riwayat ini bisa dinavigasi langsung
 dari berkas.
 
+## [v0.1.0-build74](https://github.com/29nls/rodakawan/releases/tag/v0.1.0-build74) — 2026-10-29 · pratinjau
+
+<details>
+<summary>Catatan rilis pratinjau</summary>
+
+### Perubahan lain
+
+- mock MapLibre and SVG components in navigation tests (`d8ae6ac`)
+- Add MapTiler logo SVG and create mock components for MapLibre (`167046d`)
+
+</details>
+
 ## [v0.1.0-build72](https://github.com/29nls/rodakawan/releases/tag/v0.1.0-build72) — 2026-10-28 · pratinjau
 
 <details>
