@@ -8,6 +8,21 @@ sedangkan build preview (`v<versi>-build<N>`) diringkas di dalam blok yang bisa 
 versi adalah tautan ke halaman rilisnya di GitHub, sehingga riwayat ini bisa dinavigasi langsung
 dari berkas.
 
+## [v0.1.0-build77](https://github.com/29nls/rodakawan/releases/tag/v0.1.0-build77) — 2026-10-29 · pratinjau
+
+<details>
+<summary>Catatan rilis pratinjau</summary>
+
+### Fitur
+
+- Add base framework and policies for codebase understanding (`4332d4a`)
+
+### Perubahan lain
+
+- Update documentation and migration details for beta readiness and production migration plan (`e2f5ed7`)
+
+</details>
+
 ## [v0.1.0-build75](https://github.com/29nls/rodakawan/releases/tag/v0.1.0-build75) — 2026-10-29 · pratinjau
 
 <details>
