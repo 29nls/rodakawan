@@ -1,6 +1,18 @@
 {
   "version": 1,
   "skills": {
+    "codebase-architecture": {
+      "source": "mblode/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/codebase-architecture/SKILL.md",
+      "computedHash": "76c861fdb98b7af7b6e23644f56bbab54bb1bdf4ba95d148019ab44153467f8f"
+    },
+    "codebase-understanding": {
+      "source": "noorkhalel/saas-ai-skills",
+      "sourceType": "github",
+      "skillPath": "skills/codebase-understanding/SKILL.md",
+      "computedHash": "74465ab2950ce1111b75c9385aa77de4342b64337b568e95224898747c651f4c"
+    },
     "expo-data-fetching": {
       "source": "expo/skills",
       "sourceType": "github",
@@ -18,6 +30,12 @@
       "sourceType": "github",
       "skillPath": "plugins/expo/skills/expo-router/SKILL.md",
       "computedHash": "f2f505b84f260ae29ea3f01d689c0e6b490e49d3dad2eec19cf4947d7c67ef9d"
+    },
+    "repo-skillopt": {
+      "source": "objectivlabs/reposkillopt",
+      "sourceType": "github",
+      "skillPath": "skills/repo-skillopt/SKILL.md",
+      "computedHash": "f173e45f89866e3c87742990f01fa8a29d23234d4c0b6a7ba93c43da558b2770"
     },
     "supabase": {
       "source": "supabase/agent-skills",
