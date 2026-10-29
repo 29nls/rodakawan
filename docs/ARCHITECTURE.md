@@ -84,10 +84,11 @@ supabase/
 docs/
 ```
 
-Keadaan sebenarnya per 22 Oktober 2026 (`ls src/features`): `auth`, `chat`, `clubs`, `garage`,
+Keadaan sebenarnya per 29 Oktober 2026 (`ls src/features`): `auth`, `chat`, `clubs`, `garage`,
 `hazards`, `map`, `media`, `moderation`, `profile`, `rides`. Tidak ada `services/` terpisah —
-wrapper API tinggal di `features/<domain>/api.ts` — dan `supabase/functions/` **belum ada**; Edge
-Function pertama yang direncanakan adalah pengirim notifikasi M5 (ADR-075).
+wrapper API tinggal di `features/<domain>/api.ts`. `supabase/functions/` kini berisi
+`delete-account` (Milestone 5, ADR-077); yang **belum ada** adalah Edge Function pengirim
+notifikasi M5 (ADR-075, statusnya masih Proposed).
 
 Aturan dependency: screen memanggil feature hook/service, service memanggil Supabase/client/native API. Komponen presentasional tidak memuat query database atau aturan akses. Tipe database dihasilkan dari schema/migration bila workflow Supabase CLI digunakan.
 

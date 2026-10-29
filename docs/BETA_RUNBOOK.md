@@ -60,9 +60,10 @@ Hitung daftar aktual sebelum menerapkan, karena berkas migration baru ditambahka
 (Get-ChildItem supabase/migrations/*.sql).Count
 ```
 
-Pada branch `feat/closed-beta-safe-build` saat 28 Oktober 2026, jumlah lokal adalah **30**;
-project development yang terhubung mencatat kedua migration throttle `update_ride` sudah diterapkan.
-Jangan mulai beta dari salinan folder migration lama.
+Pada 29 Oktober 2026 jumlah berkas lokal adalah **31** — termasuk migration revoke grant `anon`
+`20261028031237_revoke_anon_rls_helper_execute.sql` — dan project development yang terhubung
+tercatat sudah menerapkan seluruhnya. Jangan memakai angka lama (**30**, sebelum migration revoke)
+sebagai target, dan jangan mulai beta dari salinan folder migration lama.
 
 ```powershell
 npx supabase link --project-ref <ref-beta>   # menanyakan password sekali

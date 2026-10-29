@@ -500,11 +500,13 @@ Yang **sudah otomatis** (`npm test`, jaringan dimatikan; client Supabase diganti
 | `src/__tests__/ride-new.test.tsx` | Formulir buat/ubah perjalanan: render & label aksesibilitas, validasi judul/klub/jadwal, payload `createRide`/`updateRide`, mode ubah (hanya host, hanya `planned`), pesan galat, retry, dan pencegahan kiriman ganda. |
 | `src/components/ui/__tests__/*` | Perilaku dasar komponen yang dipakai form (tombol, field). |
 
-> Hasil terbaru 28 Oktober 2026 ada di [`BETA_READINESS.md`](BETA_READINESS.md) §7c:
-> 48 suite / 526 test, `db:test` 12/12, dan `db:test:concurrency` lulus.
-> Pembaruan lanjutan (§7d): migration `20261028031237` mencabut grant `anon`
-> dari enam helper RLS; `db:test` **12/12** lulus terhadap **31 migration** dan
-> asersi dua sisi anon ditolak / `authenticated` diizinkan ada di
+> Hasil lokal terbaru **29 Oktober 2026** (gate aplikasi saja): 48 suite / **533** test,
+> `test:scripts` 97 suite / 401 test, `doctor` 21/21, `export:android` exit 0 — lihat
+> [`BETA_READINESS.md`](BETA_READINESS.md) §7e; sesi ini tidak menyentuh backend.
+> Bukti dev backend terakhir tetap 28 Oktober 2026 (§7c/§7d): 48 suite / 526 test,
+> `db:test` **12/12** terhadap **31 migration**, dan `db:test:concurrency` lulus;
+> migration `20261028031237` mencabut grant `anon` dari enam helper RLS dengan
+> asersi dua sisi anon ditolak / `authenticated` diizinkan di
 > `rls_catalog_hardening_test.sql`.
 
 Hasil historis 19 Oktober 2026 (Node 24.18.1, npm 12.0.2, setelah `npm ci` dari
@@ -642,8 +644,9 @@ Yang **masih Blocked** (butuh perangkat / alur aplikasi / akun):
 - **GAR-01…GAR-04 dan CLUB-01…CLUB-10 — bukti per langkah** masih Blocked, meskipun pemilik
   aplikasi melaporkan build sudah dicoba di HP tanpa error yang teramati (owner-reported, tanpa tag
   rilis/kasus uji per kasus). APK yang dimaksud: `fa4397e`, rilis `v0.1.0-build20`; baseline
-  `749424c`/build19; APK terbaru sekarang `b0c8361`/`v0.1.0-build26` (build23 tetap yang dilaporkan
-  pemilik). Aturan di database sudah lulus;
+  `749424c`/build19; build Milestone 2 terakhir `b0c8361`/`v0.1.0-build26` (build23 tetap yang dilaporkan
+  pemilik). Rilis terbaru repo per 29 Oktober 2026 adalah `v0.1.0-build75` — diverifikasi dengan
+  `gh release list` dan `git tag --sort=-creatordate`, bukan dengan angka lama di tabel ini. Aturan di database sudah lulus;
   yang belum terdokumentasi adalah bukti alur layarnya (bagian 5 `docs/MILESTONE_2_REPORT.md` memuat checklist-nya).
   Bukti tiap langkah direkam otomatis oleh `node scripts/device-checklist.mjs` (tangkapan layar,
   hierarki UI, logcat, identitas perangkat dan APK); penilaian langkah tetap dilakukan manusia.

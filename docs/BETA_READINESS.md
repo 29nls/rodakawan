@@ -80,7 +80,7 @@ pemilik/produk/legal) dan **tidak diketahui** (tidak ada bukti yang cukup untuk 
 
 | ID | Temuan | Severity | Bukti | Status / tindakan |
 | --- | --- | --- | --- | --- |
-| C-01 | `supabase/config.toml` tidak ada, sehingga `verify_jwt` dan konfigurasi Edge Function tidak versioned | Low | `find supabase -name '*.toml'` = kosong; fungsi tetap memverifikasi token lewat `auth.getUser` (`supabase/functions/delete-account/index.ts`), jadi tidak ada jalur tanpa verifikasi yang terlihat | **Open** — tambahkan config.toml sebelum produksi atau dokumentasikan pengaturan platform |
+| C-01 | `supabase/config.toml` tidak ada, sehingga `verify_jwt` dan konfigurasi Edge Function tidak versioned | Low | **Ditutup 28 Oktober 2026** — berkas kini ada di `supabase/config.toml` berisi `[functions.delete-account]` + `verify_jwt = false` beserta komentar penjelas (lihat §0.1 `PRODUCTION_MIGRATION_PLAN.md`). Fungsi tetap memverifikasi token lewat `auth.getUser` (`supabase/functions/delete-account/index.ts`), jadi tidak ada jalur tanpa verifikasi yang terlihat | **Implemented** — pengaturan sudah versioned; pastikan platform mengikuti konfigurasi repo |
 | C-02 | CORS `delete-account` membuka semua origin (`*`) | Low | Sebelumnya `index.ts` mengirim `Access-Control-Allow-Origin: *`. Kini `cors.mjs` hanya mengizinkan origin persis dari `WEB_ALLOWED_ORIGINS`, menolak `*`, dan fail-closed bila kosong; 12 uji di `scripts/__tests__/delete-account-cors.test.mjs` | **Implemented**; **Passed locally**; origin sebenarnya **Blocked** sampai B-02 — isi `WEB_ALLOWED_ORIGINS` dengan origin halaman setelah URL-nya diketahui, lalu uji preflight/403 dari browser |
 | C-03 | Action workflow dipin ke tag mayor (`@v7`, `@v4`), bukan SHA | Low | `grep 'uses:' .github/workflows` | **Open** — pin SHA sebelum rilis publik; perubahan besar, tidak dilakukan di sini |
 | C-04 | Workflow Pages sudah dieksekusi, deployment belum berhasil | — | Run pertama: job build (uji statis + unggah artefak) lulus; `deploy-pages` gagal `404` karena Pages belum aktif | **Blocked** — B-02; bukan kegagalan kode workflow |
@@ -98,7 +98,7 @@ pemilik/produk/legal) dan **tidak diketahui** (tidak ada bukti yang cukup untuk 
 | D-01 | Aktifkan GitHub Pages dan tentukan backend yang ditunjuk `config.js` (development untuk uji, produksi untuk Play) | Tanpa URL live, syarat Play Console dan uji halaman tidak terpenuhi | Pemilik repository |
 D-01a (personal): Untuk 5 pengguna internal, tetap pakai development project `xvmcpfkkveeaevfcvfug`. Aktifkan GitHub Pages hanya jika dibutuhkan untuk internal testing; tidak memerlukan publik. | D-02 | Sahkan retensi laporan bahaya, audit moderasi, pesan yang diredaksi, dan metadata job | Kebijakan publik saat ini menyebut "disimpan selama diperlukan" tanpa periode; cleanup otomatis belum boleh dibuat sebelum dasar hukumnya jelas | Produk + legal |
 | D-03 | Buat project Supabase produksi, backup, dan prosedur rollback | Beta publik tidak boleh berjalan di project development | Pemilik + engineering |
-D-03a (personal): Untuk 5 pengguna internal, masih pakai development project `xvmcpfkkveeaevfcvfug`. Pada 28 Oktober 2026, project ini mencatat 30 migration dan 12/12 RLS test lulus; tidak ada kebutuhan project produksi terpisah untuk penggunaan pribadi. | D-04 | Tetapkan jadwal cadangan/verifikasi keystore | Keystore hilang = APK terpasang tidak bisa diperbarui | Pemilik |
+D-03a (personal): Untuk 5 pengguna internal, masih pakai development project `xvmcpfkkveeaevfcvfug`. Pada 28 Oktober 2026, project ini mencatat **31 migration** (§7d) dan 12/12 RLS test lulus; tidak ada kebutuhan project produksi terpisah untuk penggunaan pribadi. | D-04 | Tetapkan jadwal cadangan/verifikasi keystore | Keystore hilang = APK terpasang tidak bisa diperbarui | Pemilik |
 | D-05 | Tetapkan nama paket final (`com.rodakawan.app` masih sementara, ADR-015) | Tidak bisa diubah setelah unggah pertama Play | Pemilik produk |
 | D-06 | Penyedia peta — **sudah diputuskan lewat ADR-082** (28 Oktober 2026): MapLibre + MapTiler, menggantikan ADR-064. Logo MapTiler lokal dan pemulihan gagal memuat style sudah **Implemented** (tiket `MAP_REALTIME_TICKET.md` MAP-6); sisa tindakan pemilik: buat akun/pilih paket, isi `EXPO_PUBLIC_MAP_STYLE_URL`, serta setel kuota/alert (P-1…P-3) | Marker peta dan P-03 tetap **Blocked**: prebuild dan ekspor JS lulus, tetapi build APK belum dapat berjalan karena SDK Android tidak terkonfigurasi; setelah SDK tersedia, butuh development build dengan style URL sah dan verifikasi native. Belum ada klaim uji perangkat | Pemilik produk |
 | D-07 | Ratifikasi model persetujuan follow (ADR-039) | Fitur sosial M6, bukan blocker beta inti | Pemilik produk |
@@ -187,6 +187,29 @@ dipertahankan apa adanya dan tidak diubah.
 | `npx supabase migration list --linked` | **31 lokal = 31 remote**; `20261028031237` ada di kedua kolom |
 | Asersi dua sisi | `anon` ditolak EXECUTE pada enam helper; `authenticated` tetap diizinkan (policy RLS termasuk policy Storage logo klub tidak berubah aksesnya) |
 | Uji yang tidak dijalankan | `npm test`, `test:scripts`, `typecheck`, `lint`, `format:check`, `storage:test`, E2E, `export:android` — tidak ada perubahan kode aplikasi/TS pada perubahan ini; jalankan di CI sebelum rilis |
+
+## 7e. Verifikasi lokal 29 Oktober 2026 (tanpa backend)
+
+Dijalankan pada branch `audit/current-main-2026-10-28`. **Hanya gate lokal**: tidak ada koneksi
+ke database, tidak ada `.env*` yang dibaca, tidak ada perubahan kode yang dibuat sesi ini, dan
+tidak ada build APK native. Hasilnya **Passed locally**, bukan pengganti bukti dev backend.
+
+| Perintah | Hasil |
+| --- | --- |
+| `npm run typecheck` | exit 0 |
+| `npm run lint` | exit 0 |
+| `npm run format:check` | exit 0 |
+| `npm test -- --ci` | exit 0 — **48 suite / 533 test**; pretest lulus: `deps:check` + `db:test:lint` (**12 berkas uji / 31 migration**) |
+| `npm run test:scripts` | exit 0 — **97 suite / 401 test** |
+| `npm run doctor` | exit 0 — **21/21** pemeriksaan (memperbarui catatan 27–28 Oktober yang terblokir `EAI_AGAIN exp.host`) |
+| `npm run export:android` | exit 0 — bundel Android dibuat; **bukan** APK native |
+| `npm audit` (hanya-baca) | **20 kerentanan** (14 low, 3 moderate, 3 high); dengan `--omit=dev` **18** (12 low, 3 moderate, 3 high). `npm audit fix --force` menawarkan `expo@51.0.39` (perubahan besar) → tetap **jangan dijalankan**; rincian di AUD-25 |
+| `gh release list` + `git tag --sort=-creatordate` | rilis terbaru = **`v0.1.0-build75`** (29 Oktober 2026); dipakai untuk mengoreksi klaim "APK terbaru" di README, ROADMAP, dan QA_TEST_PLAN |
+| `npm ci`, `db:test`, `db:types:check`, `storage:test`, `e2e:*`, `beta:preflight`, build Gradle | **NOT RUN** — butuh target backend/kredensial/Android SDK yang tidak dipakai pada sesi ini |
+
+Catatan: suite `ChatPanel` memunculkan peringatan React `act(...)` yang **tidak menggagalkan**
+run. Berkas `package.json` dan `package-lock.json` sudah dimodifikasi sebelum sesi ini dan
+dipertahankan apa adanya.
 
 ## 8. Perintah verifikasi (historis, 25 Oktober 2026)
 

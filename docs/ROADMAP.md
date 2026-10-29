@@ -112,8 +112,8 @@ butuh APK di perangkat tetap **Blocked**.
       ketika file database berubah; run pertama hijau pada 16 Oktober 2026 (`38862870367`, notice
       `UJI RLS PROFIL LULUS`, 120 perintah).
 - [x] Menjalankan rilis APK pertama sampai GitHub Release berisi APK. — `v0.1.0-build9` (15 Oktober
-      2026) terbit; `v0.1.0-build26` (20 Oktober 2026, `b0c8361`) adalah build terbaru (lapisan
-      provider peta), `v0.1.0-build23` dari `df75ba1` adalah build terakhir yang memuat perbaikan
+      2026) terbit; `v0.1.0-build26` (20 Oktober 2026, `b0c8361`) adalah build terbaru pada saat catatan
+      itu ditulis (lapisan provider peta; rilis terbaru repo per 29 Oktober 2026 adalah `v0.1.0-build75`), `v0.1.0-build23` dari `df75ba1` adalah build terakhir yang memuat perbaikan
       pelacakan M3, dan `v0.1.0-build20` dari `fa4397e` adalah build terakhir yang hanya memuat
       Milestone 2 (baseline audit: `v0.1.0-build19` dari `749424c`).
 - [ ] Uji manual AUTH-01…AUTH-14 dan PROF-01…PROF-07 di perangkat. — **Blocked** (APK tersedia, tetapi
@@ -169,9 +169,10 @@ termasuk Storage foto/logo/avatar, foto profil, dan workflow perjalanan, diverif
 teramati; tag APK dan kasus uji per kasus **tidak tersedia sebagai artefak**, jadi klaim ini dicatat
 sebagai laporan pemilik, bukan bukti uji terverifikasi. Basis implementasi: `749424c` (tag
 `v0.1.0-build19`, 105.904.027 byte, SHA-256 `775a3309…b3d9`); build Milestone 2 terakhir:
-`v0.1.0-build20` dari `fa4397e` (105.904.031 byte, SHA-256 `a4ae87b4…fe9d`); build terbaru saat ini:
-`v0.1.0-build23` dari `df75ba1` (106.518.751 byte, SHA-256 `2f2890…9ee7`); build terbaru:
-`v0.1.0-build26` dari `b0c8361` (106.524.231 byte, SHA-256 `97e702…2432`). Implementasi `cf818be`,
+`v0.1.0-build20` dari `fa4397e` (105.904.031 byte, SHA-256 `a4ae87b4…fe9d`); build Milestone 3 kala itu:
+`v0.1.0-build23` dari `df75ba1` (106.518.751 byte, SHA-256 `2f2890…9ee7`); build terakhir yang tercatat
+di catatan Milestone 2 ini: `v0.1.0-build26` dari `b0c8361` (106.524.231 byte, SHA-256 `97e702…2432`).
+Rilis terbaru repo per 29 Oktober 2026 adalah `v0.1.0-build75` (lihat `CHANGELOG.md`). Implementasi `cf818be`,
 checklist perangkat `1ef13a8`, perbaikan versi Expo `a9858a9`, perbaikan generator tipe `ca2461c`. CI #26/RLS #4/Release
 #19 hijau pada `749424c`; CI #27/Release #20 hijau pada `fa4397e`. Setelah tag hanya ada commit
 dokumentasi `ee0a0bd`.

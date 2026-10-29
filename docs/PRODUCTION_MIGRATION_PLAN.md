@@ -401,8 +401,9 @@ Lakukan **setelah** preflight produksi 8/8 dan sebelum APK produksi disebar.
    memblokir panggilan. Jangan menerbitkan halaman dan jangan melemahkan
    verifikasi; catat sebagai **Blocked**, lalu putuskan `verify_jwt = false`
    khusus fungsi ini (fungsi tetap memverifikasi `auth.getUser`) atau pola
-   gateway yang didukung. `supabase/config.toml` belum ada di repo (C-01), jadi
-   pengaturan platform harus diperiksa di Dashboard dan dicatat di laporan.
+   gateway yang didukung. `supabase/config.toml` kini ada di repo dan menyetel
+   `verify_jwt = false` untuk fungsi ini (C-01 ditutup); periksa di Dashboard bahwa
+   pengaturan platform mengikuti konfigurasi itu dan catat di laporan.
 5. Aktifkan **Settings → Pages → Source: GitHub Actions**. Push perubahan
    `config.js` ke `main` (trigger `web/**`) atau jalankan
    `gh workflow run pages.yml`. Catat `page_url` dari ringkasan run.
