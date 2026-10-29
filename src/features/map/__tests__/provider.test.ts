@@ -115,7 +115,7 @@ describe('resolveMapRenderState', () => {
     if (state.kind !== 'renderer_missing') throw new Error('jenis keadaan salah');
     expect(state.provider).toBe('maptiler');
     expect(state.attribution).toEqual(MAP_ATTRIBUTION.maptiler);
-    expect(state.notice).toMatch(/renderer peta belum dipasang di build ini/);
+    expect(state.notice).toMatch(/renderer yang cocok belum terdaftar pada layar ini/);
   });
 
   it('renderer dengan provider berbeda tidak dianggap siap', () => {

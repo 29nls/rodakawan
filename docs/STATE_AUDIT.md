@@ -42,7 +42,7 @@ dan tidak menampilkan empty state palsu seolah-olah datanya memang kosong.
 | State data per layar | masing-masing `src/app/*.tsx` | Discriminated union eksplisit, mis. `loading \| ready \| error` dan `loading \| missing \| ready \| error`. |
 | `ChatPanel` | `src/features/chat/ChatPanel.tsx` | `status: 'loading' \| 'ready' \| 'error'` untuk pesan, plus `connection: 'connecting' \| 'online' \| 'offline'` untuk realtime. |
 | `PhotoCard` | `src/features/media/components/PhotoCard.tsx` | `busy` (tombol nonaktif + label “Memproses…”), `hasPhoto`, `emptyText`. |
-| `MapStatusCard` / `resolveMapRenderState` | `src/features/map/` | `unconfigured` / `renderer_missing` / siap; tidak ada tile palsu. |
+| `MapStatusCard` / `resolveMapRenderState` | `src/features/map/` | `unconfigured` / `renderer_missing` / `ready`; adapter MapLibre terdaftar, tanpa tile palsu. |
 
 ## 3. Inventaris per layar
 

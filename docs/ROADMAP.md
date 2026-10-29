@@ -207,12 +207,11 @@ melaporkan build `v0.1.0-build23` dipakai tanpa galat yang teramati (**owner-rep
 tidak menggantikan uji khusus yang masih Blocked di bawah. Formulir buat/ubah perjalanan kini punya
 component test sendiri (11 test).
 
-Gerbang tambahan sebelum layar peta: **penyedia peta/tile belum dipilih** (ADR-009/ADR-064). Opsi,
-lisensi, kuota, privasi, dan syarat offline ada di
-[`docs/MAP_PROVIDER_DECISION.md`](MAP_PROVIDER_DECISION.md). Riset 20 Oktober 2026 mengusulkan
-MapLibre + MapTiler Flex dan sudah dicatat sebagai **Proposed**; persetujuan pemilik produk belum ada,
-jadi dependency peta tetap **tidak** ditambahkan. Sampai itu terjadi, layar perjalanan menampilkan **daftar posisi**
-dengan label live/basi/belum ada, bukan peta tiruan.
+Provider peta sudah diputuskan melalui ADR-082: MapLibre + MapTiler, menggantikan ADR-064. Dependency
+native dan adapter marker sudah dipasang; detail perbandingan, style URL dan prasyarat pemilik ada di
+[`docs/MAP_PROVIDER_DECISION.md`](MAP_PROVIDER_DECISION.md) dan
+[`docs/MAP_REALTIME_TICKET.md`](MAP_REALTIME_TICKET.md). Sampai development build serta URL MapTiler
+tervalidasi, layar mempertahankan daftar posisi + label kesegaran dan tidak mengklaim peta sudah diuji.
 
 - [x] Create/join/leave ride, undangan, dan pengeluaran peserta lewat RPC.
 - [x] State machine planned/active/completed/cancelled, ditegakkan di database.
@@ -228,9 +227,8 @@ dengan label live/basi/belum ada, bukan peta tiruan.
       593 ms] → pengguna non-anggota tidak menerima event dan tidak bisa membaca → menyelesaikan
       perjalanan menghapus lokasi terakhir; tiga akun uji dibersihkan dengan verifikasi 0 sisa).
       Ini melengkapi — bukan menggantikan — uji dua perangkat di bawah, yang tetap **Blocked**.
-- [ ] Map markers (setelah provider dipilih dan renderer diuji di development build). Kontrak
-      renderer, atribusi, dan keadaan konfigurasi/gagal sudah disiapkan di `src/features/map/`
-      (20 Oktober 2026) tanpa menambahkan dependency peta.
+- [x] Adapter MapLibre + marker peserta (MAP-1/MAP-2); uji unit lokal.
+- [ ] Validasi tile, atribusi, marker stale/opt-out pada development build dengan style URL MapTiler.
 - [ ] Test dua perangkat fisik, GPS mati, mode pesawat, force-stop/reboot, dan baterai/network 30
       menit. (Realtime lintas pengguna lewat API sudah dibuktikan `e2e:shared-ride` di atas; yang
       belum adalah kombinasi izin OS + perilaku HP fisik.)
@@ -243,15 +241,15 @@ aktif; tracking tidak berjalan tanpa ride aktif dan opt-in.
 
 **Status: diimplementasikan dan lulus lokal; migration M4 sudah diterapkan ke development, dan uji
 RLS/RPC-nya lulus terhadap backend development lewat Database RLS run #19 (commit `1aa1480`,
-22 Oktober 2026 — 7/7 berkas uji). Bukti perangkat belum ada.** Pemilik produk memilih jalur
-kedua [`docs/MILESTONE_4_PLAN.md`](MILESTONE_4_PLAN.md): menunda keputusan peta (ADR-064) dan uji
-perangkat khusus M3, lalu mengerjakan M4 **tanpa marker peta**. Penundaan itu bukan bukti bahwa uji
-M3 sudah lulus.
+22 Oktober 2026 — 7/7 berkas uji). Bukti perangkat belum ada.** M4 dijalankan setelah pemilik produk
+menunda uji perangkat M3 dan marker peta agar chat serta daftar laporan dapat dikerjakan lebih dulu.
+Provider peta konvoi kemudian diputuskan melalui ADR-082; penundaan uji M3 bukan bukti bahwa uji
+perangkatnya lulus.
 
 - [x] CRUD report dan expiry rules — RPC `create_hazard`/`update_hazard`/`remove_hazard`/
       `confirm_hazard`/`expire_hazard_reports`; `expires_at` dihitung trigger dari `created_at`.
 - [x] List/filter laporan — tab Peringatan, filter kategori + keparahan, label area perkiraan dari
-      koordinat. **Tanpa peta** (ADR-064 masih Proposed); tidak ada marker atau tile tiruan.
+      koordinat. **Tanpa peta hazard** (di luar lingkup ADR-082); tidak ada marker atau tile tiruan.
 - [x] Report abuse/confirm report — `report_content` (tabel `content_reports` lama), satu konfirmasi
       per pengguna per laporan.
 - [x] Chat persisted + realtime events — `chat_messages` + Postgres Changes, keyset pagination,

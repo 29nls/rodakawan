@@ -7,6 +7,7 @@ import {
   setRideLocationSharing,
   type RideDetails,
 } from '@/features/rides/api';
+import type { MapRendererProps } from '@/features/map/provider';
 import {
   isRideLocationTrackingActive,
   readTrackedRideId,
@@ -61,7 +62,38 @@ jest.mock('@/features/rides/tracking', () => ({
 }));
 
 jest.mock('@/lib/env', () => ({
-  readPublicEnv: () => ({ EXPO_PUBLIC_MAP_STYLE_URL: undefined }),
+  readPublicEnv: () => ({
+    EXPO_PUBLIC_MAP_STYLE_URL: 'https://api.maptiler.com/maps/streets/style.json?key=unit-test',
+  }),
+  isHttpsUrl: (value: string) => {
+    try {
+      return new URL(value).protocol === 'https:';
+    } catch {
+      return false;
+    }
+  },
+}));
+
+jest.mock('@maplibre/maplibre-react-native', () =>
+  jest.requireActual('@/test-support/mapLibreMock'),
+);
+
+jest.mock('@/features/map/MapLibreRenderer', () => ({
+  MapLibreRenderer: jest.fn(({ styleUrl, markers, initialRegion }: MapRendererProps) => {
+    const { Text, View } = jest.requireActual('react-native');
+
+    return (
+      <View accessibilityLabel={styleUrl} testID="maplibre-map">
+        {markers.map((marker) => (
+          <View key={marker.userId} testID={`maplibre-marker-${marker.userId}`}>
+            <Text>{marker.label}</Text>
+            <Text>{marker.freshness === 'stale' ? 'Basi' : 'Live'}</Text>
+          </View>
+        ))}
+        <Text>{initialRegion ? 'region tersedia' : 'region kosong'}</Text>
+      </View>
+    );
+  }),
 }));
 
 const mockedDetails = jest.mocked(getRideDetails);
@@ -73,6 +105,9 @@ const mockedBackground = jest.mocked(requestBackgroundPermission);
 const mockedTrackingActive = jest.mocked(isRideLocationTrackingActive);
 const mockedStop = jest.mocked(stopRideLocationTracking);
 const mockedTrackedRide = jest.mocked(readTrackedRideId);
+const mockedMapLibreRenderer = jest.mocked(
+  jest.requireMock('@/features/map/MapLibreRenderer').MapLibreRenderer,
+);
 
 const USER_ID = '11111111-1111-1111-1111-111111111111';
 const OTHER_ID = '22222222-2222-2222-2222-222222222222';
@@ -189,6 +224,32 @@ describe('detail perjalanan', () => {
     mockedTrackingActive.mockResolvedValue(false);
     mockedStop.mockResolvedValue(undefined);
     mockedTrackedRide.mockReturnValue(null);
+  });
+
+  it('mendaftarkan renderer dan mengirim marker basi pada layar perjalanan', async () => {
+    const details = buildDetails();
+    details.locations = [
+      {
+        ...details.locations[0]!,
+        recorded_at: new Date(Date.now() - 61_000).toISOString(),
+      },
+    ];
+    mockedDetails.mockResolvedValue({ ok: true, data: details });
+
+    await render(<RideScreen />);
+
+    expect(await screen.findByText('Kopdar Sabtu')).toBeTruthy();
+    await waitFor(() => expect(mockedMapLibreRenderer).toHaveBeenCalled());
+    expect(mockedMapLibreRenderer).toHaveBeenCalledWith(
+      expect.objectContaining({
+        styleUrl: 'https://api.maptiler.com/maps/streets/style.json?key=unit-test',
+        markers: [expect.objectContaining({ userId: OTHER_ID, label: 'Budi', freshness: 'stale' })],
+        initialRegion: expect.objectContaining({ latitude: -6.2, longitude: 106.8 }),
+      }),
+    );
+    expect(screen.getByTestId(`maplibre-marker-${OTHER_ID}`)).toBeTruthy();
+    expect(screen.getAllByText('Basi').length).toBeGreaterThan(0);
+    expect(screen.getByText('region tersedia')).toBeTruthy();
   });
 
   it('menyalakan consent lalu memulai pelacakan perangkat', async () => {

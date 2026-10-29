@@ -37,7 +37,7 @@ Istilah status dipakai konsisten di seluruh dokumentasi:
 | Milestone 2: foto profil (avatar) | Ya — bucket privat owner-only, unggah/ganti/hapus dari tab Profil, foto diperkecil otomatis | Ya (17 unit test) | **Ya** (uji HTTP Storage LULUS) | **Ya** (dilaporkan pemilik) |
 | Milestone 3: perjalanan klub (buat, undang, gabung, keluar, host memulai/menyelesaikan/membatalkan) | Ya — RPC transactional, state machine di database | Ya (27 test fitur + 20 test layar, termasuk 11 test formulir buat/ubah) | **Ya** (uji RLS/RPC 67 perintah + E2E dua pengguna/realtime LULUS 25 Okt 2026) | **Blocked** (dua perangkat fisik; alur dua pengguna lewat API sudah terbukti `e2e:shared-ride`) |
 | Milestone 3: berbagi lokasi opt-in (foreground + background) | Ya — consent terpisah dari izin OS, sampling 15 dtk/25 m, basi 60 dtk, lokasi terakhir dihapus saat opt-out/keluar/ride final | Ya | **Ya** (uji allow/deny lokasi + E2E: lokasi terakhir terhapus saat ride selesai, 25 Okt 2026) | **Blocked** (izin, GPS mati, force-stop, baterai 30 menit di HP fisik) |
-| Milestone 3: peta konvoi | **Belum** — ADR-064 masih **Proposed** (rekomendasi MapLibre + MapTiler Flex, riset ulang 20 Oktober 2026); layar menampilkan daftar posisi + status kesegaran, bukan peta tiruan | — | — | — |
+| Milestone 3: peta konvoi | **Implemented** (MAP-1/MAP-2) — renderer MapLibre + adapter marker terdaftar; tile memerlukan style URL MapTiler. | Unit lokal: adapter/marker live-basi lulus | — | **Blocked** (development build + uji perangkat dan URL MapTiler belum tersedia) |
 | Milestone 4: laporan bahaya jalan (buat, filter, ubah/lepas, konfirmasi, laporkan) | Ya — RPC transaksional, expiry dihitung server, idempotensi + rate limit + deteksi duplikat di database; tanpa peta, daftar memakai label area perkiraan | Ya (29 test fitur + 6 test layar) | **Ya** (uji RLS LULUS — Database RLS #19) | **Blocked** (belum ada build perangkat) |
 | Milestone 4: chat konvoi (teks, ubah/hapus 15 menit, pesan sistem, realtime, laporkan, blokir) | Ya — Postgres Changes pada `chat_messages`, keyset pagination, idempotensi `client_message_id`, panel chat di detail perjalanan; pesan teks dari pengguna yang diblokir disaring **di server** (policy, ADR-068), bukan di UI | Ya (24 test API + 9 test panel) | **Ya** (uji RLS LULUS — Database RLS #19; chat realtime lintas pengguna dibuktikan E2E 25 Okt 2026) | **Blocked** |
 | Milestone 4: moderasi (`content_reports`, `moderation_actions`, `user_blocks`) | Ya — pelaporan lewat RPC `report_content`, dashboard `/moderation` untuk host perjalanan/admin klub dengan aksi hapus konten (soft delete), abaikan, dan tandai ditinjau, jejak audit yang hanya bisa dibaca lewat RPC; **tanpa** peran moderator global (ADR-067) | Ya (16 test layanan + 8 test layar) | **Ya** (uji RLS LULUS — Database RLS #19) | — |
@@ -83,8 +83,9 @@ Layar Milestone 2 (garasi dan klub) dan Milestone 3 (perjalanan) sepenuhnya **be
 aksinya memanggil service yang menembak tabel/RPC Supabase, dan setiap mutasi punya uji RLS allow/deny
 terhadap database development. Perjalanan memiliki daftar, formulir buat/ubah, detail peserta,
 undangan, serta kontrol host untuk memulai/menyelesaikan/membatalkan. Berbagi lokasi bersifat opt-in
-per perjalanan dan terpisah dari izin OS; peta **belum** dipasang, jadi layar menampilkan daftar
-posisi dengan label live/basi/belum ada — bukan peta atau koordinat contoh.
+per perjalanan dan terpisah dari izin OS; adapter peta MapLibre sudah dipasang, tetapi tanpa style
+URL MapTiler layar tetap menampilkan daftar posisi dan pesan konfigurasi — bukan peta atau koordinat
+contoh.
 
 Milestone 4 juga **berfungsi di aplikasi**; backend-nya sudah diverifikasi terhadap project
 development (**Database RLS #19**), sedangkan uji perangkat belum: tab **Peringatan**
@@ -95,8 +96,8 @@ riwayat 50 pesan, “muat pesan lama”, ubah/hapus 15 menit, pesan sistem, dan 
 Laporan penyalahgunaan ditinjau di **`/moderation`** (dibuka dari tab Profil): host perjalanan dan
 admin klub melihat antrean laporan atas konten yang mereka awasi, menghapus konten (soft delete),
 atau menutup laporan sebagai diabaikan/ditinjau — setiap tindakan tercatat di jejak audit.
-Karena ADR-064 belum disetujui, laporan bahaya **tidak** digambar di peta: setiap laporan menampilkan
-label area perkiraan (±1 km) dari koordinatnya, tanpa tile, marker, atau koordinat contoh.
+Laporan bahaya **tidak** digambar di peta (peta hazard berada di luar ADR-082): setiap laporan
+menampilkan label area perkiraan (±1 km) dari koordinatnya, tanpa tile, marker, atau koordinat contoh.
 
 **Hapus akun sudah berfungsi sebagai penghapusan penuh di server** (ADR-077). Dari tab Profil,
 **Hapus akun** membuka `/account-delete`: konsekuensinya dijelaskan lebih dulu, tombol baru aktif

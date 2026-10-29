@@ -15,11 +15,10 @@ type MapCanvasProps = {
 /**
  * Slot renderer peta.
  *
- * Komponen ini **tidak** mengimpor library peta. Begitu ADR-064 disetujui,
- * satu-satunya perubahan yang diperlukan adalah mendaftarkan renderer
- * (`MapRendererRegistration`) di layar pemanggil; `MapCanvas` lalu menggambar
- * peta dan atribusinya. Selama renderer belum ada, komponen ini menampilkan
- * alasan yang eksplisit — tidak ada peta tiruan, tile publik, atau marker contoh.
+ * Komponen ini tidak mengimpor library peta secara langsung; renderer didaftarkan
+ * melalui kontrak `MapRendererRegistration` oleh layar pemanggil. `MapCanvas`
+ * menggambar peta dan atribusinya saat state siap, atau menampilkan alasan
+ * eksplisit — tidak ada peta tiruan, tile publik, atau marker contoh.
  */
 export function MapCanvas({ state, markers, testID = 'map-canvas' }: MapCanvasProps) {
   if (state.kind === 'ready') {

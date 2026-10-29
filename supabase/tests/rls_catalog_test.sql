@@ -194,14 +194,12 @@ do $$
 declare
   v_terbuka text;
   v_sig text;
-  v_izin_anon text[] := array[
-    'public.can_publish_ride_location(uuid)',
-    'public.is_club_admin(uuid)',
-    'public.is_club_member(uuid)',
-    'public.is_ride_active_member(uuid)',
-    'public.is_ride_host(uuid)',
-    'public.is_ride_member(uuid)'
-  ];
+  -- Kosong sejak migration 20261028031237: enam helper RLS terakhir yang
+  -- masih membuka EXECUTE untuk `anon` telah dicabut, dan asersi dua sisi
+  -- (anon ditolak, authenticated tetap diizinkan) ditambahkan di
+  -- supabase/tests/rls_catalog_hardening_test.sql. Jangan menambah entri baru
+  -- di sini tanpa migration yang mencabutnya kembali.
+  v_izin_anon text[] := array[]::text[];
   v_allowed text[] := v_izin_anon;
 begin
   select string_agg(signature, ', ' order by signature)
@@ -218,7 +216,10 @@ begin
   -- Anti-usang: setiap entri pengecualian harus benar-benar masih terbuka.
   -- Fungsi trigger (`bootstrap_profile`, `clear_ride_location_on_opt_out`,
   -- `clear_ride_locations_on_finish`) sudah dicabut `EXECUTE`-nya oleh
-  -- migration 20261024003227 dan karena itu tidak boleh ada di daftar ini.
+  -- migration 20261024003227, dan enam helper RLS (`can_publish_ride_location`,
+  -- `is_club_admin`, `is_club_member`, `is_ride_active_member`, `is_ride_host`,
+  -- `is_ride_member`) oleh migration 20261028031237 — tidak ada satupun yang
+  -- boleh ada di daftar ini lagi.
   foreach v_sig in array v_allowed loop
     if not exists (
       select 1 from pg_temp.uji_definer_terbuka() o

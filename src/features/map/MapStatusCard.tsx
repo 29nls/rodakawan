@@ -8,6 +8,7 @@ import { Divider } from '@/components/ui/Divider';
 import { InfoRow } from '@/components/ui/InfoRow';
 import { SectionHeader } from '@/components/ui/SectionHeader';
 import { spacing } from '@/constants/theme';
+import { MapLibreRenderer } from '@/features/map/MapLibreRenderer';
 import {
   resolveMapRenderState,
   type MapProviderId,
@@ -43,7 +44,7 @@ function describeStatus(state: MapRenderState): StatusSummary {
   }
 
   if (state.kind === 'renderer_missing') {
-    return { headline: 'Renderer belum dipasang', tone: 'warning', detail: state.notice };
+    return { headline: 'Renderer tidak cocok', tone: 'warning', detail: state.notice };
   }
 
   return {
@@ -64,9 +65,9 @@ export type MapStatusCardProps = {
  * Kartu diagnostik peta untuk layar sistem.
  *
  * Memakai logika keadaan yang sama dengan layar perjalanan
- * (`resolveMapRenderState`), jadi keadaan "belum dikonfigurasi" dan "renderer
- * belum dipasang" terlihat tanpa harus membuka detail perjalanan. Nilai URL
- * gaya tidak ditampilkan agar screenshot tidak membocorkan konfigurasi —
+ * (`resolveMapRenderState`), jadi keadaan "belum dikonfigurasi" dan konfigurasi
+ * style-provider yang tidak cocok terlihat tanpa harus membuka detail perjalanan.
+ * Nilai URL gaya tidak ditampilkan agar screenshot tidak membocorkan konfigurasi —
  * hanya penyedianya.
  */
 export function MapStatusCard({
@@ -78,7 +79,7 @@ export function MapStatusCard({
     () =>
       resolveMapRenderState({
         styleUrl: styleUrl ?? readPublicEnv().EXPO_PUBLIC_MAP_STYLE_URL,
-        renderer,
+        renderer: renderer ?? { provider: 'maptiler', renderer: MapLibreRenderer },
       }),
     [styleUrl, renderer],
   );
@@ -88,7 +89,7 @@ export function MapStatusCard({
     <View testID={testID}>
       <Card>
         <SectionHeader
-          subtitle="Keadaan lapisan peta untuk build ini; keputusan penyedia menunggu ADR-064."
+          subtitle="Keadaan lapisan peta untuk build ini; MapLibre dan MapTiler ditetapkan oleh ADR-082."
           title="Peta"
         />
         <Divider />
@@ -111,7 +112,7 @@ export function MapStatusCard({
             />
             <Divider />
             <InfoRow
-              detail="Baris atribusi disiapkan; tampil hanya bila tile benar-benar digambar."
+              detail="Baris atribusi tampil bersama peta yang digambar."
               label="Atribusi wajib"
               value={`${state.attribution.length} baris`}
             />
@@ -120,8 +121,8 @@ export function MapStatusCard({
         {state.kind === 'renderer_missing' ? (
           <View style={styles.hint}>
             <AppText variant="caption" tone="muted">
-              Langkah pemasangan renderer: src/features/map/README.md. Tanpa renderer, posisi
-              anggota tetap tampil sebagai daftar dengan waktu pembaruan.
+              Renderer MapLibre tersedia pada build aplikasi. Tanpa URL MapTiler, posisi anggota
+              tetap tampil sebagai daftar dengan waktu pembaruan.
             </AppText>
           </View>
         ) : null}

@@ -4,14 +4,13 @@ Status: **Implemented · Passed locally · Passed against dev backend**. Tanggal
 
 > **Pembaruan 21 Oktober 2026:** pemilik produk menyatakan uji perangkat khusus M3 **ditunda**
 > (dua perangkat, izin dicabut, GPS mati/mode pesawat, force-stop/reboot, baterai 30 menit) dan
-> ADR-064 tetap **Proposed**, lalu Milestone 4 dikerjakan tanpa marker peta. Penundaan ini **bukan**
+> ADR-064 kemudian digantikan ADR-082; Milestone 4 dikerjakan tanpa marker peta. Penundaan ini **bukan**
 > bukti bahwa uji tersebut lulus: statusnya tetap **Deferred by owner** dan tidak boleh dinaikkan tanpa
 > bukti. Lihat ADR-066 dan `docs/QA_TEST_PLAN.md` bagian 8a.
 **Tested on physical device: Blocked** untuk alur perjalanan dua perangkat, background/reboot, dan
 pengukuran baterai. Pemilik aplikasi melaporkan build `v0.1.0-build23` dipakai tanpa galat yang
 teramati (**owner-reported**); laporan itu tidak menaikkan status uji perangkat khusus di atas karena
-tidak disertai bukti per kasus. Peta **belum dipasang** (ADR-064 masih **Proposed**); layar
-menampilkan daftar posisi dan keadaan “peta belum tersedia” yang eksplisit, bukan peta tiruan.
+tidak disertai bukti per kasus. Renderer peta MapLibre sudah dipasang melalui ADR-082; penerimaan perangkat masih **Blocked** sampai ada style URL dan bukti per kasus; layar menampilkan daftar posisi dan keadaan eksplisit saat peta belum dikonfigurasi, bukan peta tiruan.
 
 **Gerbang masuk:** pemilik aplikasi melaporkan bahwa Milestone 2 sudah dicoba di perangkat tanpa galat
 yang teramati. Laporan itu dicatat sebagai **owner-reported**, bukan bukti uji yang direkam repository
@@ -21,11 +20,9 @@ dan tidak dinaikkan menjadi “seluruh checklist lulus”.
 
 Keputusan yang sudah diambil untuk M3 ada di ADR-065: satu baris lokasi terakhir, consent per
 perjalanan, sampling 15 detik/25 meter, ambang basi 60 detik, pembersihan lewat trigger, RPC untuk
-seluruh mutasi, dan Realtime melalui Postgres Changes. Peta tetap ditunda karena ADR-064 belum final:
-jangan menambahkan dependency peta sebelum pemilik produk memilih provider dan kredensialnya diuji di
-development build. Riset ulang 20 Oktober 2026 mengusulkan MapLibre + MapTiler Flex
-(lihat [`MAP_PROVIDER_DECISION.md`](MAP_PROVIDER_DECISION.md) bagian 5), tetapi usulan itu belum
-diterima sehingga dependency peta tetap belum ditambahkan.
+seluruh mutasi, dan Realtime melalui Postgres Changes. ADR-082 kemudian menetapkan MapLibre + MapTiler
+untuk peta konvoi. Dependency dan adapter native sudah dipasang; penerimaan visual tetap menunggu
+style URL MapTiler dan uji development build/perangkat (lihat [`MAP_REALTIME_TICKET.md`](MAP_REALTIME_TICKET.md)).
 
 ## Tujuan
 
@@ -139,7 +136,7 @@ penting, uji perjalanan tetap terdaftar di runner, dan direktori draf lama tidak
 | Tab daftar perjalanan | `src/app/(tabs)/rides.tsx` | Implemented · component test |
 | Buat/ubah perjalanan | `src/app/ride-new.tsx` | Implemented · component test (11 test, 20 Oktober 2026) |
 | Detail, undangan, consent, posisi | `src/app/ride.tsx` | Implemented · component test |
-| Peta | — | **Belum** — diblokir keputusan provider (ADR-064); layar menampilkan daftar + label kesegaran, bukan peta tiruan |
+| Peta konvoi | `src/features/map/MapLibreRenderer.tsx`, `src/app/ride.tsx` | **Implemented (MAP-1/MAP-2)**; style URL MapTiler dan penerimaan native/perangkat masih **Blocked** |
 
 Tidak ada tombol demo. Setiap tombol memanggil RPC/service nyata; tombol yang tidak relevan dengan
 peran/status disembunyikan, tetapi otorisasi tetap diputuskan database.

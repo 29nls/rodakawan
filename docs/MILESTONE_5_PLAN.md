@@ -45,13 +45,14 @@ pihak ketiga, dan akan lebih murah dikerjakan setelah M4 terbukti di perangkat.
 
 Jangan dikerjakan di M5 dan jangan dicatat lulus:
 
-- pemilihan final provider/renderer peta (ADR-064 masih **Proposed**);
+- uji native/perangkat peta konvoi (provider sudah dipilih MapLibre + MapTiler melalui ADR-082);
 - uji live-location dua perangkat khusus;
 - izin lokasi ditolak, GPS mati, force-stop, reboot;
 - uji baterai/jaringan 30 menit.
 
-M5 **tidak boleh** menambah dependency peta native atau memilih provider berbayar. Layar yang
-membutuhkan peta tetap menyatakan "peta belum tersedia" dan menampilkan daftar posisi.
+M5 **tidak boleh** menambah dependency peta native atau memilih provider berbayar. Adapter konvoi
+kemudian dipasang melalui MAP-1/MAP-2; tanpa style URL valid layar tetap menampilkan keadaan eksplisit
+dan daftar posisi.
 
 ## 4. Irisan vertikal pertama yang dipilih
 

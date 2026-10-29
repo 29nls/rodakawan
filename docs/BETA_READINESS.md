@@ -45,7 +45,7 @@ pemilik/produk/legal) dan **tidak diketahui** (tidak ada bukti yang cukup untuk 
 | --- | --- | --- | --- | --- |
 | S-01 | RLS aktif pada semua tabel/API yang terekspos | **Passed against dev backend** | `npm run db:test` **12/12** lulus (28 Oktober 2026); `rls_catalog_test.sql` + `rls_catalog_hardening_test.sql` | Pertahankan kedua pagar di CI |
 | S-02 | `security definer` mengunci `search_path = ''`; view memakai `security_invoker` | **Passed against dev backend** | Pagar katalog + hardening; tidak ada pelanggaran di katalog development (tidak ada view tanpa `security_invoker`). Bisa disesuaikan untuk 5 pengguna. | Migration/view baru wajib mengikuti pola ini |
-| S-03 | Fungsi publik tidak terbuka ke `PUBLIC`/`anon` tanpa alasan | **Passed against dev backend** dengan **7 pengecualian beralasan** | `rls_catalog_hardening_test.sql`: 6 helper RLS + `touch_updated_at()` masih dapat dieksekusi `anon`; detektor diuji-diri dan daftar diperiksa anti-usang. Bisa disesuaikan untuk 5 pengguna internal. | Risiko diterima (AUD-11); cabut grant pada hardening berikut bila jalur anon tidak lagi membutuhkannya |
+| S-03 | Fungsi publik tidak terbuka ke `PUBLIC`/`anon` tanpa alasan | **Passed against dev backend** dengan **1 pengecualian beralasan** (`touch_updated_at()`, fungsi trigger) | Sejak 28 Oktober 2026 migration `20261028031237_revoke_anon_rls_helper_execute.sql` mencabut `anon` dari enam helper RLS; `rls_catalog_hardening_test.sql` menguji asersi dua sisi (anon ditolak, `authenticated` diizinkan) dan daftar pengecualian anti-usang; `npm run db:test` **12/12** lulus setelah push. Bisa disesuaikan untuk 5 pengguna internal. | AUD-11 ditutup; pertahankan pagar anti-usang di CI |
 | S-04 | Bucket Storage tetap privat | **Passed against dev backend** | Hardening test: tepat 3 bucket (`avatars`, `club-logos`, `vehicle-photos`), `public = false`; probe bucket publik tertangkap. Aturan ini tetap dihormati walaupun internal (5 pengguna). | Jangan menambah bucket publik |
 | S-05 | Policy Storage memakai path sebagai otorisasi | **Passed against dev backend** | `rls_profiles_test.sql` bagian 13; bucket privat, owner-only foto kendaraan/avatar, logo per peran, CHECK path. Bisa disesuaikan untuk 5 pengguna internal. | Unggahan HTTP nyata tetap **Blocked** (GAR-05/CLUB-11) |
 | S-06 | Data sensitif tidak terbaca `anon` | **Passed against dev backend** | Hardening test membuat satu baris `motorcycle_private_details`; pemilik membaca 1, `anon` membaca 0. Bisa dikonfigurasi untuk 5 pengguna internal. | Ulangi bila policy berubah |
@@ -67,7 +67,7 @@ pemilik/produk/legal) dan **tidak diketahui** (tidak ada bukti yang cukup untuk 
 | --- | --- | --- | --- |
 | P-01 | Akun, profil, klub, buat/gabung/perjalanan berfungsi di perangkat target | **Blocked** | Unit/komponen lulus; tidak ada bukti perangkat untuk alur penuh. Bisa diuji dengan 5 pengguna internal. |
 | P-02 | Live location foreground/background, izin ditolak, GPS mati, jaringan hilang, app dihentikan | **Blocked** | Rencana di `QA_TEST_PLAN.md` 8d; tidak ada artefak. Bisa diuji dengan 5 perangkat internal. |
-| P-03 | Marker menunjukkan waktu update; posisi lama tidak tampak live | **Implemented**; **Blocked** di perangkat | Logika stale + label umur posisi ada; renderer peta belum dipasang (ADR-064). Bisa diuji dengan 5 pengguna. |
+| P-03 | Marker menunjukkan waktu update; posisi lama tidak tampak live | **Implemented**; **Blocked** di perangkat | Adapter MapLibre + label status/umur lokasi ada; `prebuild --no-clean` dan ekspor Android lulus, tetapi build APK Gradle **Blocked** karena Android SDK/`ANDROID_HOME`/`ANDROID_SDK_ROOT` tidak tersedia; perlu SDK, style URL MapTiler, development build dan bukti perangkat (PD-03). Bisa diuji dengan 5 pengguna. |
 | P-04 | Non-anggota tidak dapat membaca lokasi/chat lewat API/Realtime | **Passed against dev backend** | `db:test` + `e2e:shared-ride`: pengguna C menerima 0 event realtime dan membaca 0 baris `rides`/`chat_messages`/`ride_locations`; pengiriman chat non-anggota ditolak RPC. Bukt perangkat: PD-15 di QA 8f | **Blocked** di perangkat |
 | P-05 | Road report kedaluwarsa dan dapat dilaporkan | **Passed against dev backend**; **Blocked** di perangkat. Bisa diuji dengan 5 pengguna internal. |
 | P-06 | Chat membatasi akses berdasarkan anggota perjalanan | **Passed against dev backend**; **Blocked** untuk realtime klien. Bisa dikonfigurasi untuk tim internal. |
@@ -100,7 +100,7 @@ D-01a (personal): Untuk 5 pengguna internal, tetap pakai development project `xv
 | D-03 | Buat project Supabase produksi, backup, dan prosedur rollback | Beta publik tidak boleh berjalan di project development | Pemilik + engineering |
 D-03a (personal): Untuk 5 pengguna internal, masih pakai development project `xvmcpfkkveeaevfcvfug`. Pada 28 Oktober 2026, project ini mencatat 30 migration dan 12/12 RLS test lulus; tidak ada kebutuhan project produksi terpisah untuk penggunaan pribadi. | D-04 | Tetapkan jadwal cadangan/verifikasi keystore | Keystore hilang = APK terpasang tidak bisa diperbarui | Pemilik |
 | D-05 | Tetapkan nama paket final (`com.rodakawan.app` masih sementara, ADR-015) | Tidak bisa diubah setelah unggah pertama Play | Pemilik produk |
-| D-06 | Setujui/tolak ADR-064 (penyedia peta) | Marker peta dan P-03 tidak bisa diklaim selesai | Pemilik produk |
+| D-06 | Penyedia peta — **sudah diputuskan lewat ADR-082** (28 Oktober 2026): MapLibre + MapTiler, menggantikan ADR-064. Logo MapTiler lokal dan pemulihan gagal memuat style sudah **Implemented** (tiket `MAP_REALTIME_TICKET.md` MAP-6); sisa tindakan pemilik: buat akun/pilih paket, isi `EXPO_PUBLIC_MAP_STYLE_URL`, serta setel kuota/alert (P-1…P-3) | Marker peta dan P-03 tetap **Blocked**: prebuild dan ekspor JS lulus, tetapi build APK belum dapat berjalan karena SDK Android tidak terkonfigurasi; setelah SDK tersedia, butuh development build dengan style URL sah dan verifikasi native. Belum ada klaim uji perangkat | Pemilik produk |
 | D-07 | Ratifikasi model persetujuan follow (ADR-039) | Fitur sosial M6, bukan blocker beta inti | Pemilik produk |
 | D-08 | Jadwalkan uji perangkat ACC-01..08 + QA 8d | Satu-satunya bukti yang tidak bisa digantikan uji SQL/unit | Pemilik + QA |
 
@@ -170,6 +170,23 @@ Uji database hanya menulis ke project development (`xvmcpfkkveeaevfcvfug`); tida
 | Migration lokal ↔ development | **30 lokal = 30 remote**; migration `ride_metadata_update_throttle` dan `ride_update_throttle_cleanup` tercatat remote. Foreign key cleanup tervalidasi sehingga penghapusan profil menghapus window. |
 | GitHub CI / Database RLS / release | Untuk `main` pada SHA `e248d2595a057e081fdda0e79cb20e45a909a12a`, CI, Database RLS, dan seluruh job release build71 selesai sukses. Itu bukti baseline sebelumnya, bukan CI untuk branch ini. |
 | Environment beta / APK beta / uji fisik | **Belum ada** Environment `beta`, backend beta, APK beta, atau bukti penerimaan perangkat fisik. Tetap **Blocked**. |
+
+## 7d. Verifikasi lanjutan 28 Oktober 2026 — audit induk & pencabutan grant `anon`
+
+Uji database hanya menulis ke project development (`xvmcpfkkveeaevfcvfug`); tidak ada perubahan
+ke beta atau production, tidak ada APK baru, dan tidak ada klaim uji perangkat. Dua edit lokal yang
+sudah ada sebelum sesi audit (`.vscode/settings.json`, `supabase/functions/delete-account/index.ts`)
+dipertahankan apa adanya dan tidak diubah.
+
+| Perintah / bukti | Hasil |
+| --- | --- |
+| `npx supabase db push --dry-run --linked` | hanya `20261028031237_revoke_anon_rls_helper_execute.sql` (tidak dijalankan pada dry-run) |
+| `npx supabase db push --linked --yes` | migration revoke diterapkan ke development |
+| `npm run db:test:lint` | exit 0 — **12 berkas uji / 31 migration** |
+| `npm run db:test` | sebelum push: **10/12** (dua uji katalog gagal karena grant masih ada — detektor bekerja); setelah push: **exit 0 — 12/12** |
+| `npx supabase migration list --linked` | **31 lokal = 31 remote**; `20261028031237` ada di kedua kolom |
+| Asersi dua sisi | `anon` ditolak EXECUTE pada enam helper; `authenticated` tetap diizinkan (policy RLS termasuk policy Storage logo klub tidak berubah aksesnya) |
+| Uji yang tidak dijalankan | `npm test`, `test:scripts`, `typecheck`, `lint`, `format:check`, `storage:test`, E2E, `export:android` — tidak ada perubahan kode aplikasi/TS pada perubahan ini; jalankan di CI sebelum rilis |
 
 ## 8. Perintah verifikasi (historis, 25 Oktober 2026)
 

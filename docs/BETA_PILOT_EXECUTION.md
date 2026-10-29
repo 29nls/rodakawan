@@ -32,7 +32,7 @@ Setelah workflow perubahan tersedia di branch default, siapkan GitHub Environmen
 | Variable | `BETA_SUPABASE_PROJECT_REF` | Ref project beta yang sama dengan URL dan DB, tidak sama dengan development |
 | Variable | `BETA_SUPABASE_URL` | URL `https://<ref-beta>.supabase.co` |
 | Variable | `BETA_SUPABASE_PUBLISHABLE_KEY` | Publishable key beta; nilai publik, akan masuk APK |
-| Variable | `BETA_MAP_STYLE_URL` | Kosong sampai keputusan ADR-064; jangan menambah provider peta |
+| Variable | `BETA_MAP_STYLE_URL` | Kosong sampai akun MapTiler dibuat (ADR-082 disetujui 28 Okt 2026); tanpa nilai, build menampilkan "peta belum dikonfigurasi" |
 | Secret | `BETA_SUPABASE_DATABASE_URL` | Connection string session pooler beta, rahasia |
 
 Secrets keystore rilis yang sudah digunakan workflow harus tersedia; jangan menyalin/menampilkan nilainya. Build beta memvalidasi ref API, ref database, dan ref eksplisit, menjalankan preflight, membuat APK, memverifikasi signature/SHA-256, lalu menguji install/launch pada emulator. Beta hanya diunggah sebagai Actions artifact selama 30 hari; workflow tidak membuat GitHub Release/tag.
@@ -67,7 +67,7 @@ Sebelum setiap sesi:
 
 ## 4. Urutan penerimaan pilot
 
-Penuhi gerbang sebelum memulai: backend beta preflight lulus, build beta diverifikasi, dan smoke test emulator sukses. Jalankan terlebih dahulu PD-01…PD-05, PD-09, PD-13…PD-15, PD-21. Tambahkan PD-06…PD-08, PD-10…PD-12 dan PD-16…PD-20/PD-22 sebelum memperluas pilot. Detail langkah/expected result adalah sumber kasus di `QA_TEST_PLAN.md` 8f; jangan mengubah expected result untuk membuat kasus tampak lulus.
+Penuhi gerbang sebelum memulai: backend beta preflight lulus, build beta diverifikasi, dan smoke test emulator sukses. Jalankan terlebih dahulu PD-01…PD-05, PD-09, PD-13…PD-15, PD-21. Untuk penerimaan native MapLibre, PD-03, PD-13 dan PD-21 wajib dilaksanakan mengikuti prosedur khusus di `QA_TEST_PLAN.md` §8f.1; catat pula kegagalan tile/pemulihan sebagai MAP-TILE-01. Tambahkan PD-06…PD-08, PD-10…PD-12 dan PD-16…PD-20/PD-22 sebelum memperluas pilot. Detail langkah/hasil yang diharapkan bersumber dari §8f dan §8f.1; jangan mengubah expected result agar kasus tampak lulus.
 
 | Kelompok | ID tetap | Fokus / peran |
 | --- | --- | --- |
@@ -78,7 +78,7 @@ Penuhi gerbang sebelum memulai: backend beta preflight lulus, build beta diverif
 | Batas anggota | PD-21 | C non-member mencoba UI dan akses yang dicatat; backend harus menolak |
 | Keselamatan dan operasi | PD-16, PD-17, PD-18, PD-19 | A/B: hazard, moderasi, Storage privat, hapus akun serta recovery |
 
-Peta konvoi interaktif belum tersedia (ADR-064); jangan mencatat marker peta seolah-olah diuji. Push, voice PTT, dan musik lokal bukan fitur pilot yang dinyatakan tersedia.
+Adapter MapLibre untuk peta konvoi sudah tersedia (lihat `MAP_REALTIME_TICKET.md`), tetapi peta menunggu style URL MapTiler dan validasi development build/perangkat; jangan mencatat marker peta seolah-olah sudah diuji. Saat prasyarat terpenuhi, jalankan PD-03 (realtime/umur), PD-13 (opt-out dan dua jalur keanggotaan), PD-21 (isolasi C), serta MAP-TILE-01 (tile gagal dan pulih) pada perangkat native. Push, voice PTT, dan musik lokal bukan fitur pilot yang dinyatakan tersedia.
 
 ## 5. Form bukti — salin satu formulir per kasus dan perangkat
 
@@ -124,7 +124,7 @@ Jangan unggah token/JWT, password, connection string, publishable key, alamat em
 - [ ] Periksa batas signup/rate limit Auth pada Dashboard; repository tidak dapat membuktikannya.
 - [ ] Sahkan rencana operasional/retensi beta yang sesuai keputusan privasi; backup dan proses penghapusan tetap mengikuti runbook.
 - [ ] Siapkan perangkat Android fisik, peserta A/B/C, jadwal, kanal laporan privat, dan personel pemulihan.
-- [ ] Putuskan ADR-064 sebelum pekerjaan peta; tidak ada peta interaktif pada pilot sekarang.
+- [ ] Peta: ADR-064 sudah digantikan ADR-082 (MapLibre + MapTiler); adapter MAP-1/MAP-2 sudah ada. Pemilik masih perlu akun/style URL MapTiler; peta juga perlu development build dan uji perangkat sesuai `MAP_REALTIME_TICKET.md` sebelum pilot.
 - [ ] Tinjau pencadangan/restore keystore; jangan memulai pilot dengan identitas signing yang tidak dapat diperbarui.
 
 **Status akhir saat disiapkan: Blocked — belum ada backend beta terverifikasi, belum ada APK yang diarahkan ke beta, dan belum ada bukti uji perangkat fisik.**

@@ -2,8 +2,8 @@
  * Perhitungan murni untuk laporan bahaya: label area perkiraan, jarak, dan
  * jendela kedaluwarsa.
  *
- * Tidak ada peta pada build ini (ADR-064 masih Proposed), jadi lokasi laporan
- * tidak digambar. Yang ditampilkan hanya label area kasar yang benar-benar
+ * Laporan hazard tidak digambar pada peta konvoi ADR-082. Yang ditampilkan hanya
+ * label area kasar yang benar-benar
  * diturunkan dari koordinat laporan — bukan nama tempat karangan dan bukan
  * koordinat presisi milik pelapor.
  */

@@ -17,6 +17,7 @@ import { TextField } from '@/components/ui/TextField';
 import { colors, spacing } from '@/constants/theme';
 import { BackendUnavailableBanner } from '@/features/auth/components/BackendUnavailableBanner';
 import { MapCanvas } from '@/features/map/MapCanvas';
+import { MapLibreRenderer } from '@/features/map/MapLibreRenderer';
 import { buildRideMarkers, resolveMapRenderState } from '@/features/map/provider';
 import type { AppError } from '@/features/auth/errors';
 import { useAuthSession } from '@/features/auth/session';
@@ -515,10 +516,14 @@ export default function RideScreen() {
   const joinedMembers = details?.members.filter((member) => member.status === 'joined') ?? [];
   const invitedMembers = details?.members.filter((member) => member.status === 'invited') ?? [];
 
-  // Selama ADR-064 belum disetujui, `renderer` tidak pernah didaftarkan sehingga
-  // keadaan tertinggi yang bisa dicapai adalah `renderer_missing`.
+  // Renderer MapLibre hanya siap ketika URL gaya MapTiler HTTPS dikenali; tanpa
+  // konfigurasi layar tetap menampilkan pemberitahuan dan tidak memuat tile.
   const mapState = useMemo(
-    () => resolveMapRenderState({ styleUrl: readPublicEnv().EXPO_PUBLIC_MAP_STYLE_URL }),
+    () =>
+      resolveMapRenderState({
+        styleUrl: readPublicEnv().EXPO_PUBLIC_MAP_STYLE_URL,
+        renderer: { provider: 'maptiler', renderer: MapLibreRenderer },
+      }),
     [],
   );
   const mapMarkers = useMemo(

@@ -12,8 +12,9 @@
 --   a. **Fungsi publik yang dapat dieksekusi `PUBLIC`/`anon`** — bukan hanya
 --      `security definer`. Grant bawaan PostgreSQL untuk fungsi baru adalah
 --      PUBLIC, jadi helper biasa pun bisa menjadi endpoint tanpa sesi. Enam
---      helper RLS dan satu fungsi trigger saat ini masih terbuka; daftar
---      pengecualiannya ditulis beserta alasannya dan diperiksa anti-usang.
+--      helper RLS sempat terbuka; grant `anon`-nya dicabut migration
+--      `20261028031237_revoke_anon_rls_helper_execute.sql`. Pengecualian yang
+--      tersisa ditulis beserta alasannya dan diperiksa anti-usang.
 --   b. **Bucket Storage publik** — bucket publik melewati seluruh policy baca
 --      karena objeknya dapat diunduh tanpa token. Ketiga bucket aplikasi harus
 --      tetap privat.
@@ -255,36 +256,16 @@ where id = 'uji-hardening-probe-publik';
 -- ---------------------------------------------------------------------------
 -- 3. Pengecualian grant `anon`/PUBLIC, lengkap dengan alasannya.
 -- ---------------------------------------------------------------------------
+-- Sejak migration 20261028031237 enam helper RLS (`can_publish_ride_location`,
+-- `is_club_admin`, `is_club_member`, `is_ride_active_member`, `is_ride_host`,
+-- `is_ride_member`) tidak lagi membuka EXECUTE untuk `anon`; mereka sengaja
+-- tidak terdaftar di sini. Asersi dua sisi anon/authenticated ada di bagian 4.
 create temporary table uji_hardening_izin_anon (
   signature text primary key,
   alasan text not null check (char_length(alasan) > 40)
 );
 
 insert into uji_hardening_izin_anon (signature, alasan) values
-  (
-    'public.can_publish_ride_location(uuid)',
-    'Helper policy lokasi perjalanan. Dipanggil policy sebagai peran yang membaca/menulis, jadi `authenticated` membutuhkannya; tanpa sesi ia mengembalikan false karena membandingkan dengan auth.uid().'
-  ),
-  (
-    'public.is_club_admin(uuid)',
-    'Helper policy klub dan Storage logo. Peran `anon` membutuhkannya untuk mengevaluasi policy baca klub publik; tanpa sesi hasilnya false, sehingga tidak membuka data.'
-  ),
-  (
-    'public.is_club_member(uuid)',
-    'Helper policy keanggotaan klub. Sama seperti is_club_admin: dipakai policy baca klub publik, mengembalikan false tanpa auth.uid().'
-  ),
-  (
-    'public.is_ride_active_member(uuid)',
-    'Helper policy lokasi/chat perjalanan. Hanya relevan untuk sesi; tanpa sesi false, jadi grant anon tidak membuka baris.'
-  ),
-  (
-    'public.is_ride_host(uuid)',
-    'Helper policy perjalanan. Dipanggil policy sebagai peran pembaca; tanpa sesi false, sehingga tidak membuka baris.'
-  ),
-  (
-    'public.is_ride_member(uuid)',
-    'Helper policy chat/lokasi perjalanan. Tanpa sesi false; dibutuhkan policy saat peran anon dievaluasi pada jalur publik.'
-  ),
   (
     'public.touch_updated_at()',
     'Fungsi trigger yang hanya mengisi NEW.updated_at. Tidak dapat dipanggil langsung di luar konteks trigger; grant PUBLIC adalah bawaan PostgreSQL, bukan jalur data.'
@@ -359,6 +340,40 @@ begin
   end if;
 
   raise notice 'UJI: tidak ada fungsi public yang terbuka ke PUBLIC/anon di luar pengecualian beralasan';
+end;
+$$;
+
+-- Asersi dua sisi atas migration 20261028031237: mencabut grant `anon` tidak
+-- boleh mengubah akses `authenticated`, karena policy RLS (termasuk policy
+-- Storage logo klub) memanggil keenam helper itu saat pengguna login membaca
+-- baris. Kedua arah wajib lulus — menutup anon tanpa menjaga login akan
+-- merusak keanggotaan klub/perjalanan di produksi.
+do $$
+declare
+  v_sig text;
+  v_helper text[] := array[
+    'public.can_publish_ride_location(uuid)',
+    'public.is_club_admin(uuid)',
+    'public.is_club_member(uuid)',
+    'public.is_ride_active_member(uuid)',
+    'public.is_ride_host(uuid)',
+    'public.is_ride_member(uuid)'
+  ];
+begin
+  foreach v_sig in array v_helper loop
+    if has_function_privilege('anon', v_sig, 'EXECUTE') then
+      raise exception
+        'UJI GAGAL (helper masih terbuka): anon masih boleh EXECUTE %.',
+        v_sig;
+    end if;
+    if not has_function_privilege('authenticated', v_sig, 'EXECUTE') then
+      raise exception
+        'UJI GAGAL (akses login hilang): authenticated kehilangan EXECUTE %; policy RLS yang memanggilnya akan gagal. Kembalikan grant lewat migration baru.',
+        v_sig;
+    end if;
+  end loop;
+
+  raise notice 'UJI: enam helper RLS tertutup untuk anon dan tetap terbuka untuk authenticated';
 end;
 $$;
 

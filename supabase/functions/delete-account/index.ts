@@ -25,7 +25,9 @@ import { createClient } from 'npm:@supabase/supabase-js@2.117.3';
 import { handleCors, parseAllowedOrigins } from './cors.mjs';
 import { DeletionStepError, runAccountDeletion } from './orchestrator.mjs';
 
-function json(body: unknown, status: number, corsHeaders: Record<string, string>) {
+type CorsHeaders = ReturnType<typeof handleCors>['headers'];
+
+function json(body: unknown, status: number, corsHeaders: CorsHeaders) {
   return new Response(JSON.stringify(body), {
     status,
     headers: {
@@ -36,7 +38,7 @@ function json(body: unknown, status: number, corsHeaders: Record<string, string>
   });
 }
 
-function failure(error: unknown, corsHeaders: Record<string, string>) {
+function failure(error: unknown, corsHeaders: CorsHeaders) {
   const code =
     error instanceof DeletionStepError
       ? error.code
@@ -237,8 +239,11 @@ Deno.serve(async (request: Request) => {
       status: 'failed' | 'completed',
       step: string,
       error: string | null,
-      leaseToken: string,
+      leaseToken?: string,
     ) => {
+      if (!leaseToken) {
+        throw new DeletionStepError('account_deletion_status_failed', step);
+      }
       const { error: finishError } = await admin.rpc('finish_account_deletion_claim', {
         p_job: jobId,
         p_lease: leaseToken,

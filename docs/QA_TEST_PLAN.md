@@ -337,6 +337,110 @@ orang nyata, token/JWT, kata sandi, connection string, maupun alamat email priba
 Ganti dengan penanda seperti `<koordinat>` atau `<token>`. Potong logcat hanya pada baris yang
 menjelaskan perilaku yang diuji.
 
+### 8f.1 Prosedur native MapLibre Android
+
+Prosedur ini melengkapi PD-03, PD-13, dan PD-21; jalankan hanya pada development build yang memuat
+plugin native MapLibre, bukan Expo Go. Gunakan backend dan akun uji yang memang diizinkan untuk pilot.
+Sebelum tes peta, pastikan `EXPO_PUBLIC_MAP_STYLE_URL` berisi style URL HTTPS MapTiler yang sah di
+konfigurasi lokal build. Jangan menyalin URL/kunci itu ke bukti, tiket, screenshot, atau log. Jika
+build belum punya konfigurasi atau style tidak berhasil dimuat, catat sebagai blocker setup; jangan
+mengganti status tes marker menjadi lulus.
+
+Untuk setiap kasus, lengkapi kolom umum PD-03/13/21 di tabel bawah (model/Android/ROM, tanggal dan
+zona waktu, versi APK serta SHA-256 yang diverifikasi, akun A/B/C, hasil faktual, nama bukti aman).
+Ambil bukti sebelum/sesudah pada layar yang sama bila relevan. Gunakan nama file privat seperti
+`PD-03-A-before.png`, `PD-03-A-after.png`, `MAP-TILE-01-failure.png`, dan `MAP-TILE-01-recovery.png`;
+isi kolom Bukti dengan nama/rujukan saja. Samarkan nama peserta menjadi A/B/C, jangan tampilkan
+koordinat presisi, email, token, URL gaya, atau key. Status per kasus tetap **Blocked** sampai
+operator yang menjalankan mengisi fakta dan bukti; jangan menurunkan status dengan menyalin prosedur
+ini.
+
+**PD-03 — marker realtime, umur, dan status basi (A/B; dua perangkat Android):**
+
+1. A membuat atau memakai perjalanan uji aktif; B bergabung. Pastikan kedua akun mengaktifkan izin
+   lokasi OS dan consent berbagi lokasi khusus perjalanan itu. Catat jam awal, status GPS/jaringan,
+   build/hash yang sama, serta bahwa layar detail perjalanan terbuka di kedua perangkat.
+2. Buka peta konvoi di A dan B. Pastikan tile, atribusi MapTiler/OSM, dan logo MapTiler terlihat;
+   cocokkan marker yang terlihat dengan anggota aktif saja. Jangan menganggap daftar peserta sebagai
+   bukti marker peta.
+3. Gerakkan A dan B bergantian dengan lokasi uji yang aman. Catat waktu perubahan yang terlihat
+   pada perangkat pasangan, label `Live`/umur posisi, serta selisih waktu dari gerak/publikasi sampai
+   marker berubah. Gunakan bukti tersanitasi tanpa koordinat.
+4. Hentikan sementara pembaruan lokasi satu pengirim dengan cara yang dapat dipulihkan (misalnya
+   matikan GPS atau jaringan perangkat pengirim; jangan opt-out karena itu menghapus baris lokasi).
+   Tunggu sampai timestamp lokasi yang terakhir memang melewati ambang basi 60 detik, lalu periksa
+   perangkat penerima. Label harus menunjukkan umur/status basi dan tidak boleh tetap `Live`.
+   Pulihkan GPS/jaringan dan pastikan label kembali segar setelah update baru.
+5. Bukti minimum: screenshot tersanitasi marker/label awal dan basi pada perangkat penerima,
+   catatan waktu gerak/pembaruan/pemulihan, perangkat pengirim-penerima A/B, serta cuplikan log
+   jaringan/realtime yang hanya berisi waktu/status dan hitungan event (tanpa payload lokasi/token).
+   Jika salah satu sisi tidak menerima pembaruan atau label basi tetap `Live`, tandai **Fail** dan
+   lampirkan langkah reproduksi; jangan menafsirkan lag sebagai bukti akurasi GPS.
+
+**PD-13 — opt-out dan keluar/dikeluarkan membersihkan marker (A/B; dua perangkat Android):**
+
+Jalankan dan catat kedua sub-skenario secara terpisah; satu sub-skenario lulus tidak meluluskan yang
+lain.
+
+1. Pastikan A dan B anggota aktif, keduanya berbagi lokasi, dan marker keduanya terlihat. Catat
+   screenshot awal serta waktu.
+2. Sub-skenario opt-out: A mematikan berbagi lokasi lewat kontrol aplikasi. Periksa pada B bahwa
+   marker A hilang setelah event diterima; jangan sekadar mengandalkan label basi atau menyembunyikan
+   marker lokal. Periksa bahwa A tidak lagi menerbitkan lokasi setelah opt-out. Catat waktu aksi,
+   waktu marker hilang, hasil UI A, dan bukti sebelum/sesudah.
+3. Pulihkan keadaan uji hanya bila aman dan sesuai consent; buat ride uji baru bila diperlukan.
+   Jalankan sub-skenario keanggotaan secara terpisah: (a) B keluar sendiri, lalu (b) A sebagai host
+   mengeluarkan B. Untuk tiap skenario, periksa pada A bahwa marker B hilang dan pada B bahwa akses/
+   penerbitan lokasi sebagai peserta perjalanan itu tidak berlanjut. Catat tindakan yang diuji;
+   jangan menggabungkan hasil keluar sendiri dan dikeluarkan host.
+4. Muat ulang layar atau pulihkan koneksi secara terkendali dan pastikan marker tidak muncul kembali
+   dari lokasi lama. Bila pemeriksaan baris server diperlukan, gunakan runner/prosedur development
+   yang disetujui; jangan mengedit database manual atau merekam koordinat.
+5. Bukti minimum per sub-skenario: peran/perangkat, keadaan awal, waktu aksi dan waktu marker hilang,
+   screenshot sebelum/sesudah yang menyamarkan peta/koordinat presisi, catatan status izin/keanggotaan,
+   dan ringkasan tersanitasi apakah event penghapusan diterima serta apakah ada publikasi berikutnya.
+   Marker yang bertahan atau lokasi yang diterbitkan lagi setelah hak berbagi berakhir = **Fail**;
+   hentikan sesi dan ikuti prosedur insiden.
+
+**PD-21 — isolasi non-anggota C (A/B anggota; C non-member):**
+
+1. A membuat ride uji dan B bergabung; A/B mempunyai lokasi/chat uji. Catat bahwa C memakai sesi
+   terautentikasi sendiri dan tidak pernah bergabung. Jangan pakai sesi/token A atau B pada C.
+2. Di perangkat/sesi C, coba buka ride melalui navigasi yang memang tersedia, lalu coba akses layar
+   detail/lokasi/chat. Rekam hanya hasil UI yang aman (mis. akses ditolak/tidak ada data), bukan
+   kredensial atau isi pesan.
+3. Amati jaringan/realtime pada sesi C dengan alat inspeksi yang disetujui. Verifikasi respons tidak
+   memuat baris ride/lokasi/chat dan C tidak menerima event lokasi/chat; bila mencoba pengiriman,
+   pastikan ditolak. Simpan hanya endpoint yang sudah disamarkan, metode/status HTTP, jumlah baris dan
+   event, serta hasil penolakan—hapus header auth, body, UUID sensitif, koordinat, email, dan isi chat.
+4. Bukti minimum: identitas peran A/B/C, cara memastikan C non-member, screenshot hasil UI C,
+   ringkasan hitungan respons/event = 0 untuk data terlindungi, dan status penolakan pengiriman.
+   Kebocoran data apa pun adalah **Fail** berprioritas tinggi: hentikan tes/pilot, jangan ulangi
+   request, dan ikuti `INCIDENT_RESPONSE.md`.
+5. Jangan menyamakan bukti backend sebelumnya dengan PD-21: status perangkat hanya boleh berubah
+   setelah interaksi native dan trafik perangkat ini diamati.
+
+**MAP-TILE-01 — kegagalan tile/style dan pemulihan (satu perangkat Android; laporkan terpisah dari PD):**
+
+1. Buka peta dengan style yang sah dan pastikan kondisi awalnya tampil. Pilih area uji yang belum
+   pernah dibuka agar cache tile tidak menyamarkan gangguan; jangan menghapus data aplikasi/sesi.
+2. Putuskan jaringan (mode pesawat atau matikan Wi-Fi/data), pindahkan peta ke area uji yang belum
+   tersimpan cache bila dapat dilakukan dengan aman, lalu gunakan **Coba lagi** jika tombol tersedia.
+   Catat waktu gangguan, apakah pesan `Peta gagal dimuat` terlihat, apakah kontrol coba lagi merespons,
+   dan apakah peta tetap kosong tanpa pesan. Jangan menyimpulkan penyebab selain yang benar-benar
+   diketahui; callback native MapLibre tidak memberi detail penyebab.
+3. Pulihkan jaringan dan tekan **Coba lagi**. Catat waktu sampai style/tile kembali, apakah logo serta
+   atribusi tetap terlihat, dan apakah marker muncul lagi tanpa duplikasi.
+4. Bukti minimum: screenshot kondisi awal, saat gagal, dan pulih; waktu putus/pulih dan durasi
+   pemulihan; perangkat/build/hash; status jaringan; hasil tombol coba lagi; serta cuplikan logcat
+   terbatas pada error MapLibre yang relevan dan sudah dibersihkan dari URL/key/token/lokasi.
+5. Jika tile gagal tetapi callback tidak menampilkan pesan, tulis fakta itu dan tandai **Fail** untuk
+   penerimaan pesan kegagalan (jangan menyatakan seluruh kegagalan tile tertangani hanya karena
+   callback uji unit lulus). Jika cache mungkin membuat hasil tidak deterministik, tandai
+   **Needs retest** dan ulangi di area belum tercache; jangan menghapus data aplikasi untuk memaksa
+   hasil. Jika ada kebutuhan menguji style/key tidak sah, gunakan hanya konfigurasi development
+   sementara yang disetujui dan pulihkan segera; jangan pernah membagikan URL/key tersebut.
+
 | ID | Perangkat | Waktu uji | Versi APK | Akun | Langkah | Hasil yang diharapkan | Hasil aktual | Bukti | Status |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | PD-01 |  |  |  | A, B | Daftar + login di dua perangkat; tutup aplikasi; buka lagi; matikan jaringan sesaat lalu buka | Sesi pulih tanpa login ulang; galat jaringan menjelaskan pemulihan, bukan crash |  |  | **Blocked** |
@@ -398,6 +502,10 @@ Yang **sudah otomatis** (`npm test`, jaringan dimatikan; client Supabase diganti
 
 > Hasil terbaru 28 Oktober 2026 ada di [`BETA_READINESS.md`](BETA_READINESS.md) §7c:
 > 48 suite / 526 test, `db:test` 12/12, dan `db:test:concurrency` lulus.
+> Pembaruan lanjutan (§7d): migration `20261028031237` mencabut grant `anon`
+> dari enam helper RLS; `db:test` **12/12** lulus terhadap **31 migration** dan
+> asersi dua sisi anon ditolak / `authenticated` diizinkan ada di
+> `rls_catalog_hardening_test.sql`.
 
 Hasil historis 19 Oktober 2026 (Node 24.18.1, npm 12.0.2, setelah `npm ci` dari
 `package-lock.json`):

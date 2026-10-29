@@ -1,17 +1,18 @@
 # Keputusan penyedia peta/tile (Milestone 3)
 
-Status: **Belum diputuskan** — bahan keputusan, bukan keputusan. Tanggal riset: 2026-10-19.
-Pemilik keputusan: pemilik produk + engineering. ADR terkait: ADR-009, ADR-064, ADR-065.
+Status: **Diputuskan** — ADR-082 (28 Oktober 2026) menetapkan **MapLibre + MapTiler** dan menggantikan ADR-064.
+Dokumen ini tetap menjadi arsip bahan perbandingan. Tanggal riset: 2026-10-19; riset susulan 2026-10-28 (§6).
+Pemilik keputusan: pemilik produk + engineering. ADR terkait: ADR-009, ADR-064 (Superseded), ADR-065, ADR-082.
 
-**Pembaruan 19 Oktober 2026:** alur perjalanan dan berbagi lokasi sudah dirilis di lapisan aplikasi
-tanpa renderer peta. Layar detail menampilkan daftar peserta beserta umur posisi dan menyatakan peta
-belum tersedia; tidak ada tile publik, URL contoh, atau marker palsu. Rekomendasi teknis yang masih
-menunggu persetujuan pemilik produk adalah **MapLibre + MapTiler Flex** (biaya/kuota jelas, atribusi
-OSM, dan paket berbayar untuk penggunaan komersial), tetapi dependency peta **belum** ditambahkan
-sampai provider, lisensi komersial, dan kredensial yang dibatasi per aplikasi disetujui.
+**Catatan historis 19 Oktober 2026:** alur perjalanan dan berbagi lokasi saat itu dirilis tanpa
+renderer peta; layar detail menampilkan daftar peserta dan umur posisi. Rekomendasi waktu itu adalah
+MapLibre + MapTiler Flex, tetapi keputusan pemilik produk belum ada.
 
-Dokumen ini tidak menambahkan dependency apa pun. Jangan memasang library peta atau memanggil tile
-provider produksi sebelum salah satu opsi di bawah dipilih dan dicatat sebagai ADR final.
+**Status saat ini (28 Oktober 2026):** ADR-082 telah menetapkan MapLibre + MapTiler dan dependency
+serta adapter native telah dipasang. Logo resmi MapTiler kini dibundel secara lokal dan callback
+kegagalan gaya menampilkan pemulihan/coba lagi (MAP-6). Dokumen ini adalah arsip perbandingan, bukan
+gerbang persetujuan saat ini. Pemilik tetap perlu mengatur akun/paket, style URL dan kuota;
+development build serta uji perangkat masih diperlukan sebelum menyatakan peta tervalidasi.
 
 ## 1. Yang perlu dipisahkan
 
@@ -76,14 +77,15 @@ Sumber:
 - **Bila prioritasnya kemudahan Android dan tidak butuh offline:** Google Maps SDK native, dengan
   konsekuensi telemetri dan aturan konten Google.
 
-Pilihan final harus dicatat sebagai ADR (menggantikan status "Belum final" ADR-009) sebelum
-`@maplibre/maplibre-react-native` atau `@rnmapbox/maps` ditambahkan ke `package.json`.
+Pilihan final dicatat di ADR-082 (menggantikan status "Belum final" ADR-009); dependency
+`@maplibre/maplibre-react-native` dipasang mengikuti keputusan tersebut. Bagian awal dokumen ini
+mempertahankan konteks historis dari riset sebelumnya.
 
 ## 5. Pembaruan riset 20 Oktober 2026 dan usulan keputusan
 
-Status ADR-064 kini **Proposed**, bukan final: rekomendasi teknis sudah diperbarui, tetapi pemilik
-produk belum menyetujuinya. Dependency peta tetap belum ditambahkan, dan layar perjalanan tetap
-menampilkan daftar posisi + label kesegaran (tanpa peta, tile publik, atau koordinat contoh).
+Bagian ini mencatat keadaan pada 20 Oktober 2026. Saat itu ADR-064 masih **Proposed**, dependency
+peta belum ditambahkan, dan layar perjalanan menampilkan daftar posisi + label kesegaran. Keputusan
+final berikutnya dicatat sebagai ADR-082 pada 28 Oktober 2026.
 
 Angka di bawah diverifikasi ulang dari halaman resmi pada 20 Oktober 2026. Yang berubah dari bagian 2:
 
@@ -114,7 +116,7 @@ dashboard MapTiler, rotasi kunci bila bocor, dan kesadaran bahwa kunci di aplika
 diekstrak. Ini risiko yang harus disetujui pemilik produk, bukan sesuatu yang bisa dihilangkan
 dengan konfigurasi.
 
-### Rekomendasi (status: Proposed)
+### Rekomendasi saat riset dilakukan (status saat itu: Proposed)
 
 **MapLibre + MapTiler Flex** untuk renderer dan tile.
 
@@ -133,35 +135,57 @@ Android dan siap menerima telemetri serta lisensi kendaraan: **Google Maps SDK**
 
 ### Lapisan renderer yang sudah disiapkan (20 Oktober 2026)
 
-Tanpa menambahkan dependency, kontrak renderer sudah dipisahkan dari layar di
-[`src/features/map/`](../src/features/map/README.md): `provider.ts` (keadaan peta, atribusi wajib,
-marker dari lokasi terakhir, region awal), `MapAttribution.tsx`, dan `MapCanvas.tsx` (slot renderer
-+ keadaan “belum dikonfigurasi/gagal”). Layar perjalanan memakai slot itu, jadi pemasangan MapLibre
-nanti hanya perlu satu adapter + pendaftaran renderer, bukan perubahan di layar.
+Pada saat catatan 20 Oktober dibuat, tanpa menambahkan dependency, kontrak renderer sudah dipisahkan
+dari layar di [`src/features/map/`](../src/features/map/README.md): `provider.ts` (keadaan peta,
+atribusi wajib, marker dari lokasi terakhir, region awal), `MapAttribution.tsx`, dan `MapCanvas.tsx`
+(slot renderer + keadaan “belum dikonfigurasi/gagal”). Pemasangan MapLibre kemudian mengikuti
+kontrak itu.
 
 Konsekuensi yang sudah diuji: URL gaya non-https, host provider tak dikenal (atribusi tidak bisa
 ditentukan), dan nilai contoh `.env.example` semuanya berhenti sebagai keadaan eksplisit — bukan peta
 tanpa atribusi.
 
-### Yang harus terjadi sebelum implementasi
+### Gerbang yang dicatat sebelum keputusan final (historis)
 
-1. Pemilik produk menerima salah satu opsi dan status ADR-064 diubah dari **Proposed** menjadi
-   **Disetujui** di [`PROJECT_DECISIONS.md`](PROJECT_DECISIONS.md).
-2. Akun provider + paket yang sesuai dibuat, lalu kunci/URL gaya peta disimpan sebagai
-   `EXPO_PUBLIC_MAP_STYLE_URL` (variabel publik yang **sudah** dibaca `src/lib/env.ts`; nilainya
-   bukan rahasia, tetapi tetap tidak boleh di-commit).
-3. `@maplibre/maplibre-react-native` ditambahkan, config plugin dipasang, dan **development build**
-   dibangun — bukan Expo Go.
-4. Renderer dibungkus lapisan provider tunggal, atribusi MapTiler + OSM ditampilkan, dan keadaan
-   "peta belum dikonfigurasi"/galat tetap eksplisit.
-5. Baru setelah itu marker posisi peserta (hanya anggota aktif, lewat RLS yang sudah ada) dikerjakan.
+Daftar di atas mencerminkan gerbang yang berlaku sebelum ADR-082. Pada 28 Oktober 2026 keputusan
+final memilih MapLibre + MapTiler. Dependency dan adapter kemudian ditambahkan; penerimaan native
+masih memerlukan development build dan style URL yang sah. Lihat [`MAP_REALTIME_TICKET.md`](MAP_REALTIME_TICKET.md)
+untuk prasyarat pemilik serta status perangkat terbaru.
 
 ### Catatan 26 Oktober 2026: pilot internal berjalan tanpa peta
 
-Gerbang kesiapan bersama-pakai (26 Oktober 2026) memutuskan **tidak** memasang renderer pada tahap
-ini: ADR-064 masih **Proposed** (keputusan D-06 di `BETA_READINESS.md`), belum ada akun/kunci
-provider yang sah untuk dibuat agent, dan memasang dependency native tanpa uji perangkat akan
-menambah risiko tanpa nilai pengguna — tanpa style URL yang valid, peta tetap menampilkan
-"belum dikonfigurasi". Kontrak `src/features/map/` beserta 27 tesnya tetap lulus; pemasangan
-MapLibre nanti mengikuti tujuh langkah di [`src/features/map/README.md`](../src/features/map/README.md)
-setelah keputusan provider disetujui dan kunci tersedia.
+Pada tanggal itu keputusan gerbang adalah **tidak** memasang renderer: ADR-064 masih **Proposed**, belum
+ada akun/kunci provider, dan uji perangkat belum dijadwalkan. Kontrak `src/features/map/` beserta 27
+tesnya tetap lulus. Keputusan tersebut bersifat historis; ADR-082 dan status implementasi terkini
+tercatat sesudahnya.
+
+## 6. Riset 28 Oktober 2026: `react-native-maps` vs MapLibre React Native
+
+Riset ini menjawab pertanyaan yang tersisa sebelum ADR-082 dibuat. Angka diverifikasi dari
+halaman resmi pada 28 Oktober 2026; dua koreksi terhadap dokumen lama dicatat di bawah.
+
+| Aspek | `react-native-maps` | `@maplibre/maplibre-react-native` |
+| --- | --- | --- |
+| Lisensi | **MIT** (lisensi pustaka tidak memberi hak atas data/tile) | Paket RN: **MIT**; inti `maplibre-native`: **BSD-2-Clause**. (Koreksi: BSD-3-Clause milik MapLibre GL JS, bukan dua artefak ini) |
+| Biaya | Renderer gratis; di Android mengunci ke Google Maps — **billing account wajib** walau SKU Maps SDK Android kini "Unlimited"/tanpa biaya; riwayat kredit US$200/bulan sudah tidak berlaku sebagai cara membaca harga | Renderer gratis; biaya ada di tile provider. MapTiler Free $0 (5.000 sesi + 100.000 request/bulan, non-komersial) / **Flex $30/bulan**; meteran untuk SDK pihak ketiga = request tile |
+| Dukungan Expo | **Jalan di Expo Go** (docs Expo); untuk Google Maps butuh API key + rebuild. Fabric/RN ≥0.81.1 sejak 1.26.1 (cocok RN 0.86) | **Tidak jalan di Expo Go**: butuh config plugin + `expo prebuild` + dev client. v11 hanya New Architecture; peer `expo >=54`, `react-native >=0.80` (cocok SDK 57) |
+| Performa realtime (2–10 marker, update beberapa detik) | Cukup; catatan isu Android: custom marker view berat — pakai marker gambar/default dan interpolasi lokal (`AnimatedRegion`) | Cukup; keunggulan praktisnya sumber `GeoJSONSource` + layer native untuk banyak fitur sekaligus, bukan benchmark yang membuktikan lebih cepat |
+| Integrasi Supabase Realtime | Netral — keduanya mengonsumsi event JS yang sama; ADR-065 memakai Postgres Changes + RLS | Sama; tidak ada library peta yang memengaruhi jalur realtime |
+| Dukungan tile provider | `UrlTile` = overlay raster XYZ di atas basemap (di Android perlu `mapType="none"`); bukan gaya vektor first-class | Style URL/Style JSON langsung: MapTiler, Protomaps, gaya sendiri; raster dan vektor lewat sistem gaya |
+| Status rilis (2026) | 1.29.11 (27 Sept 2026) — aktif | 11.5.0 (4 Okt 2026) — aktif |
+
+Sumber: <https://github.com/react-native-maps/react-native-maps> (lisensi, tabel kompatibilitas,
+catatan marker), <https://docs.expo.dev/versions/latest/sdk/map-view/> (Expo Go + plugin),
+<https://developers.google.com/maps/documentation/android-sdk/usage-and-billing> (billing wajib),
+<https://maplibre.org/maplibre-react-native/docs/setup/expo/> dan
+<https://maplibre.org/maplibre-react-native/docs/setup/migrations/v11/> (Expo + v11),
+<https://github.com/maplibre/maplibre-react-native/blob/main/package/package.json> (lisensi MIT),
+<https://github.com/maplibre/maplibre-native/blob/main/LICENSE.md> (BSD-2-Clause),
+<https://www.maptiler.com/cloud/pricing/>, <https://docs.maptiler.com/guides/account/sessions-vs-requests/>,
+<https://operations.osmfoundation.org/policies/tiles/>.
+
+**Kesimpulan (diadopsi sebagai ADR-082):** untuk konvoi 2–10 pengguna, performa bukan pemilih —
+keduanya cukup. Pemilihnya adalah (a) kebebasan mengganti tile provider tanpa mengganti renderer,
+(b) menghindari akun billing + telemetri Google di Android, dan (c) kenyataan bahwa pipeline proyek
+sudah memakai development build sehingga batasan "tidak bisa di Expo Go" bukan kerugian nyata.
+Rencana implementasi: [`MAP_REALTIME_TICKET.md`](MAP_REALTIME_TICKET.md).

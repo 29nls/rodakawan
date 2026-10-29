@@ -1,7 +1,7 @@
 /**
  * Tab Peringatan — laporan bahaya jalan (Milestone 4).
  *
- * Tidak ada peta pada build ini: ADR-064 masih Proposed, jadi laporan tidak
+ * Laporan hazard tidak ditampilkan pada peta konvoi ADR-082, jadi laporan tidak
  * digambar di peta dan tidak ada tile/marker palsu. Penggantinya adalah daftar
  * dengan filter kategori/keparahan dan label area kasar yang diturunkan dari
  * koordinat laporan (`approximateAreaLabel`).

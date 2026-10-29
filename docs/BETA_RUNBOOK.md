@@ -161,7 +161,7 @@ Environments) dan mengisinya tanpa mengubah variables/secrets repository atau en
 | Variable | `BETA_SUPABASE_PROJECT_REF` | ref project beta, bukan `xvmcpfkkveeaevfcvfug` |
 | Variable | `BETA_SUPABASE_URL` | `https://<ref-beta>.supabase.co` |
 | Variable | `BETA_SUPABASE_PUBLISHABLE_KEY` | publishable key project beta |
-| Variable | `BETA_MAP_STYLE_URL` | kosongkan; ADR-064 belum diputuskan |
+| Variable | `BETA_MAP_STYLE_URL` | style URL MapTiler setelah akun dibuat (ADR-082); kosongkan selama akun belum ada — tanpa nilai, build menampilkan "peta belum dikonfigurasi", bukan kegagalan |
 | Secret | `BETA_SUPABASE_DATABASE_URL` | session-pooler connection string project beta |
 
 Pastikan `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, dan

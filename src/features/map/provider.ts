@@ -1,14 +1,14 @@
 /**
- * Lapisan provider peta — kontrak, bukan renderer.
+ * Lapisan provider peta — kontrak renderer peta dan pembangun marker lokasi.
  *
- * ADR-064 belum disetujui, jadi modul ini **tidak** mengimpor library peta apa pun.
- * Tugasnya hanya memutuskan apakah peta boleh digambar dan apa yang harus
- * ditampilkan bila belum bisa:
+ * Modul ini tidak mengimpor implementasi peta; pemanggil memasok renderer yang
+ * cocok dengan provider yang terdeteksi. Tugasnya memutuskan apakah peta boleh
+ * digambar dan apa yang harus ditampilkan bila belum bisa:
  *
  * - `missing_style_url` / `invalid_style_url` / `unknown_provider` → peta tidak
  *   digambar, dengan penjelasan yang bisa ditindaklanjuti;
- * - `renderer_missing` → gaya peta sudah dikonfigurasi tetapi build ini belum
- *   memuat renderer (keadaan hari ini);
+ * - `renderer_missing` → gaya peta sudah dikonfigurasi tetapi belum ada renderer
+ *   yang terdaftar untuk provider tersebut;
  * - `ready` → hanya terjadi bila renderer benar-benar didaftarkan pemanggil.
  *
  * Aturan atribusi mengikuti ketentuan provider yang dirangkum di
@@ -111,7 +111,7 @@ const NOTICE = {
   unknown:
     'Penyedia peta pada URL gaya tidak dikenali, sehingga atribusi wajibnya tidak dapat ditentukan. Peta tidak digambar agar tidak ada tile tanpa atribusi.',
   rendererMissing:
-    'Gaya peta sudah dikonfigurasi, tetapi renderer peta belum dipasang di build ini. Posisi ditampilkan sebagai daftar dengan waktu pembaruan.',
+    'Gaya peta sudah dikonfigurasi, tetapi renderer yang cocok belum terdaftar pada layar ini. Posisi ditampilkan sebagai daftar dengan waktu pembaruan.',
 } as const;
 
 /** Menebak provider dari URL gaya peta; hanya untuk memilih atribusi yang benar. */

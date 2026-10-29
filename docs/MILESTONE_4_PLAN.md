@@ -33,12 +33,10 @@ peta + uji perangkat M3.
 Detail keputusan ada di ADR-066 (`docs/PROJECT_DECISIONS.md`) dan langkah penerapan di
 `docs/SETUP_GUIDE.md` bagian 4.
 
-**Gerbang masuk.** M4 hanya dimulai setelah salah satu dari dua hal terjadi:
-
-1. ADR-064 (provider peta) **disetujui** dan uji perangkat khusus M3 (dua perangkat, izin dicabut,
-   GPS mati/mode pesawat, force-stop/reboot, baterai 30 menit) selesai; atau
-2. pemilik produk menyatakan secara eksplisit bahwa kedua hal itu **ditunda** dan M4 boleh berjalan
-   tanpa marker peta (chat dan daftar laporan tetap bisa dikerjakan lebih dulu).
+**Gerbang masuk (riwayat keputusan).** M4 dimulai setelah pemilik produk menunda uji perangkat M3
+serta pekerjaan marker peta agar chat dan daftar laporan dapat berjalan lebih dulu. Provider peta
+kemudian diputuskan terpisah melalui ADR-082; validasi perangkat masih belum menggantikan penundaan
+uji GPS/lokasi M3.
 
 Sampai itu terjadi, dokumen ini hanya bahan keputusan.
 
@@ -231,8 +229,8 @@ peringatan berbasis suara. Semuanya tetap ditunda sesuai ADR-007 dan roadmap.
 
 ## 9. Risiko dan keputusan terbuka
 
-- **Marker peta bergantung pada ADR-064.** Tanpa persetujuan provider, M4 hanya bisa sampai daftar
-  dan filter — jangan memasang dependency peta lebih dulu.
+- **Marker peta hazard tetap di luar lingkup.** M4 menyediakan daftar/filter dan label area kasar;
+  ADR-082 memilih MapLibre + MapTiler hanya untuk peta konvoi, bukan untuk menggambar laporan hazard.
 - **Masa berlaku per kategori** adalah angka usulan, bukan kebijakan yang disetujui.
 - **Moderator** belum ada peran global; M4 butuh keputusan apakah moderasi dilakukan lewat dashboard
   Supabase untuk sementara.
