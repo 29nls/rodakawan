@@ -91,6 +91,25 @@ Jangan mengadopsi retensi tabel ini secara otomatis; tetapkan dasar, kebutuhan, 
 - **Tidak ada koordinat di log.** Task lokasi hanya meneruskan angka ke RPC; kegagalan tidak mencatat posisi. UI menampilkan umur posisi (“baru saja”, “N detik lalu”, “basi”) dan tidak pernah menampilkan marker diam sebagai live.
 - **Batas yang belum terbukti.** Uji allow/deny database lulus (67 perintah), tetapi perilaku perangkat — izin background, GPS mati, mode pesawat, force-stop, reboot, dan konsumsi baterai 30 menit — masih **Blocked** dan tidak boleh ditulis sebagai lulus. Adapter MapLibre untuk marker sudah terdaftar; render native tetap **Blocked** sampai style URL dan bukti uji perangkat tersedia, sementara layar mempertahankan daftar posisi.
 
+### 4.3 Identitas anonim per perangkat (6 November 2026)
+
+- **Tidak ada email, nomor HP, atau kata sandi yang disimpan.** Identitas dibuat server lewat
+  `signInAnonymously()`; tidak ada data akun yang bisa bocor, disinkronkan, atau dilaporkan karena
+  memang tidak pernah dikumpulkan.
+- **Otorisasi tidak berubah.** Klien tetap mendapat JWT `authenticated` dan seluruh policy lama
+  (`auth.uid()`, keanggotaan klub, peserta perjalanan, pemilik baris) tetap berlaku; peran `anon`
+  tetap tidak punya akses dan ujinya dipertahankan.
+- **Identitas tidak bisa dipulihkan.** Menghapus aplikasi, membersihkan data, mengganti HP, atau token
+  refresh yang ditolak berarti akses ke data lama hilang; anggota harus diundang ulang (ADR-083).
+- **Tidak ada ban global.** Identitas baru dapat dibuat kapan saja, jadi blokir hanya mengurangi
+  gangguan dan penjagaan sebenarnya ada pada undangan klub serta moderator (ADR-087).
+- **Penghapusan tetap satu jalur.** "Hapus data saya" memanggil Edge Function yang memindahkan logo
+  klub, memurnikan data dalam satu transaksi, lalu menghapus identitas di Auth (ADR-076/ADR-077);
+  laporan bahaya dan audit moderasi dipertahankan tanpa identitas.
+- **Batas yang diketahui:** pembersihan identitas anonim yang ditinggalkan belum dijadwalkan, dan
+  jelajah klub/perjalanan publik belum ditutup di policy (ADR-085, **Diusulkan**) — selama itu, orang
+  luar yang memasang aplikasi masih dapat membaca konten yang ditandai publik.
+
 ## 5. Keamanan token dan storage
 
 - Access token ditangani SDK auth; gunakan storage aman yang direkomendasikan untuk secure session pada platform.

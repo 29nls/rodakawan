@@ -111,6 +111,10 @@ header `Origin` sehingga tetap bekerja tanpa entri apa pun.
 
 ## 4. Aktifkan identitas anonim (menggantikan alur email)
 
+Prosedur operasional lengkap untuk mode tanpa akun — gejala, pemulihan identitas, undangan klub,
+dan penghapusan data — ada di [`RUNBOOK_TANPA_AKUN.md`](RUNBOOK_TANPA_AKUN.md). Bagian di bawah ini
+hanya langkah penyiapan awal.
+
 > **Sejak ADR-083 aplikasi tidak punya akun email.** Tidak ada Redirect URL, SMTP, konfirmasi email,
 > atau reset kata sandi yang perlu disiapkan untuk APK baru. Yang wajib hanya dua pengaturan di bawah.
 
