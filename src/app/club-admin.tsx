@@ -146,7 +146,7 @@ export default function ClubAdminScreen() {
   const precondition = screenPrecondition(
     backend,
     userId,
-    'Sesi tidak ditemukan di perangkat ini. Masuk kembali untuk membuka pengelolaan klub.',
+    'Identitas perangkat ini tidak aktif. Buka ulang aplikasi untuk membuka pengelolaan klub.',
   );
   const missingTarget = clubId.length === 0;
 

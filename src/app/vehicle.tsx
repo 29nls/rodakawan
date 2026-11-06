@@ -87,7 +87,7 @@ export default function VehicleScreen() {
   const precondition = screenPrecondition(
     backend,
     userId,
-    'Sesi tidak ditemukan di perangkat ini. Masuk kembali untuk membuka kendaraan Anda.',
+    'Identitas perangkat ini tidak aktif. Buka ulang aplikasi untuk membuka kendaraan Anda.',
   );
   const missingTarget = vehicleId.length === 0;
 

@@ -67,9 +67,9 @@ export default function PrivacyScreen() {
             termasuk untuk keselamatan peserta lain.
           </AppText>
           <AppText variant="callout">
-            • Setelah akun dihapus, identitas login, profil, dan data pribadi dihapus. Laporan
+            • Setelah data dihapus, identitas perangkat, profil, dan data pribadi dihapus. Laporan
             bahaya dan audit moderasi tetap ada tanpa identitas Anda; pesan konvoi serta
-            postingan/komentar diredaksi dan diatribusikan ke “Akun dihapus”.
+            postingan/komentar diredaksi dan diatribusikan ke “Pengguna dihapus”.
           </AppText>
           <AppText variant="callout">
             • Data tidak dijual dan tidak dipakai untuk iklan. Layanan pihak ketiga hanya Supabase

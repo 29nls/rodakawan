@@ -21,13 +21,17 @@ import { useProfile } from '@/features/profile/useProfile';
 const SUPPORT_URL = 'https://github.com/29nls/rodakawan/issues';
 
 /**
- * Hapus akun (penghapusan penuh di server).
+ * Hapus data saya (penghapusan penuh di server).
+ *
+ * Sejak aplikasi memakai identitas anonim per perangkat, tidak ada akun atau
+ * email yang bisa disebut. Yang dihapus adalah data milik identitas perangkat
+ * ini: profil, kendaraan, keanggotaan, pesan, foto, dan identitas anonimnya
+ * sendiri. Edge Function tetap menjadi satu-satunya pihak yang menghapus data.
  *
  * Layar ini sengaja tidak menawarkan tombol sekali tekan: konsekuensinya tidak
- * bisa dibatalkan, jadi pengguna harus mengetik username-nya sendiri. Klien
- * hanya memanggil Edge Function; server yang memindahkan/menghapus media,
- * memurnikan database, dan menghapus identitas login. "Berhasil" hanya
- * ditampilkan setelah server mengonfirmasi seluruh langkah selesai.
+ * bisa dibatalkan, jadi pengguna harus mengetik username-nya sendiri.
+ * "Berhasil" hanya ditampilkan setelah server mengonfirmasi seluruh langkah
+ * selesai.
  */
 export default function AccountDeleteScreen() {
   const router = useRouter();
@@ -67,16 +71,16 @@ export default function AccountDeleteScreen() {
     }
 
     setNotice(
-      'Akun Anda dan identitas login sudah dihapus. Anda tidak bisa masuk lagi dengan akun ini, dan sesi di perangkat ini telah berakhir.',
+      'Data Anda sudah dihapus dari server dan identitas perangkat ini telah berakhir. Aplikasi akan memulai identitas baru; keanggotaan dan riwayat yang lama tidak bisa dipulihkan.',
     );
 
     await signOut();
-    router.replace('/sign-in');
+    router.replace('/');
   }
 
   return (
     <Screen
-      header={<ScreenHeader showBack title="Hapus akun" />}
+      header={<ScreenHeader showBack title="Hapus data saya" />}
       scroll
       testID="account-delete-screen"
     >
@@ -104,7 +108,7 @@ export default function AccountDeleteScreen() {
 
       <Card>
         <SectionHeader
-          subtitle="Penghapusan bersifat permanen dan tidak bisa dibatalkan. Anda akan keluar dari perangkat ini."
+          subtitle="Penghapusan bersifat permanen dan tidak bisa dibatalkan. Setelah selesai, perangkat ini memakai identitas baru yang belum menjadi anggota klub mana pun."
           title="Apa yang terjadi"
         />
         <View style={styles.list}>
@@ -113,7 +117,8 @@ export default function AccountDeleteScreen() {
           </AppText>
           <AppText variant="callout">
             • Kendaraan, nomor polisi, catatan privat, token notifikasi, lokasi terakhir, relasi
-            follow, dan blokir dihapus. Identitas login juga dihapus permanen.
+            follow, dan blokir dihapus. Identitas anonim perangkat ini juga dihapus permanen, jadi
+            data lama tidak bisa dipulihkan lagi.
           </AppText>
           <AppText variant="callout">
             • Anda keluar dari klub dan perjalanan. Kepemilikan klub/perjalanan dialihkan ke
@@ -122,7 +127,7 @@ export default function AccountDeleteScreen() {
           </AppText>
           <AppText variant="callout">
             • Laporan bahaya tetap tersimpan untuk keselamatan peserta lain, tanpa identitas Anda.
-            Pesan konvoi serta postingan/komentar Anda diredaksi dan diatribusikan ke “Akun
+            Pesan konvoi serta postingan/komentar Anda diredaksi dan diatribusikan ke “Pengguna
             dihapus”. Jejak audit moderasi tetap ada tanpa identitas Anda.
           </AppText>
         </View>
@@ -135,7 +140,7 @@ export default function AccountDeleteScreen() {
           action="Periksa koneksi, lalu coba lagi. Bila berulang, hubungi dukungan."
           message={error.message}
           testID="account-delete-error"
-          title="Akun belum dihapus"
+          title="Data belum terhapus"
           tone="danger"
         />
       ) : null}
@@ -144,7 +149,7 @@ export default function AccountDeleteScreen() {
         <Banner
           message={notice}
           testID="account-delete-notice"
-          title="Akun dihapus"
+          title="Data terhapus"
           tone="success"
         />
       ) : null}
@@ -160,7 +165,7 @@ export default function AccountDeleteScreen() {
           </AppText>
         ) : (
           <AppText tone="secondary" variant="callout">
-            Profil belum termuat. Muat ulang layar ini sebelum menghapus akun.
+            Profil belum termuat. Muat ulang layar ini sebelum menghapus data.
           </AppText>
         )}
 
@@ -178,7 +183,7 @@ export default function AccountDeleteScreen() {
           disabled={!backend.available || !matches || busy || !profile}
           fullWidth
           icon="trash-outline"
-          label={busy ? 'Menghapus akun…' : 'Hapus akun saya'}
+          label={busy ? 'Menghapus data…' : 'Hapus data saya'}
           onPress={() => {
             void handleDelete();
           }}

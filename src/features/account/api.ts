@@ -5,7 +5,7 @@
  * Klien hanya memanggil Edge Function `delete-account` dengan access token
  * sesinya; server memverifikasi token itu, menangani Storage (termasuk logo klub
  * milik pengguna), memurnikan database dalam satu transaksi, lalu menghapus
- * identitas login lewat Auth Admin API.
+ * identitas anonim lewat Auth Admin API.
  *
  * Pembagian ini penting:
  *   * Klien tidak pernah mengirim `userId` — target selalu `auth.uid()` hasil

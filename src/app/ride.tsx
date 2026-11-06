@@ -111,7 +111,7 @@ export default function RideScreen() {
   const precondition = screenPrecondition(
     backend,
     userId,
-    'Sesi tidak ditemukan di perangkat ini. Masuk kembali untuk membuka perjalanan.',
+    'Identitas perangkat ini tidak aktif. Buka ulang aplikasi untuk membuka perjalanan.',
   );
 
   useEffect(() => {

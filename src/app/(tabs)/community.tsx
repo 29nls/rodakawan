@@ -81,7 +81,7 @@ export default function CommunityScreen() {
   const precondition = screenPrecondition(
     backend,
     userId,
-    'Sesi tidak ditemukan di perangkat ini. Masuk kembali untuk menjelajah klub.',
+    'Identitas perangkat ini tidak aktif. Buka ulang aplikasi untuk menjelajah klub.',
   );
 
   useEffect(() => {

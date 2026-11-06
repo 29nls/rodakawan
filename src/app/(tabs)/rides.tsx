@@ -56,7 +56,7 @@ export default function RidesScreen() {
   const precondition = screenPrecondition(
     backend,
     userId,
-    'Sesi tidak ditemukan di perangkat ini. Masuk kembali untuk melihat perjalanan.',
+    'Identitas perangkat ini tidak aktif. Buka ulang aplikasi untuk melihat perjalanan.',
   );
 
   useFocusEffect(

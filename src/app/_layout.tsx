@@ -24,8 +24,9 @@ export default function RootLayout() {
 
 /**
  * Navigasi berbasis `Stack.Protected` (pola resmi Expo Router): rute privat hanya
- * terdaftar ketika sesi sudah diperiksa dan valid, sehingga pengguna tanpa sesi
- * tidak bisa berada di layar privat walaupun mengetik URL-nya.
+ * terdaftar ketika identitas perangkat sudah siap, sehingga layar privat tidak
+ * bisa dibuka sebelum identitas ada. Tidak ada lagi rute masuk/daftar: identitas
+ * dibuat otomatis oleh `AuthSessionProvider`.
  *
  * Proteksi ini hanya lapisan navigasi klien — otorisasi data tetap milik RLS di
  * database (docs/SECURITY_PRIVACY.md bagian 2).
@@ -41,15 +42,14 @@ function RootNavigator() {
         headerShown: false,
       }}
     >
-      {/* Selalu tersedia: gerbang loading/arah awal dan penerima tautan email. */}
+      {/* Gerbang awal: loading, butuh internet, identitas hilang, lalu arah tujuan. */}
       <Stack.Screen name="index" />
-      <Stack.Screen name="auth/callback" />
 
       <Stack.Protected guard={resolved && session !== null}>
+        <Stack.Screen name="onboarding" />
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="system" />
         <Stack.Screen name="profile/edit" />
-        <Stack.Screen name="reset-password" />
         {/* Milestone 2: garasi dan klub, semuanya di dalam penjaga sesi. */}
         <Stack.Screen name="garage" />
         <Stack.Screen name="vehicle" />
@@ -60,10 +60,6 @@ function RootNavigator() {
         <Stack.Screen name="ride" />
         {/* Milestone 4: moderasi laporan penyalahgunaan (host/admin klub). */}
         <Stack.Screen name="moderation" />
-      </Stack.Protected>
-
-      <Stack.Protected guard={resolved && session === null}>
-        <Stack.Screen name="(auth)" />
       </Stack.Protected>
     </Stack>
   );

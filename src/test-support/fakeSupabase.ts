@@ -11,17 +11,11 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database, ProfileRow } from '@/lib/supabase/database.types';
 
 export type AuthSpies = {
-  signUp: jest.Mock;
-  signInWithPassword: jest.Mock;
+  /** Satu-satunya jalur pembuatan identitas di RodaKawan. */
+  signInAnonymously: jest.Mock;
   signOut: jest.Mock;
-  resetPasswordForEmail: jest.Mock;
-  resend: jest.Mock;
-  updateUser: jest.Mock;
   getSession: jest.Mock;
   onAuthStateChange: jest.Mock;
-  exchangeCodeForSession: jest.Mock;
-  verifyOtp: jest.Mock;
-  setSession: jest.Mock;
   initialize: jest.Mock;
   startAutoRefresh: jest.Mock;
   stopAutoRefresh: jest.Mock;
@@ -33,17 +27,10 @@ const DEFAULT_RESULT: AuthResultShape = { data: {}, error: null };
 
 export function createAuthSpies(overrides: Partial<AuthSpies> = {}): AuthSpies {
   return {
-    signUp: jest.fn(async () => DEFAULT_RESULT),
-    signInWithPassword: jest.fn(async () => DEFAULT_RESULT),
+    signInAnonymously: jest.fn(async () => DEFAULT_RESULT),
     signOut: jest.fn(async () => DEFAULT_RESULT),
-    resetPasswordForEmail: jest.fn(async () => DEFAULT_RESULT),
-    resend: jest.fn(async () => DEFAULT_RESULT),
-    updateUser: jest.fn(async () => DEFAULT_RESULT),
     getSession: jest.fn(async () => ({ data: { session: null }, error: null })),
     onAuthStateChange: jest.fn(() => ({ data: { subscription: { unsubscribe: jest.fn() } } })),
-    exchangeCodeForSession: jest.fn(async () => DEFAULT_RESULT),
-    verifyOtp: jest.fn(async () => DEFAULT_RESULT),
-    setSession: jest.fn(async () => DEFAULT_RESULT),
     initialize: jest.fn(async () => ({ data: { session: null, user: null }, error: null })),
     startAutoRefresh: jest.fn(async () => undefined),
     stopAutoRefresh: jest.fn(async () => undefined),

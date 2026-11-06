@@ -133,7 +133,7 @@ export default function HazardsScreen() {
   const precondition = screenPrecondition(
     backend,
     userId,
-    'Sesi tidak ditemukan di perangkat ini. Masuk kembali untuk melihat laporan bahaya.',
+    'Identitas perangkat ini tidak aktif. Buka ulang aplikasi untuk melihat laporan bahaya.',
   );
 
   useFocusEffect(
@@ -219,7 +219,9 @@ export default function HazardsScreen() {
 
   const handleCreate = async () => {
     if (unauthorized) {
-      setFormError('Backend belum siap atau sesi belum aktif. Masuk kembali lalu coba lagi.');
+      setFormError(
+        'Backend belum siap atau identitas perangkat belum aktif. Buka ulang aplikasi lalu coba lagi.',
+      );
       return;
     }
 

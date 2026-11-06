@@ -97,7 +97,7 @@ export default function GarageScreen() {
   const precondition = screenPrecondition(
     backend,
     userId,
-    'Sesi tidak ditemukan di perangkat ini. Masuk kembali untuk membuka garasi.',
+    'Identitas perangkat ini tidak aktif. Buka ulang aplikasi untuk membuka garasi.',
   );
 
   async function handleAdd() {

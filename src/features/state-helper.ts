@@ -16,7 +16,7 @@ import { describeUnavailableReason, type SupabaseClientState } from '@/lib/supab
  * Prasyarat yang harus terpenuhi sebelum layar memuat data dari Supabase.
  *
  * `sessionMessage` wajib menyebut apa yang harus dilakukan pengguna (mis.
- * "Masuk kembali untuk membuka garasi."), karena pesan ini tampil apa adanya.
+ * "Buka ulang aplikasi untuk membuka garasi."), karena pesan ini tampil apa adanya.
  */
 export function screenPrecondition(
   backend: SupabaseClientState,

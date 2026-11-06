@@ -28,7 +28,8 @@ function tagOf(error: unknown): string {
 export const ACCOUNT_ERROR_TAGS: Record<string, AppError> = {
   account_unauthenticated: {
     code: 'session_expired',
-    message: 'Sesi Anda sudah berakhir. Masuk kembali, lalu ulangi permintaan hapus akun.',
+    message:
+      'Identitas perangkat ini sudah berakhir. Buka ulang aplikasi, lalu ulangi permintaan hapus data.',
     retryable: false,
   },
   account_profile_missing: {
@@ -73,7 +74,8 @@ export const ACCOUNT_FUNCTION_ERROR_TAGS: Record<string, AppError> = {
   },
   account_deletion_unauthenticated: {
     code: 'session_expired',
-    message: 'Sesi Anda sudah berakhir. Masuk kembali, lalu ulangi permintaan hapus akun.',
+    message:
+      'Identitas perangkat ini sudah berakhir. Buka ulang aplikasi, lalu ulangi permintaan hapus data.',
     retryable: false,
   },
   account_deletion_invalid_user: {

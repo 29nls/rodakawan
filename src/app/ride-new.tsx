@@ -84,7 +84,7 @@ export default function RideNewScreen() {
   const precondition = screenPrecondition(
     backend,
     userId,
-    'Sesi tidak ditemukan di perangkat ini. Masuk kembali untuk membuat perjalanan.',
+    'Identitas perangkat ini tidak aktif. Buka ulang aplikasi untuk membuat perjalanan.',
   );
 
   const [clubs, setClubs] = useState<RideClubSummary[] | null>(null);

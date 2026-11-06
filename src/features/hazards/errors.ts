@@ -26,7 +26,8 @@ function tagOf(error: unknown): string {
 export const HAZARD_ERROR_TAGS: Record<string, AppError> = {
   hazard_unauthenticated: {
     code: 'not_authorized',
-    message: 'Masuk dulu untuk mengirim atau mengubah laporan bahaya.',
+    message:
+      'Identitas perangkat ini tidak aktif. Buka ulang aplikasi untuk mengirim atau mengubah laporan bahaya.',
     retryable: false,
   },
   hazard_invalid_category: {

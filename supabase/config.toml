@@ -12,5 +12,17 @@
 
 version = "1"
 
+[auth]
+# RodaKawan tidak punya akun: setiap perangkat membuat satu identitas anonim.
+# Tanpa ini, `signInAnonymously()` ditolak dengan `anonymous_provider_disabled`.
+# Aktifkan juga di project yang sudah berjalan lewat dashboard:
+# Authentication → Sign In / Providers → Anonymous sign-ins.
+enable_anonymous_sign_ins = true
+
+[auth.email]
+# Tidak ada layar daftar/login/reset di aplikasi. Provider email dimatikan agar
+# permukaan serangan tidak melebar dan tidak ada jalur masuk berbasis email.
+enable_signup = false
+
 [functions.delete-account]
 verify_jwt = false

@@ -95,11 +95,12 @@ describe('AccountDeleteScreen', () => {
     });
 
     expect(await screen.findByTestId('account-delete-notice')).toBeTruthy();
-    expect(screen.getByText(/identitas login sudah dihapus/)).toBeTruthy();
+    expect(screen.getByText(/Data Anda sudah dihapus dari server/)).toBeTruthy();
 
     await waitFor(() => {
       expect(mockSignOut).toHaveBeenCalledTimes(1);
-      expect(mockReplace).toHaveBeenCalledWith('/sign-in');
+      // Kembali ke gerbang awal: provider membuat identitas anonim baru di sana.
+      expect(mockReplace).toHaveBeenCalledWith('/');
     });
   });
 
@@ -133,7 +134,8 @@ describe('AccountDeleteScreen', () => {
       ok: false,
       error: {
         code: 'session_expired',
-        message: 'Sesi Anda sudah berakhir. Masuk kembali, lalu ulangi permintaan hapus akun.',
+        message:
+          'Identitas perangkat ini sudah berakhir. Buka ulang aplikasi, lalu ulangi permintaan hapus data.',
         retryable: false,
       },
     });
