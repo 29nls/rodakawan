@@ -8,6 +8,24 @@ sedangkan build preview (`v<versi>-build<N>`) diringkas di dalam blok yang bisa 
 versi adalah tautan ke halaman rilisnya di GitHub, sehingga riwayat ini bisa dinavigasi langsung
 dari berkas.
 
+## [v0.1.0-build78](https://github.com/29nls/rodakawan/releases/tag/v0.1.0-build78) — 2026-11-06 · pratinjau
+
+<details>
+<summary>Catatan rilis pratinjau</summary>
+
+### ⚠️ Perubahan yang Merusak (Breaking Changes)
+
+_Tindakan diperlukan sebelum memperbarui ke rilis ini._
+
+- **feat: ganti autentikasi email dengan identitas anonim per perangkat** (`ace67c7`)
+
+### Perubahan lain
+
+- perbarui dokumentasi mode tanpa akun (ADR-083) (`401bba4`)
+- deps: samakan dependency dengan Expo SDK 57.0.32 (`6794b73`)
+
+</details>
+
 ## [v0.1.0-build77](https://github.com/29nls/rodakawan/releases/tag/v0.1.0-build77) — 2026-10-29 · pratinjau
 
 <details>
