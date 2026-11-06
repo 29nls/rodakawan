@@ -2,25 +2,21 @@
  * Uji statis halaman web publik di `web/`.
  *
  * Halaman ini diterbitkan ke GitHub Pages oleh `.github/workflows/pages.yml` dan
- * menjadi satu-satunya jalur hapus akun yang bisa dipakai tanpa memasang
- * aplikasi — syarat Google Play. Karena tidak ada build step, satu-satunya
- * gerbang sebelum terbit adalah test ini: ia membaca berkas yang **akan**
- * diunggah, bukan salinan lain.
+ * menjadi satu-satunya halaman hapus data yang bisa dibuka tanpa memasang
+ * aplikasi. Karena tidak ada build step, satu-satunya gerbang sebelum terbit
+ * adalah test ini: ia membaca berkas yang **akan** diunggah, bukan salinan lain.
  *
- * Yang dijaga:
+ * Sejak RodaKawan tidak punya akun (ADR-083), halaman hapus data tidak lagi
+ * punya formulir login: penghapusan terjadi di aplikasi, dan halaman hanya
+ * menjelaskan langkah serta konsekuensinya. Yang dijaga di sini:
  * - konten wajib: retensi per jenis data, kontak dukungan, dan langkah hapus
- *   akun (halaman yang kehilangan bagian ini tetap "tampil", tetapi tidak
+ *   data (halaman yang kehilangan bagian ini tetap "tampil", tetapi tidak
  *   memenuhi syarat Play Console);
- * - tautan internal tidak patah (halaman 404 di jalur hapus akun membuat
- *   pengguna tidak bisa menghapus akunnya);
- * - tidak ada skrip, iframe, atau tracker pihak ketiga (halaman ini memegang
- *   kata sandi; permukaan pihak ketiga harus nol);
- * - tidak ada secret, URL database, JWT, atau ref project development di
- *   berkas yang diterbitkan;
- * - `config.js` hanya memuat URL, publishable key, dan tautan — publishable key
- *   berbentuk JWT lama hanya boleh bila payload-nya berperan `anon`, sehingga
- *   service role key yang tidak sengaja ditempel tertangkap;
- * - `app.js` tidak menyimpan token di storage dan tidak mencetaknya;
+ * - tidak ada formulir email/kata sandi yang menjanjikan jalur yang tidak ada;
+ * - tidak ada JavaScript yang mengirim data ke Supabase dari halaman publik;
+ * - tautan internal tidak patah;
+ * - tidak ada skrip, iframe, atau tracker pihak ketiga;
+ * - tidak ada secret, URL project, JWT, atau connection string database;
  * - workflow Pages hanya mengunggah `web/` dengan izin minimal.
  *
  * Jalankan: `npm run test:scripts` (atau `node --test scripts/__tests__/web-static.test.mjs`).
@@ -61,18 +57,19 @@ const PRIVACY_CONTENT = [
   'Laporan bahaya',
   'Setelah penghapusan akun',
   'Metadata status penghapusan',
-  'Profil → Hapus akun',
+  'Profil → Hapus data saya',
   'github.com/29nls/rodakawan/issues',
 ];
 
-/** Konsekuensi yang harus dinyatakan sebelum pengguna menghapus akun. */
+/** Konsekuensi yang harus dinyatakan sebelum pengguna menghapus data. */
 const DELETION_CONTENT = [
-  'Identitas login',
+  'Profil → Hapus data saya',
+  'Identitas anonim',
   'Laporan bahaya',
   'Pesan konvoi',
   'Kepemilikan klub/perjalanan',
   'tidak bisa dibatalkan',
-  'HAPUS AKUN',
+  'github.com/29nls/rodakawan/issues',
 ];
 
 describe('Halaman web publik: isi wajib', () => {
@@ -87,7 +84,7 @@ describe('Halaman web publik: isi wajib', () => {
     }
   });
 
-  it('halaman privasi menyebut retensi per jenis data, kontak, dan jalur hapus akun', () => {
+  it('halaman privasi menyebut retensi per jenis data, kontak, dan jalur hapus data', () => {
     const html = webText('privacy/index.html');
 
     for (const phrase of PRIVACY_CONTENT) {
@@ -107,23 +104,33 @@ describe('Halaman web publik: isi wajib', () => {
       /tidak lagi menunjuk identitas Anda/,
       'halaman harus menyatakan konten yang dipertahankan tidak lagi menunjuk identitas',
     );
+    assert.doesNotMatch(html, /email \(dikelola/, 'halaman masih menggambarkan akun email');
   });
 
-  it('halaman hapus akun menyatakan konsekuensi dan konfirmasi ketik ulang', () => {
+  it('halaman hapus data menjelaskan langkah aplikasi tanpa formulir login', () => {
     const html = webText('account-deletion/index.html');
 
     for (const phrase of DELETION_CONTENT) {
-      assert.ok(html.includes(phrase), `halaman hapus akun tidak menyebut "${phrase}"`);
+      assert.ok(html.includes(phrase), `halaman hapus data tidak menyebut "${phrase}"`);
     }
 
-    assert.match(html, /id="konfirmasi"/, 'input konfirmasi harus ada');
+    // Tidak ada formulir: tidak ada akun, jadi tidak ada yang bisa "masuk".
+    assert.doesNotMatch(html, /<form\b/i, 'halaman tidak boleh punya formulir');
+    assert.doesNotMatch(html, /<input\b/i, 'halaman tidak boleh punya kolom input');
+    assert.doesNotMatch(html, /type="password"/i, 'halaman tidak boleh meminta kata sandi');
+    assert.doesNotMatch(html, /type="email"/i, 'halaman tidak boleh meminta email');
+    assert.doesNotMatch(
+      html,
+      /autocomplete="current-password"/i,
+      'halaman tidak boleh menyiratkan login kata sandi',
+    );
+
+    // Halaman harus menyatakan batasnya, bukan menawarkan jalur yang tidak ada.
     assert.match(
       html,
-      /autocomplete="current-password"/,
-      'input kata sandi harus memakai autocomplete kata sandi',
+      /tidak ada jalur penghapusan dari browser|tidak bisa dipulihkan dari luar|hanya ada di perangkat/i,
+      'halaman harus menyatakan bahwa penghapusan tidak dilakukan dari browser',
     );
-    assert.match(html, /role="alert"/, 'pesan galat harus diumumkan ke pembaca layar');
-    assert.match(html, /aria-live="polite"/, 'status proses harus diumumkan tanpa mengganggu');
   });
 
   it('halaman tidak mengklaim URL publik yang belum diverifikasi', () => {
@@ -177,9 +184,18 @@ describe('Halaman web publik: tautan dan pihak ketiga', () => {
     }
   });
 
-  it('tidak ada skrip, iframe, stylesheet, atau tracker pihak ketiga', () => {
+  it('tidak ada JavaScript, skrip, iframe, stylesheet, atau tracker pihak ketiga', () => {
     const thirdParty =
       /google-analytics|googletagmanager|googlesyndication|doubleclick|facebook\.(?:net|com)|hotjar|plausible\.io|segment\.(?:io|com)|mixpanel|sentry\.io|fullstory|clarity\.ms/i;
+
+    for (const page of PAGES) {
+      const html = webText(page);
+      assert.doesNotMatch(
+        html,
+        /<script\b/i,
+        `${page} memuat skrip; halaman hapus data tidak boleh menjalankan JavaScript`,
+      );
+    }
 
     for (const file of textWebFiles) {
       const text = read(file);
@@ -202,123 +218,42 @@ describe('Halaman web publik: tautan dan pihak ketiga', () => {
 });
 
 describe('Halaman web publik: rahasia dan konfigurasi', () => {
-  it('tidak ada secret, URL database, JWT, atau ref project development di web/', () => {
+  it('tidak ada secret, URL project, JWT, atau connection string di web/', () => {
     const forbidden = [
       { pattern: /xvmcpfkkveeaevfcvfug/, label: 'ref project development' },
+      { pattern: /[a-z0-9]{20}\.supabase\.co/i, label: 'URL project Supabase' },
+      { pattern: /sb_publishable_[A-Za-z0-9_-]{10,}/, label: 'publishable key' },
       { pattern: /sb_secret_[A-Za-z0-9_-]{10,}/, label: 'secret key Supabase' },
       { pattern: /SUPABASE_SERVICE_ROLE_KEY/, label: 'nama service role key' },
       { pattern: /postgres(?:ql)?:\/\/[^\s"'<>]*@/, label: 'connection string database' },
       { pattern: /-----BEGIN [A-Z ]*PRIVATE KEY-----/, label: 'private key' },
+      { pattern: /eyJ[A-Za-z0-9_-]{10,}\./, label: 'JWT' },
     ];
 
     for (const file of textWebFiles) {
       const text = read(file);
       const name = path.relative(ROOT, file);
 
-      // Lewati config.js dalam pemindaian rahasian umum — berkas ini
-      // sengaja berisi URL project Supabase dan publishable key yang
-      // diakses publik (lihat test 'config.js hanya memuat URL project').
-      if (path.basename(file) !== 'config.js') {
-        for (const { pattern, label } of forbidden) {
-          assert.doesNotMatch(text, pattern, `${name} memuat ${label}`);
-        }
-
-        // JWT diizinkan hanya di config.js (publishable/anon key lama); berkas
-        // lain tidak punya alasan memuat token apa pun.
-        assert.doesNotMatch(text, /eyJ[A-Za-z0-9_-]{10,}\./, `${name} memuat JWT`);
+      for (const { pattern, label } of forbidden) {
+        assert.doesNotMatch(text, pattern, `${name} memuat ${label}`);
       }
+
+      assert.doesNotMatch(text, /\bstorage:/i, `${name} menyentuh localStorage/sessionStorage`);
     }
   });
 
-  it('config.js hanya memuat URL project, publishable key, dan tautan', () => {
-    const source = webText('account-deletion/config.js');
-    const match = /window\.RODAKAWAN_WEB\s*=\s*\{([\s\S]*?)\};/.exec(source);
-    assert.ok(match, 'config.js harus menetapkan window.RODAKAWAN_WEB');
-
-    const body = match[1];
-    // Hanya kunci di awal baris (properti objek), bukan "https:" di dalam nilai.
-    const keys = [...body.matchAll(/^\s{2,}([A-Za-z][A-Za-z0-9_]*)\s*:/gm)]
-      .map((entry) => entry[1])
-      .sort();
-    assert.deepEqual(
-      keys,
-      ['privacyUrl', 'publishableKey', 'supabaseUrl', 'supportUrl'],
-      'config.js memuat kunci yang tidak diizinkan; jangan menambah service role atau secret',
+  it('halaman hapus data tidak lagi bergantung pada berkas konfigurasi', () => {
+    // Halaman yang butuh config cenderung butuh URL + kunci; keduanya sekarang
+    // dilarang. Bila kebutuhan itu muncul lagi, ubah ADR-083 lebih dulu.
+    assert.equal(
+      fs.existsSync(webFile('account-deletion/config.js')),
+      false,
+      'config.js tidak boleh kembali tanpa keputusan produk baru',
     );
-
-    const valueOf = (key) => {
-      const found = new RegExp(`${key}\\s*:\\s*'([^']*)'`).exec(body);
-      assert.ok(found, `config.js tidak memuat nilai ${key}`);
-      return found[1];
-    };
-
-    const supabaseUrl = valueOf('supabaseUrl');
-    assert.match(
-      supabaseUrl,
-      /^https:\/\/(?:GANTI-PROJECT-REF|[a-z0-9-]+)\.supabase\.co$/,
-      `supabaseUrl harus URL project Supabase, bukan: ${supabaseUrl}`,
-    );
-
-    // Placeholder tetap boleh; begitu diisi, nilainya harus publishable.
-    // Anon key lama berbentuk JWT — periksa payload-nya agar service role key
-    // yang tertempel tidak lolos hanya karena "kelihatan seperti kunci".
-    const publishableKey = valueOf('publishableKey');
-    if (/^GANTI-/.test(publishableKey)) {
-      // belum dikonfigurasi: halaman menampilkan pesan, bukan mengaku siap
-    } else if (publishableKey.startsWith('sb_publishable_')) {
-      // format publishable key baru
-    } else {
-      assert.match(
-        publishableKey,
-        /^eyJ[A-Za-z0-9_-]+\./,
-        'publishable key harus publishable/anon key, bukan nilai lain',
-      );
-
-      const payload = publishableKey.split('.')[1];
-      const claims = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
-      assert.equal(
-        claims.role,
-        'anon',
-        'publishable key berbentuk JWT harus berperan "anon"; service role key tidak boleh masuk halaman publik',
-      );
-    }
-
-    assert.equal(valueOf('supportUrl'), 'https://github.com/29nls/rodakawan/issues');
-    assert.equal(valueOf('privacyUrl'), '../privacy/');
-  });
-
-  it('app.js tidak menyimpan token di storage, tidak memakai cookie, dan tidak mencetak apa pun', () => {
-    // Komentar boleh menyebut localStorage (menjelaskan bahwa token tidak
-    // disimpan di sana); yang diperiksa adalah kode yang benar-benar berjalan.
-    const app = webText('account-deletion/app.js')
-      .replace(/\/\*[\s\S]*?\*\//g, '')
-      .replace(/^\s*\/\/.*$/gm, '');
-
-    assert.doesNotMatch(
-      app,
-      /\b(?:localStorage|sessionStorage|document\.cookie)\b/,
-      'token tidak boleh dipersistenkan',
-    );
-    assert.doesNotMatch(
-      app,
-      /console\.(?:log|info|debug|warn|error)/,
-      'halaman tidak boleh mencetak ke console',
-    );
-    assert.match(
-      app,
-      /Authorization:\s*'Bearer '\s*\+\s*token/,
-      'token hanya dikirim sebagai header Bearer',
-    );
-    assert.match(
-      app,
-      /'\/functions\/v1\/delete-account'/,
-      'halaman harus memanggil Edge Function hapus akun',
-    );
-    assert.match(app, /token = '';/, 'token harus dikosongkan setelah percobaan');
-    assert.doesNotMatch(
-      app,
-      /Email tidak terdaftar|akun tidak ditemukan/i,
-      'galat login tidak boleh mengungkap keberadaan akun',
+    assert.equal(
+      fs.existsSync(webFile('account-deletion/app.js')),
+      false,
+      'app.js tidak boleh kembali: halaman tidak menjalankan JavaScript',
     );
   });
 });

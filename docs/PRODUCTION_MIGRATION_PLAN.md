@@ -368,24 +368,18 @@ Target ini harus diuji, bukan diasumsikan:
 
 Lakukan **setelah** preflight produksi 8/8 dan sebelum APK produksi disebar.
 
-1. Ubah `web/account-deletion/config.js`:
-   - `supabaseUrl` → `https://<ref-prod>.supabase.co`
-   - `publishableKey` → publishable key produksi (bukan service role)
-   - `supportUrl`/`privacyUrl` tetap, atau sesuaikan setelah domain final.
+1. Tidak ada konfigurasi backend di halaman. Sejak halaman hapus data menjadi
+   instruksi tanpa JavaScript (6 November 2026), `web/` tidak memuat URL project,
+   publishable key, atau token apa pun; terbitkan folder itu apa adanya.
 2. Jalankan uji statis (juga berjalan di CI):
 
    ```powershell
-   node --test scripts/__tests__/web-static.test.mjs   # 11/11
-   if (Select-String -Path web/account-deletion/config.js -Pattern 'xvmcpfkkveeaevfcvfug' -Quiet) {
-     throw 'config.js masih menunjuk project development'
-   }
+   node --test scripts/__tests__/web-static.test.mjs   # 10/10
    ```
 
-   Perhatikan batas uji itu: `config.js` **dikecualikan** dari pemindaian ref
-   development (`scripts/__tests__/web-static.test.mjs`), justru karena berkas
-   ini memang harus memuat URL project. Karena itu langkah `grep` di atas wajib:
-   tanpa itu, lupa mengganti URL tetap lolos 11/11. publishable key produksi
-   boleh ada karena memang publik; service role tidak pernah boleh.
+   Uji ini memindai **seluruh** `web/` tanpa pengecualian terhadap ref project
+   development, kunci Supabase, JWT, dan connection string; halaman yang kembali
+   memuat config akan langsung gagal.
 3. Set origin halaman di Edge Function produksi, lalu deploy ulang bila perlu:
 
    ```powershell
@@ -421,7 +415,10 @@ Lakukan **setelah** preflight produksi 8/8 dan sebelum APK produksi disebar.
    `config.js` ke `main` (trigger `web/**`) atau jalankan
    `gh workflow run pages.yml`. Catat `page_url` dari ringkasan run.
 6. Verifikasi di browser: halaman privasi dan hapus akun terbuka dan tidak ada
-   error konsol. **Alur hapus akun di halaman web masih Blocked**: `web/account-deletion/app.js`
+   error konsol. **Alur hapus akun tidak lagi lewat halaman web**: sejak 6 November 2026 halaman
+   itu hanya memuat instruksi (tanpa JavaScript, formulir, atau config), karena identitas anonim
+   hanya ada di perangkat. Verifikasi penghapusan dilakukan dari aplikasi terhadap project
+   development, bukan dari browser.
    memakai email + kata sandi, sedangkan APK baru tidak punya akun email
    (ADR-083). Jangan menerbitkan halaman itu sebagai alur final sebelum ia
    diubah ke identitas perangkat; catat sebagai **Blocked** dengan pemilik
