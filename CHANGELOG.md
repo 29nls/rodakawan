@@ -8,6 +8,23 @@ sedangkan build preview (`v<versi>-build<N>`) diringkas di dalam blok yang bisa 
 versi adalah tautan ke halaman rilisnya di GitHub, sehingga riwayat ini bisa dinavigasi langsung
 dari berkas.
 
+## [v0.1.0-build80](https://github.com/29nls/rodakawan/releases/tag/v0.1.0-build80) — 2026-11-06 · pratinjau
+
+<details>
+<summary>Catatan rilis pratinjau</summary>
+
+### Fitur
+
+- samakan istilah hapus data di kebijakan privasi dan pesan galat (`d26c42e`)
+- tambahkan undangan klub untuk klub invite-only (`308f159`)
+
+### Perubahan lain
+
+- pakai anonymous sign-in di skrip integrasi dan E2E (`d8aa439`)
+- catat ADR-084 dan status verifikasi Fase 2 (`ba3e684`)
+
+</details>
+
 ## [v0.1.0-build78](https://github.com/29nls/rodakawan/releases/tag/v0.1.0-build78) — 2026-11-06 · pratinjau
 
 <details>
