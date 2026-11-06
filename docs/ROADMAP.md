@@ -36,7 +36,8 @@ perangkat fisik masih **Blocked** (belum ada build terpasang), bukan lagi karena
 
 Kode dan skrip (implementasi):
 
-- [x] Sign in/sign up/reset diimplementasikan dengan Supabase Auth (alur email + password).
+- [x] ~~Sign in/sign up/reset dengan Supabase Auth (alur email + password).~~ **Diganti ADR-083:**
+      identitas anonim per perangkat lewat `signInAnonymously()`, tanpa layar masuk/daftar/reset.
 - [x] Buat/edit profil dan username unik diimplementasikan (+ validasi dan penanganan benturan).
 - [x] Pengaturan sesi/logout diimplementasikan (persistensi `expo-sqlite`, auto-refresh, PKCE).
 - [x] Policy RLS profil dari migration awal dipertahankan tanpa pelonggaran.
@@ -49,9 +50,10 @@ Kode dan skrip (implementasi):
       LULUS di project development (PROF-01…PROF-05 tercakup).
 - [x] Migration awal + migration bootstrap profil diterapkan ke project development (`npx supabase db
       push`; riwayat remote berisi kedua versi).
-- [ ] Registrasi + konfirmasi email diuji ke project Supabase development (project sudah ada, uji
-      manual belum dijalankan).
-- [ ] Login, reset password, dan session persistence diuji di perangkat fisik.
+- [ ] Anonymous sign-ins diaktifkan di project development dan onboarding username diuji manual
+      (belum dijalankan; butuh keputusan/kredensial pemilik).
+- [ ] Identitas perangkat dan session persistence diuji di perangkat fisik (termasuk mode pesawat
+      pada instalasi baru dan skenario identitas hilang).
 
 **Exit criteria:** dua user dapat masuk di perangkat/sesi berbeda; user A tidak dapat mengedit profil user B. — *aturan di database sudah terbukti (uji RLS LULUS di project development); alur dua user di perangkat belum diverifikasi.*
 

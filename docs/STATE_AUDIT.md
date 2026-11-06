@@ -1,8 +1,10 @@
 # Inventaris State Layar (Expo SDK 57, RN 0.86)
 
-Status dokumen: **diperbarui 26 Oktober 2026** setelah audit ulang terhadap kode
+Status dokumen: **diperbarui 6 November 2026** setelah mode tanpa akun (ADR-083) menghapus
+rute `(auth)/*`, `auth/callback.tsx`, dan `reset-password.tsx`, lalu menambah gerbang identitas
+perangkat + onboarding satu layar. Audit ulang sebelumnya (26 Oktober 2026) dilakukan terhadap kode
 `src/app` dan `src/features`. Versi sebelumnya menyebut layar yang tidak ada
-(`community.tsx`, `hazards.tsx`, `profile.tsx`, `sign-in.tsx`, dan seterusnya),
+(`community.tsx`, `hazards.tsx`, `profile.tsx`, dan seterusnya),
 menyatakan `StateView` tidak dipakai, dan menggambarkan kebijakan privasi punya
 banner error — semuanya tidak cocok lagi dengan kode. Dokumen ini adalah
 inventaris, bukan rencana; bila kode berubah, dokumen ini ikut berubah.
@@ -35,7 +37,7 @@ dan tidak menampilkan empty state palsu seolah-olah datanya memang kosong.
 
 | Sumber | Lokasi | Bentuk state |
 | --- | --- | --- |
-| `useAuthSession()` | `src/features/auth/session.tsx` | `status: 'loading' \| 'ready'`, `session`, `userId`, `email`, `backend` (`available: true` + client, atau `available: false` + `reason`), `signOut()`. |
+| `useAuthSession()` | `src/features/auth/session.tsx` | `status: 'loading' \| 'ready' \| 'offline' \| 'identity_lost'`, `session`, `userId`, `isAnonymous`, `startupError`, `backend` (`available: true` + client, atau `available: false` + `reason`), `retryIdentity()`, `startFreshIdentity()`, `signOut()`. |
 | `useProfile()` | `src/features/profile/useProfile.ts` | `{ status: 'loading' }`, `{ status: 'ready', profile: ProfileRow \| null }`, `{ status: 'error', error: AppError }`, plus `reload()`. Prasyarat backend/sesi sudah diturunkan menjadi `error`. |
 | `useAppStatus()` | `src/hooks/useAppStatus.ts` | Info build dari `expo-constants` + `backend` untuk diagnosa; tanpa query jaringan. |
 | `useFocusEffect` | layar tab (`rides`, `hazards`) | Memuat ulang saat tab difokuskan; token reload manual ditambahkan lewat `reloadToken`. |
@@ -51,13 +53,8 @@ Tabel ini menyebut apa yang **benar-benar dirender** oleh kode, bukan niat desai
 | Layar | Model state | Loading | Error | Empty / belum tersedia | Retry |
 | --- | --- | --- | --- | --- | --- |
 | `src/app/_layout.tsx` | — | — | `RouteErrorBoundary` (ekspor `ErrorBoundary`) | — | Tombol di `ErrorState` memanggil `retry()`. |
-| `src/app/index.tsx` (gerbang sesi) | `status` dari `useAuthSession` | `LoadingState "Memeriksa sesi…"` + catatan sesi aman | Redirect ke `/sign-in` bila sesi tidak ada | — | — |
-| `(auth)/_layout.tsx` | `Stack.Protected` berbasis sesi | — | — | — | — |
-| `(auth)/sign-in.tsx` | form + `submitting` | Label tombol “Memproses…” | `Banner` dari `AppError` | `BackendUnavailableBanner`; tombol kirim nonaktif | Kirim ulang manual |
-| `(auth)/sign-up.tsx` | form + `submitting` + `awaitingConfirmation` + `resending` | Label tombol | `Banner "Pendaftaran gagal"` | Banner konfirmasi email; banner status kirim ulang | Kirim ulang tautan konfirmasi |
-| `(auth)/forgot-password.tsx` | form + `submitting` + `sent` | Label tombol | `Banner "Gagal mengirim"` | Kartu “tautan terkirim” | Kirim ulang manual |
-| `auth/callback.tsx` | `CallbackState`: `working \| signed-in \| recovery \| incomplete \| failed` | `LoadingState "Memverifikasi tautan…"` | Banner + tombol ke halaman masuk | `incomplete` → banner tautan tidak lengkap | Minta tautan baru |
-| `reset-password.tsx` | form + `attempted` + `submitting` + `updated` | Label tombol | `Banner "Gagal menyimpan"` | `BackendUnavailableBanner`; tombol nonaktif | Kirim ulang manual |
+| `src/app/index.tsx` (gerbang identitas) | `status` dari `useAuthSession` (`loading \| ready \| offline \| identity_lost`) + `useProfile` | `LoadingState "Menyiapkan identitas perangkat…"` lalu `"Memuat profil…"` | Banner `startupError` di layar `offline` | Layar “Butuh internet untuk memulai” + **Coba lagi**; layar “Identitas lama tidak bisa dipulihkan” + **Buat identitas baru** | `retryIdentity()` / `startFreshIdentity()` |
+| `src/app/onboarding.tsx` | `useProfile` + `attempted` + `submitting` | Label tombol saat menyimpan | `Banner` dari `AppError` (termasuk `username_taken`) | `BackendUnavailableBanner`; tombol nonaktif | Kirim ulang manual setelah mengganti username |
 | `(tabs)/ringkasan.tsx` | statis (`useAppStatus`, `constants/roadmap`) | — | — | — | — |
 | `(tabs)/rides.tsx` | `loading \| ready \| error` | `LoadingState "Memuat perjalanan…"` | `ErrorState` + retry | `EmptyState "Belum ada perjalanan"` + CTA; `UnavailableState` bila backend/sesi belum siap | `reload()` |
 | `(tabs)/hazards.tsx` | `loading \| ready \| error` + state form/aksi | `LoadingState "Memuat laporan bahaya…"` | `ErrorState` + retry; `Banner` untuk aksi | `EmptyState "Tidak ada laporan aktif"` (ikut filter); `UnavailableState` bila backend/sesi belum siap | `reload()` |

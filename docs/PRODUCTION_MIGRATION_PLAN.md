@@ -8,6 +8,13 @@ Dokumen ini menjawab empat hal: promosi migration, backup/restore, rollback, dan
 pengarahan halaman web ke backend rilis. Tidak ada fitur, dependency, izin
 Android, atau migration baru yang ditambahkan oleh rencana ini.
 
+> **Pembaruan ADR-083 (6 November 2026):** aplikasi tidak lagi punya akun email. Di mana pun
+> rencana ini menyebut "daftar/konfirmasi email", "login", "reset password", atau SMTP untuk APK,
+> gantinya adalah **Anonymous sign-ins = ON** dan **provider Email = OFF** di project rilis. Setiap
+> instalasi membuat identitas sendiri; tidak ada pemulihan identitas dan tidak ada email yang perlu
+> dikonfirmasi. Langkah yang menyebut halaman web hapus akun tetap berlaku sebagai **Blocked**:
+> halaman itu masih memakai alur email + kata sandi yang perlu ditinjau ulang.
+
 ## 0. Keputusan yang mengikat rencana
 
 | Hal | Keputusan | Konsekuensi bila salah |
@@ -75,8 +82,11 @@ Sebelum satu perintah pun dijalankan:
    password manager.
 2. **Paket Android final** (ADR-015 masih menyebut `com.rodakawan.app`
    sementara). Putuskan sebelum unggah pertama ke Play Console.
-3. **SMTP + Confirm email** untuk produksi. Jangan mengulang `autoconfirm`
-   development; preflight akan menandainya GAGAL.
+3. **Anonymous sign-ins = ON dan provider Email = OFF** di project produksi
+   (ADR-083). Tidak ada SMTP, konfirmasi email, atau reset kata sandi yang perlu
+   disiapkan untuk APK. `beta:preflight` tetap memeriksa `autoconfirm` di
+   `/auth/v1/settings`; dengan provider Email mati, kegagalan pemeriksaan itu
+   diharapkan dan dicatat sebagai temuan konfigurasi, bukan kegagalan migration.
 4. **Origin halaman web** yang akan dipakai (`https://<owner>.github.io` untuk
    GitHub Pages project site, atau domain kustom). Ini menjadi
    `WEB_ALLOWED_ORIGINS`.
@@ -160,9 +170,10 @@ Kriteria lulus rehearsal:
 
 - `migration list` tanpa selisih; `db:types:check` lulus;
 - `db:test` **12/12** di staging; `db:test:concurrency` lulus;
-- `beta:preflight` **8/8** di staging (termasuk autoconfirm nonaktif). Bila SMTP
-  staging belum ada, catat kegagalan itu sebagai temuan konfigurasi, bukan
-  kegagalan migration;
+- `beta:preflight` **7/8 atau 8/8** di staging. Sejak ADR-083 provider Email
+  dimatikan, sehingga pemeriksaan `autoconfirm` bisa gagal secara wajar; catat
+  hasilnya sebagai temuan konfigurasi, bukan kegagalan migration. Tujuh
+  pemeriksaan lain tetap wajib lulus;
 - bukti E2E development pada commit yang sama: `storage:test` **27**,
   `e2e:account-delete` **17**, `e2e:shared-ride` **24**;
 - tidak ada akun/objek uji tersisa di staging maupun development.
@@ -286,10 +297,12 @@ keluarannya ke laporan publik. **Jangan** menjalankan `db:test`,
 - [ ] `delete-account` di-deploy, memakai key baru (bukan env legacy yang
       kosong), dan menolak request tanpa JWT/apikey (401).
 - [ ] Satu akun uji produksi berhasil dihapus penuh lewat halaman web; bukan
-      hanya 401 yang diperiksa.
-- [ ] Redirect URL `rodakawan://auth/callback` terdaftar; Site URL benar.
-- [ ] SMTP teruji: konfirmasi pendaftaran dan reset password benar-benar
-      sampai (bukan hanya "dashboard hijau").
+      hanya 401 yang diperiksa. (**Blocked** sampai halaman web pindah dari
+      alur email + kata sandi ke identitas anonim, ADR-083.)
+- [ ] **Anonymous sign-ins = ON** dan provider **Email = OFF**; provider lain
+      yang tidak dipakai juga OFF.
+- [ ] Satu instalasi baru di perangkat bersih mendapat sesi `authenticated`
+      tanpa layar masuk; pengguna `anon` tetap ditolak RLS.
 - [ ] Rate limit Auth dan CAPTCHA (bila tersedia) diputuskan.
 - [ ] Tidak ada akun uji tersisa (preflight).
 
@@ -329,7 +342,7 @@ Urutannya sama, dengan tambahan:
 | Gagal di tengah, produksi **sudah** punya pengguna | Jangan hapus project. Perbaiki dengan migration baru; bila schema tidak konsisten, restore backup ke **project baru**, verifikasi, lalu arahkan environment ke sana. |
 | Data rusak/hilang karena bug aplikasi | Hentikan penulisan (nonaktifkan fungsi/rilis), tentukan waktu aman, restore PITR/backup ke project baru, bandingkan, baru arahkan. |
 | Edge Function salah | Deploy ulang versi commit sebelumnya; secret tidak berubah. Verifikasi 401 tanpa JWT. |
-| Pengaturan Auth/SMTP salah | Kembalikan di Dashboard; tidak butuh build. |
+| Pengaturan Auth salah (Anonymous OFF / Email ON) | Aplikasi berhenti di "Butuh internet untuk memulai" | Kembalikan di Dashboard; tidak butuh build. |
 | Halaman web salah menunjuk backend | Revert commit `config.js`, push (workflow `web/**`), atau unpublish Pages sebagai upaya terakhir. |
 | APK baru bermasalah | Terbitkan APK perbaikan dengan `versionCode` lebih tinggi. APK lama **tidak** bisa dipasang di atasnya. |
 
@@ -407,13 +420,15 @@ Lakukan **setelah** preflight produksi 8/8 dan sebelum APK produksi disebar.
 5. Aktifkan **Settings → Pages → Source: GitHub Actions**. Push perubahan
    `config.js` ke `main` (trigger `web/**`) atau jalankan
    `gh workflow run pages.yml`. Catat `page_url` dari ringkasan run.
-6. Verifikasi di browser: halaman privasi dan hapus akun terbuka, tidak ada
-   error konsol, dan alur hapus akun diuji dengan **akun produksi sekali
-   pakai** yang sudah dikonfirmasi emailnya:
-   - salah kata sandi → pesan galat jelas;
-   - kata sandi benar → status selesai;
+6. Verifikasi di browser: halaman privasi dan hapus akun terbuka dan tidak ada
+   error konsol. **Alur hapus akun di halaman web masih Blocked**: `web/account-deletion/app.js`
+   memakai email + kata sandi, sedangkan APK baru tidak punya akun email
+   (ADR-083). Jangan menerbitkan halaman itu sebagai alur final sebelum ia
+   diubah ke identitas perangkat; catat sebagai **Blocked** dengan pemilik
+   sebagai penanggung jawab. Setelah diubah, uji dengan akun produksi sekali
+   pakai:
    - Auth user, profil, media pribadi hilang; konten bersama menjadi tombstone;
-   - login ulang gagal; job `completed`; tidak ada objek/baris tersisa.
+   - job `completed`; tidak ada objek/baris tersisa.
 7. Baru setelah itu catat URL publik di `README.md`,
    `docs/BETA_READINESS.md`, `docs/ROADMAP.md`, dan `web/README.md` — dengan
    tanggal dan bukti, bukan sebelum halaman benar-benar terbuka.
@@ -467,15 +482,17 @@ role (hanya server).
    - SHA-256 APK di badan rilis = berkas yang diunduh;
    - sidik jari sertifikat penandatangan sama dengan rilis sebelumnya;
    - layar Sistem aplikasi menampilkan ref produksi (URL/key publik).
-5. Uji di **dua HP** + akun ketiga: daftar/konfirmasi email, klub, perjalanan,
-   lokasi, chat, bahaya, hapus akun. Isi checklist 8f; jangan menulis
-   "Tested on physical device" tanpa artefak.
+5. Uji di **dua HP** (identitas anonim baru per instalasi): onboarding, klub,
+   perjalanan, lokasi, chat, bahaya, hapus data. Isi checklist 8f; jangan
+   menulis "Tested on physical device" tanpa artefak.
 
 ### 8.3 Distribusi
 
 - APK beta dan produksi memakai paket sama, jadi tidak bisa berdampingan;
   memasang APK produksi menimpa beta (data aplikasi di perangkat dipertahankan,
-  sesi lama akan ditolak karena project berbeda — minta peserta login ulang).
+  sesi lama akan ditolak karena project berbeda). Identitas anonim terikat pada
+  project, jadi setiap peserta mendapat identitas baru dan harus diundang ulang
+  ke klub; jelaskan ini sebelum cutover.
 - Setelah produksi berjalan, jangan arahkan kembali variabel build ke beta
   tanpa build baru.
 
@@ -483,10 +500,10 @@ role (hanya server).
 
 | Waktu | Langkah | Bukti yang disimpan |
 | --- | --- | --- |
-| T-7 | Tutup §0.1; putuskan §1; buat project staging; rehearsal §3 | fungsi key baru teruji; `db:test` staging 12/12 + konkurensi; E2E dev 27/17/24; preflight 8/8 |
-| T-3 | Buat project produksi; siapkan SMTP, redirect URL, backup plan | tangkapan dashboard tanpa secret |
+| T-7 | Tutup §0.1; putuskan §1; buat project staging; rehearsal §3 | fungsi key baru teruji; `db:test` staging 12/12 + konkurensi; E2E dev 27/17/24; preflight 7/8 atau 8/8 |
+| T-3 | Buat project produksi; aktifkan Anonymous sign-ins, matikan Email; siapkan backup plan | tangkapan dashboard tanpa secret |
 | T-1 | Dump baseline; uji restore ke scratch; siapkan Environment `production` | log drill, hash dump |
-| T-0 | `db push` produksi → `db:types:check` → preflight → function + secret → Auth → web config → Pages | `migration list`, preflight 8/8, `page_url` |
+| T-0 | `db push` produksi → `db:types:check` → preflight → function + secret → Auth → web config → Pages | `migration list`, hasil preflight, `page_url` |
 | T-0 | Rilis APK produksi → smoke emulator → uji 2 HP | SHA-256, cert, checklist 8f |
 | T+1 | Pantau Auth/function/DB; verifikasi backup harian; umumkan ke tester | log tanpa PII, tanggal |
 
@@ -495,11 +512,13 @@ baris yang sama selesai.
 
 ## 10. Verifikasi pasca-cutover
 
-- [ ] `beta:preflight` 8/8 terhadap produksi.
-- [ ] Halaman web: privasi + hapus akun terbuka; CORS menolak origin asing;
-      hapus akun sekali-pakai berhasil penuh.
-- [ ] APK: login, konfirmasi email, reset password, klub, perjalanan, lokasi,
-      chat, bahaya, hapus akun — di dua perangkat.
+- [ ] `beta:preflight` dijalankan terhadap produksi; tujuh pemeriksaan wajib
+      lulus dan hasil pemeriksaan `autoconfirm` dicatat apa adanya.
+- [ ] Halaman web: privasi terbuka; CORS menolak origin asing. Alur hapus akun
+      web tetap **Blocked** sampai alur email diganti (ADR-083).
+- [ ] APK: identitas anonim baru, onboarding, klub, perjalanan, lokasi, chat,
+      bahaya, hapus data — di dua perangkat.
+- [ ] Pengguna `anon` (tanpa sesi) ditolak saat membaca tabel apa pun.
 - [ ] Tidak ada akun/objek uji tersisa; `contoh.test` = 0.
 - [ ] Backup harian terlihat di dashboard; dump manual tersimpan; drill
       berikutnya dijadwalkan.
@@ -518,7 +537,7 @@ baris yang sama selesai.
 | Repository variables dipakai bersama | Build dev menunjuk produksi | Environment `production` khusus job rilis |
 | `EXPO_PUBLIC_*` dibakar | Tidak bisa ganti backend tanpa build | Rilis baru; jangan tukar variabel saat runtime |
 | APK tidak bisa downgrade | Rollback aplikasi tidak instan | Rilis perbaikan cepat; jangan pernah menurunkan versionCode |
-| `autoconfirm`/SMTP salah | Akun tidak terverifikasi, email tidak sampai | Preflight + uji kirim email nyata sebelum sebar |
+| `autoconfirm` aktif / provider Email menyala | Pemeriksaan preflight gagal dan permukaan auth yang tak terpakai terbuka | Catat sebagai temuan konfigurasi; matikan provider Email; preflight tidak diubah |
 | Halaman web menunjuk dev | Pengguna menghapus akun di backend uji | Uji statis + review config sebelum Pages |
 | Origin Pages berubah | Hapus akun dari web ditolak 403 | Perbarui `WEB_ALLOWED_ORIGINS`, uji CORS |
 | Paket Android diganti setelah Play | Aplikasi baru, pengguna lama tertinggal | Putuskan sebelum unggah pertama |
@@ -526,10 +545,11 @@ baris yang sama selesai.
 
 ## 12. Yang belum bisa dibuktikan tanpa pemilik
 
-- Pembuatan project, aktivasi Pages, dan kredensial SMTP.
+- Pembuatan project, aktivasi Pages, dan pengaturan Auth di dashboard.
 - Restore backup nyata (butuh project scratch dan data produksi).
 - Uji perangkat fisik, Play Console, dan verifikasi sertifikat APK.
 - Keputusan retensi, paket final, dan biaya PITR.
+- Halaman web hapus akun yang cocok dengan identitas anonim (masih alur email).
 
 Sampai semua itu ada, status yang benar adalah **rencana**, bukan
 "produksi siap".
