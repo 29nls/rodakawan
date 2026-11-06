@@ -1,5 +1,5 @@
 /**
- * Pemetaan galat hapus akun menjadi `AppError`.
+ * Pemetaan galat hapus data menjadi `AppError`.
  *
  * Ada dua sumber:
  *
@@ -35,13 +35,13 @@ export const ACCOUNT_ERROR_TAGS: Record<string, AppError> = {
   account_profile_missing: {
     code: 'profile_missing',
     message:
-      'Profil akun ini belum tersedia di server, jadi belum ada yang bisa dihapus. Muat ulang aplikasi lalu coba lagi.',
+      'Profil perangkat ini belum tersedia di server, jadi belum ada yang bisa dihapus. Muat ulang aplikasi lalu coba lagi.',
     retryable: true,
   },
   account_deletion_requires_server: {
     code: 'app_outdated',
     message:
-      'Cara menghapus akun berubah. Perbarui RodaKawan ke versi terbaru, lalu ulangi dari Profil → Hapus akun.',
+      'Cara menghapus data berubah. Perbarui RodaKawan ke versi terbaru, lalu ulangi dari Profil → Hapus data saya.',
     retryable: false,
   },
 };
@@ -57,19 +57,19 @@ export const ACCOUNT_FUNCTION_ERROR_TAGS: Record<string, AppError> = {
   account_deletion_in_progress: {
     code: 'deletion_in_progress',
     message:
-      'Penghapusan akun Anda sedang diproses server. Tunggu sebentar lalu coba lagi; jangan ulang berkali-kali.',
+      'Penghapusan data Anda sedang diproses server. Tunggu sebentar lalu coba lagi; jangan ulang berkali-kali.',
     retryable: true,
   },
   account_deletion_incomplete: {
     code: 'deletion_incomplete',
     message:
-      'Penghapusan belum selesai sepenuhnya. Coba lagi; bila tetap gagal, hubungi dukungan sebelum menganggap akun sudah hilang.',
+      'Penghapusan belum selesai sepenuhnya. Coba lagi; bila tetap gagal, hubungi dukungan sebelum menganggap data Anda sudah hilang.',
     retryable: true,
   },
   account_deletion_unavailable: {
     code: 'backend_not_configured',
     message:
-      'Layanan hapus akun belum tersedia di server. Coba lagi nanti atau hubungi dukungan melalui halaman Kebijakan privasi.',
+      'Layanan hapus data belum tersedia di server. Coba lagi nanti atau hubungi dukungan melalui halaman Kebijakan privasi.',
     retryable: true,
   },
   account_deletion_unauthenticated: {
@@ -80,13 +80,13 @@ export const ACCOUNT_FUNCTION_ERROR_TAGS: Record<string, AppError> = {
   },
   account_deletion_invalid_user: {
     code: 'invalid_data',
-    message: 'Permintaan hapus akun tidak sah. Muat ulang aplikasi lalu coba lagi.',
+    message: 'Permintaan hapus data tidak sah. Muat ulang aplikasi lalu coba lagi.',
     retryable: false,
   },
   account_deletion_requires_server: {
     code: 'app_outdated',
     message:
-      'Cara menghapus akun berubah. Perbarui RodaKawan ke versi terbaru, lalu ulangi dari Profil → Hapus akun.',
+      'Cara menghapus data berubah. Perbarui RodaKawan ke versi terbaru, lalu ulangi dari Profil → Hapus data saya.',
     retryable: false,
   },
 };
