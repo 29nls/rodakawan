@@ -473,6 +473,19 @@ baris **Blocked** yang relevan untuk fitur itu, fitur tersebut tidak boleh dilap
 perangkat". Catat akun C sebagai non-member terpisah dari A (host) dan B (peserta); jangan gunakan
 data lokasi atau akun pribadi.
 
+### 8g. Status verifikasi Fase 2 — undangan klub (`invite_only`)
+
+Sebelum Fase 2, klub `join_policy = 'invite_only'` adalah jalan buntu: `request_club_membership` menolak permintaan bergabung dan tidak ada mekanisme undangan. Migration `20261106194500_club_invites.sql` menambahkan `public.club_invites` (hanya hash kode) serta RPC `create_club_invite`, `revoke_club_invite`, `list_club_invites`, dan `redeem_club_invite`.
+
+| Butir | Status | Bukti / penghalang |
+|---|---|---|
+| Tabel + empat RPC undangan | **Implemented** | `supabase/migrations/20261106194500_club_invites.sql`; RLS aktif tanpa policy; grant dicabut dari `public`/`anon` |
+| Uji allow/deny SQL | **Implemented**; **Blocked** eksekusi | `supabase/tests/rls_club_invites_test.sql` (anon tertutup, non-admin nol baris, kode sekali-pakai, cabut, kedaluwarsa, audit, batas argumen). `npm run db:test` butuh `.env.db` project development `xvmcpfkkveeaevfcvfug` |
+| Pendaftaran berkas uji | **Implemented**; **Passed locally** | Terdaftar di `DEFAULT_TEST_FILES`; `npm run db:test:lint` memeriksa direktif notice dan literal UUID tanpa kredensial |
+| Tipe database (`database.generated.ts`) | **Blocked** | Hanya boleh dihasilkan `npm run db:types` setelah migration diterapkan ke project development; tanpa `.env.db` tidak bisa dijalankan |
+| Layar undangan di aplikasi | **Blocked** | Menunggu regenerasi tipe di atas; RPC sudah siap dipakai klien |
+| Dua perangkat: undang → bergabung → admin melihat anggota | **Blocked** | Butuh perangkat/emulator dan backend dev |
+
 ## 9. Status otomatisasi dan verifikasi (Milestone 1–3)
 
 Istilah status yang dipakai: **Implemented**, **Passed locally**, **Passed against dev backend**,

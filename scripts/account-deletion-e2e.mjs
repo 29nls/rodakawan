@@ -45,7 +45,7 @@
  * di development.
  */
 
-import { randomBytes, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import process from 'node:process';
 
 import pg from 'pg';
@@ -172,9 +172,10 @@ async function main() {
   const storageBase = `${supabaseUrl}/storage/v1`;
 
   const id = {
-    a: randomUUID(),
-    b: randomUUID(),
-    c: randomUUID(),
+    /* Diisi dari anonymous sign-in: ID pengguna ditentukan server, bukan klien. */
+    a: null,
+    b: null,
+    c: null,
     club: randomUUID(),
     ride: randomUUID(),
     motor: randomUUID(),
@@ -184,22 +185,10 @@ async function main() {
     chat: randomUUID(),
   };
   const suffix = randomUUID().slice(0, 8);
-  const email = {
-    a: `e2e.hapus.a.${suffix}@contoh.test`,
-    b: `e2e.hapus.b.${suffix}@contoh.test`,
-    c: `e2e.hapus.c.${suffix}@contoh.test`,
-  };
-  const password = {
-    a: randomBytes(18).toString('base64url'),
-    b: randomBytes(18).toString('base64url'),
-    c: randomBytes(18).toString('base64url'),
-  };
 
-  const avatarPath = {
-    a: `${id.a}/e2e-avatar.png`,
-    b: `${id.b}/e2e-avatar.png`,
-  };
-  const vehiclePath = `${id.a}/${id.motor}/e2e-photo.png`;
+  /** Path media memakai ID pengguna, jadi baru bisa dihitung setelah sign-in. */
+  let avatarPath;
+  let vehiclePath;
   const logoPath = `${id.club}/logo-e2e.png`;
 
   const client = new pg.Client({
@@ -227,20 +216,31 @@ async function main() {
     return request(`${storageBase}${suffixPath}`, { method, headers, body });
   };
 
-  const signIn = async (label, mail, pass) => {
-    const response = await request(`${authBase}/token?grant_type=password`, {
+  /**
+   * Membuat identitas anonim lewat endpoint yang sama dengan
+   * `supabase.auth.signInAnonymously()` di aplikasi (`POST /auth/v1/signup` tanpa
+   * email/kata sandi). ID pengguna ditentukan server, jadi fixture memakai hasilnya.
+   */
+  const signInAnonymous = async (label) => {
+    const response = await request(`${authBase}/signup`, {
       method: 'POST',
       headers: { apikey: publishableKey, 'content-type': 'application/json' },
-      body: JSON.stringify({ email: mail, password: pass }),
+      body: JSON.stringify({ data: {}, gotrue_meta_security: {} }),
     });
     const { json } = await jsonBody(response);
 
     if (response.status !== 200 || typeof json?.access_token !== 'string') {
-      throw new UjiGagal(`sign-in ${label} gagal (HTTP ${response.status}).`);
+      throw new UjiGagal(
+        `anonymous sign-in ${label} gagal (HTTP ${response.status}). Aktifkan Anonymous sign-ins di dashboard project development (atau enable_anonymous_sign_ins di config.toml).`,
+      );
     }
 
-    ok(`sign-in ${label} lewat GoTrue password grant`);
-    return json.access_token;
+    if (typeof json?.user?.id !== 'string') {
+      throw new UjiGagal(`anonymous sign-in ${label} tidak mengembalikan user.id.`);
+    }
+
+    ok(`anonymous sign-in ${label} (identitas perangkat)`);
+    return { id: json.user.id, token: json.access_token, refreshToken: json.refresh_token };
   };
 
   const removeObjects = async (token, bucket, paths) => {
@@ -374,35 +374,42 @@ async function main() {
     await client.connect();
     terhubung = true;
 
-    /* 1. Akun uji + fixture. Token string kosong wajib (GoTrue memindai kolom
-          string); profil dibuat trigger bootstrap. */
+    /* 1. Tiga identitas anonim (jalur yang sama dengan aplikasi), lalu fixture.
+          ID pengguna berasal dari server, jadi path media dihitung setelah ini. */
+    const sesi = {
+      a: await signInAnonymous('A'),
+      b: await signInAnonymous('B'),
+      c: await signInAnonymous('C'),
+    };
+    id.a = sesi.a.id;
+    id.b = sesi.b.id;
+    id.c = sesi.c.id;
+    tokenA = sesi.a.token;
+    tokenB = sesi.b.token;
+    tokenC = sesi.c.token;
+
+    avatarPath = {
+      a: `${id.a}/e2e-avatar.png`,
+      b: `${id.b}/e2e-avatar.png`,
+    };
+    vehiclePath = `${id.a}/${id.motor}/e2e-photo.png`;
+
     await sql(
-      `insert into auth.users (
-         id, instance_id, aud, role, email, encrypted_password, email_confirmed_at,
-         confirmation_token, recovery_token, email_change, email_change_token_new,
-         email_change_token_current, phone_change, phone_change_token,
-         reauthentication_token, raw_app_meta_data, raw_user_meta_data,
-         created_at, updated_at
-       ) values
-         ($1, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', $4, crypt($7, gen_salt('bf')), now(), '', '', '', '', '', '', '', '', '{"provider":"email","providers":["email"]}', $10::jsonb, now(), now()),
-         ($2, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', $5, crypt($8, gen_salt('bf')), now(), '', '', '', '', '', '', '', '', '{"provider":"email","providers":["email"]}', $11::jsonb, now(), now()),
-         ($3, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', $6, crypt($9, gen_salt('bf')), now(), '', '', '', '', '', '', '', '', '{"provider":"email","providers":["email"]}', $12::jsonb, now(), now())`,
-      [
-        id.a,
-        id.b,
-        id.c,
-        email.a,
-        email.b,
-        email.c,
-        password.a,
-        password.b,
-        password.c,
-        JSON.stringify({ username: `e2e_hapus_a_${suffix}`, display_name: 'E2E Hapus A' }),
-        JSON.stringify({ username: `e2e_hapus_b_${suffix}`, display_name: 'E2E Hapus B' }),
-        JSON.stringify({ username: `e2e_hapus_c_${suffix}`, display_name: 'E2E Hapus C' }),
-      ],
+      `update public.profiles set username = $2, display_name = $3, updated_at = now()
+        where id = $1`,
+      [id.a, `e2e_hapus_a_${suffix}`, 'E2E Hapus A'],
     );
-    ok('tiga akun uji dibuat (profil otomatis lewat trigger bootstrap)');
+    await sql(
+      `update public.profiles set username = $2, display_name = $3, updated_at = now()
+        where id = $1`,
+      [id.b, `e2e_hapus_b_${suffix}`, 'E2E Hapus B'],
+    );
+    await sql(
+      `update public.profiles set username = $2, display_name = $3, updated_at = now()
+        where id = $1`,
+      [id.c, `e2e_hapus_c_${suffix}`, 'E2E Hapus C'],
+    );
+    ok('tiga identitas anonim dibuat (profil otomatis lewat trigger bootstrap)');
 
     await sql(
       `insert into public.clubs (id, name, slug, description, visibility, join_policy, created_by)
@@ -460,10 +467,7 @@ async function main() {
     await sql(`update public.clubs set logo_path = $2 where id = $1`, [id.club, logoPath]);
     ok('fixture database: klub, ride, hazard, laporan, chat, kendaraan, token push');
 
-    /* 2. JWT lewat password grant GoTrue (bukan service_role). */
-    tokenA = await signIn('A', email.a, password.a);
-    tokenB = await signIn('B', email.b, password.b);
-    tokenC = await signIn('C', email.c, password.c);
+    /* 2. JWT sudah diperoleh dari anonymous sign-in di langkah 1 (bukan service_role). */
 
     /* 3. Unggah media nyata ke tiga bucket privat. */
     const upload = async (bucket, path, token, label) => {
@@ -516,28 +520,15 @@ async function main() {
 
     // Akun pemantau: bila identitas memang diambil dari token, akun inilah yang
     // terhapus — bukan A/B/C yang sedang diuji.
-    const idD = randomUUID();
-    const emailD = `e2e.hapus.d.${suffix}@contoh.test`;
-    const passwordD = randomBytes(18).toString('base64url');
+    const sesiD = await signInAnonymous('D');
+    const idD = sesiD.id;
     await sql(
-      `insert into auth.users (
-         id, instance_id, aud, role, email, encrypted_password, email_confirmed_at,
-         confirmation_token, recovery_token, email_change, email_change_token_new,
-         email_change_token_current, phone_change, phone_change_token,
-         reauthentication_token, raw_app_meta_data, raw_user_meta_data,
-         created_at, updated_at
-       ) values ($1, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated',
-         $2, crypt($3, gen_salt('bf')), now(), '', '', '', '', '', '', '', '',
-         '{"provider":"email","providers":["email"]}', $4::jsonb, now(), now())`,
-      [
-        idD,
-        emailD,
-        passwordD,
-        JSON.stringify({ username: `e2e_hapus_d_${suffix}`, display_name: 'E2E Hapus D' }),
-      ],
+      `update public.profiles set username = $2, display_name = $3, updated_at = now()
+        where id = $1`,
+      [idD, `e2e_hapus_d_${suffix}`, 'E2E Hapus D'],
     );
 
-    const tokenD = await signIn('D', emailD, passwordD);
+    const tokenD = sesiD.token;
     const lintasAkun = await request(`${apiBase}/delete-account`, {
       method: 'POST',
       headers: {
@@ -717,13 +708,13 @@ async function main() {
       `JWT lama masih bisa menulis kendaraan (HTTP ${tulisLama.status}).`,
     );
 
-    const loginLagi = await request(`${authBase}/token?grant_type=password`, {
+    const refreshLama = await request(`${authBase}/token?grant_type=refresh_token`, {
       method: 'POST',
       headers: { apikey: publishableKey, 'content-type': 'application/json' },
-      body: JSON.stringify({ email: email.a, password: password.a }),
+      body: JSON.stringify({ refresh_token: sesi.a.refreshToken }),
     });
-    check(loginLagi.status !== 200, 'akun A masih bisa login setelah dihapus.');
-    ok('JWT lama tidak bisa membaca/menulis, dan login ulang A gagal');
+    check(refreshLama.status !== 200, 'refresh token A masih bisa dipakai setelah data dihapus.');
+    ok('JWT lama tidak bisa membaca/menulis, dan refresh identitas A gagal');
 
     /* 10. Job selesai. */
     const job = (
