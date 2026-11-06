@@ -40,7 +40,7 @@
  * Tidak dijalankan otomatis di CI; ini perintah manual terhadap development.
  */
 
-import { randomBytes, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import process from 'node:process';
 
 import { createClient } from '@supabase/supabase-js';
@@ -242,21 +242,12 @@ async function main() {
   const authBase = `${supabaseUrl}/auth/v1`;
 
   const id = {
-    a: randomUUID(),
-    b: randomUUID(),
-    c: randomUUID(),
+    /* Diisi dari anonymous sign-in: ID pengguna ditentukan server, bukan klien. */
+    a: null,
+    b: null,
+    c: null,
   };
   const suffix = randomUUID().slice(0, 8);
-  const email = {
-    a: `e2e.shared.a.${suffix}@contoh.test`,
-    b: `e2e.shared.b.${suffix}@contoh.test`,
-    c: `e2e.shared.c.${suffix}@contoh.test`,
-  };
-  const password = {
-    a: randomBytes(18).toString('base64url'),
-    b: randomBytes(18).toString('base64url'),
-    c: randomBytes(18).toString('base64url'),
-  };
 
   const client = new pg.Client({
     connectionString,
@@ -278,20 +269,31 @@ async function main() {
   let terhubung = false;
   let gagalBersih = false;
 
-  const signIn = async (label, mail, pass) => {
-    const response = await request(`${authBase}/token?grant_type=password`, {
+  /**
+   * Membuat identitas anonim lewat endpoint yang sama dengan
+   * `supabase.auth.signInAnonymously()` di aplikasi (`POST /auth/v1/signup` tanpa
+   * email/kata sandi). ID pengguna ditentukan server, jadi fixture memakai hasilnya.
+   */
+  const signInAnonymous = async (label) => {
+    const response = await request(`${authBase}/signup`, {
       method: 'POST',
       headers: { apikey: publishableKey, 'content-type': 'application/json' },
-      body: JSON.stringify({ email: mail, password: pass }),
+      body: JSON.stringify({ data: {}, gotrue_meta_security: {} }),
     });
     const { json } = await jsonBody(response);
 
     if (response.status !== 200 || typeof json?.access_token !== 'string') {
-      throw new UjiGagal(`sign-in ${label} gagal (HTTP ${response.status}).`);
+      throw new UjiGagal(
+        `anonymous sign-in ${label} gagal (HTTP ${response.status}). Aktifkan Anonymous sign-ins di dashboard project development (atau enable_anonymous_sign_ins di config.toml).`,
+      );
     }
 
-    ok(`sign-in ${label} lewat GoTrue password grant`);
-    return json.access_token;
+    if (typeof json?.user?.id !== 'string') {
+      throw new UjiGagal(`anonymous sign-in ${label} tidak mengembalikan user.id.`);
+    }
+
+    ok(`anonymous sign-in ${label} (identitas perangkat)`);
+    return { id: json.user.id, token: json.access_token };
   };
 
   const cleanup = async () => {
@@ -373,38 +375,35 @@ async function main() {
     await client.connect();
     terhubung = true;
 
-    /* 1. Akun uji + profil otomatis lewat trigger bootstrap. */
-    await sql(
-      `insert into auth.users (
-         id, instance_id, aud, role, email, encrypted_password, email_confirmed_at,
-         confirmation_token, recovery_token, email_change, email_change_token_new,
-         email_change_token_current, phone_change, phone_change_token,
-         reauthentication_token, raw_app_meta_data, raw_user_meta_data,
-         created_at, updated_at
-       ) values
-         ($1, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', $4, crypt($7, gen_salt('bf')), now(), '', '', '', '', '', '', '', '', '{"provider":"email","providers":["email"]}', $10::jsonb, now(), now()),
-         ($2, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', $5, crypt($8, gen_salt('bf')), now(), '', '', '', '', '', '', '', '', '{"provider":"email","providers":["email"]}', $11::jsonb, now(), now()),
-         ($3, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', $6, crypt($9, gen_salt('bf')), now(), '', '', '', '', '', '', '', '', '{"provider":"email","providers":["email"]}', $12::jsonb, now(), now())`,
-      [
-        id.a,
-        id.b,
-        id.c,
-        email.a,
-        email.b,
-        email.c,
-        password.a,
-        password.b,
-        password.c,
-        JSON.stringify({ username: `e2e_shared_a_${suffix}`, display_name: 'E2E Shared A' }),
-        JSON.stringify({ username: `e2e_shared_b_${suffix}`, display_name: 'E2E Shared B' }),
-        JSON.stringify({ username: `e2e_shared_c_${suffix}`, display_name: 'E2E Shared C' }),
-      ],
-    );
-    ok('tiga akun uji dibuat (profil otomatis lewat trigger bootstrap)');
+    /* 1. Tiga identitas anonim (jalur yang sama dengan aplikasi); ID berasal dari server. */
+    const sesi = {
+      a: await signInAnonymous('A'),
+      b: await signInAnonymous('B'),
+      c: await signInAnonymous('C'),
+    };
+    id.a = sesi.a.id;
+    id.b = sesi.b.id;
+    id.c = sesi.c.id;
+    tokenA = sesi.a.token;
+    const tokenB = sesi.b.token;
+    const tokenC = sesi.c.token;
 
-    tokenA = await signIn('A', email.a, password.a);
-    const tokenB = await signIn('B', email.b, password.b);
-    const tokenC = await signIn('C', email.c, password.c);
+    await sql(
+      `update public.profiles set username = $2, display_name = $3, updated_at = now()
+        where id = $1`,
+      [id.a, `e2e_shared_a_${suffix}`, 'E2E Shared A'],
+    );
+    await sql(
+      `update public.profiles set username = $2, display_name = $3, updated_at = now()
+        where id = $1`,
+      [id.b, `e2e_shared_b_${suffix}`, 'E2E Shared B'],
+    );
+    await sql(
+      `update public.profiles set username = $2, display_name = $3, updated_at = now()
+        where id = $1`,
+      [id.c, `e2e_shared_c_${suffix}`, 'E2E Shared C'],
+    );
+    ok('tiga identitas anonim dibuat (profil otomatis lewat trigger bootstrap)');
 
     supabaseA = createUserClient(supabaseUrl, publishableKey, tokenA);
     supabaseB = createUserClient(supabaseUrl, publishableKey, tokenB);

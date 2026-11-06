@@ -22,10 +22,9 @@
  *   sengaja tidak pernah disimpan di repo/mesin ini (lihat scripts/db-test.mjs dan
  *   docs/SETUP_GUIDE.md). Runner ini cukup dengan `DATABASE_URL` (sama dengan yang
  *   sudah dipakai db:test) plus URL + publishable key publik dari `.env.local`.
- * - Kata sandi akun uji dibuat acak setiap run, di-hash dengan pgcrypto saat insert,
- *   dan tidak pernah dicetak. Sesi JWT justru diperoleh lewat password grant GoTrue
- *   yang sesungguhnya (`/auth/v1/token?grant_type=password`), jadi uji ini sekaligus
- *   membuktikan akun buatan database memang bisa dipakai lewat HTTP.
+ * - Identitas uji dibuat lewat anonymous sign-in (`POST /auth/v1/signup` tanpa email
+ *   atau kata sandi) — jalur yang sama dengan aplikasi — sehingga tidak ada kata sandi
+ *   yang perlu dibuat, di-hash, atau dibersihkan dari log.
  *
  * Kenapa objek dibersihkan lewat HTTP, bukan `delete from storage.objects`:
  * - Supabase memasang trigger yang menolak DELETE langsung pada tabel Storage
@@ -51,7 +50,7 @@
  * `db.<ref>.supabase.co` hanya punya record AAAA sehingga sering gagal di jaringan IPv4.
  */
 
-import { createHash, randomBytes } from 'node:crypto';
+import { createHash } from 'node:crypto';
 import process from 'node:process';
 
 import pg from 'pg';
@@ -60,13 +59,18 @@ const BUCKET = 'vehicle-photos';
 /** Bucket avatar memakai pola policy yang sama (owner-only) dengan path lebih pendek. */
 const AVATAR_BUCKET = 'avatars';
 
-/** ID uji tetap (bukan acak) supaya sisa run sebelumnya dapat dikenali dan disapu. */
-const USER_A_ID = 'a1000000-0000-4000-8000-00000000000a';
-const USER_B_ID = 'b2000000-0000-4000-8000-00000000000b';
+/**
+ * ID pengguna uji berasal dari server: identitas dibuat lewat anonymous sign-in —
+ * jalur yang sama dengan aplikasi — sehingga tidak bisa ditentukan di muka.
+ * Kendaraan uji tetap memakai ID tetap karena barisnya dibuat lewat SQL.
+ */
+let USER_A_ID;
+let USER_B_ID;
 const MOTOR_ID = 'c3000000-0000-4000-8000-00000000000c';
 
-const USER_A_EMAIL = 'uji.storage.a@contoh.test';
-const USER_B_EMAIL = 'uji.storage.b@contoh.test';
+/** Username uji dipakai menyapu sisa run sebelumnya, karena ID lamanya tidak diketahui. */
+const USER_A_USERNAME = 'uji_storage_a';
+const USER_B_USERNAME = 'uji_storage_b';
 
 /** Nama berkas yang mungkin ditinggalkan run sebelumnya; semuanya dihapus lewat HTTP. */
 const FILE_UTAMA = 'uji.png';
@@ -289,19 +293,15 @@ async function main() {
     return 1;
   }
 
-  const storageUrl = (suffix) => `${apiBase}/storage/v1${suffix}`;
-
-  const folderA = `${USER_A_ID}/${MOTOR_ID}`;
-  const folderB = `${USER_B_ID}/${MOTOR_ID}`;
-  const pathUtama = `${folderA}/${FILE_UTAMA}`;
-  const pathDitolak = [
-    ...FILE_DITOLAK.map((nama) => `${folderA}/${nama}`),
-    `${folderB}/milik-b.png`,
-  ];
-
-  const avatarA = `${USER_A_ID}/${FILE_AVATAR}`;
-  const avatarDitolak = `${USER_A_ID}/${FILE_AVATAR_DITOLAK}`;
-  const avatarAnon = `${USER_A_ID}/anon.png`;
+  const storageUrl = (suffix) =>
+    `${apiBase}/storage/v1${suffix}`; /* Path objek butuh ID pengguna, dan ID itu baru diketahui setelah sign-in. */
+  let folderA;
+  let folderB;
+  let pathUtama;
+  let pathDitolak;
+  let avatarA;
+  let avatarDitolak;
+  let avatarAnon;
   /** Kedua bucket diuji; pembersihan dan verifikasi harus mencakup keduanya. */
   const BUCKETS_UJI = [BUCKET, AVATAR_BUCKET];
 
@@ -335,6 +335,39 @@ async function main() {
       body: JSON.stringify({ prefixes: paths }),
     });
 
+  /**
+   * Membuat identitas anonim lewat endpoint yang sama dengan
+   * `supabase.auth.signInAnonymously()` di aplikasi (`POST /auth/v1/signup` tanpa
+   * email/kata sandi). ID-nya ditentukan server, jadi fixture memakai hasil ini.
+   */
+  const signInAnonymous = async (label) => {
+    const response = await request(`${apiBase}/auth/v1/signup`, {
+      method: 'POST',
+      headers: { apikey: publishableKey, 'content-type': 'application/json' },
+      body: JSON.stringify({ data: {}, gotrue_meta_security: {} }),
+    });
+
+    if (response.status !== 200) {
+      throw new UjiGagal(
+        `anonymous sign-in ${label} gagal (HTTP ${response.status}). Aktifkan Anonymous sign-ins di dashboard project development (atau enable_anonymous_sign_ins di config.toml).`,
+      );
+    }
+
+    let payload;
+    try {
+      payload = JSON.parse(response.text);
+    } catch {
+      throw new UjiGagal(`anonymous sign-in ${label} mengembalikan respons bukan JSON.`);
+    }
+
+    if (typeof payload?.access_token !== 'string' || typeof payload?.user?.id !== 'string') {
+      throw new UjiGagal(`anonymous sign-in ${label} tidak mengembalikan access_token/user.id.`);
+    }
+
+    ok(`anonymous sign-in ${label} (identitas perangkat)`);
+    return { id: payload.user.id, token: payload.access_token };
+  };
+
   let tokenA;
   let tokenB;
 
@@ -354,54 +387,46 @@ async function main() {
           dulu. Sejak ADR-077 profil TIDAK lagi ikut ON DELETE CASCADE dari auth.users,
           jadi profil dihapus eksplisit (kendaraan ikut cascade dari profil). Objeknya
           baru bisa disapu setelah akun pengganti dengan ID yang sama dibuat (langkah 2b). */
-    await deleteRows(`delete from public.profiles where id in ($1, $2) returning 1`, [
-      USER_A_ID,
-      USER_B_ID,
-    ]);
-    const sisaAkun = await deleteRows(`delete from auth.users where id in ($1, $2) returning 1`, [
-      USER_A_ID,
-      USER_B_ID,
-    ]);
+    const sisa = (
+      await sql(`select id::text as id from public.profiles where username = any($1::text[])`, [
+        [USER_A_USERNAME, USER_B_USERNAME],
+      ])
+    ).rows.map((baris) => baris.id);
+
+    if (sisa.length > 0) {
+      await deleteRows(`delete from public.profiles where id = any($1::uuid[]) returning 1`, [
+        sisa,
+      ]);
+    }
+
+    const sisaAkun =
+      sisa.length === 0
+        ? 0
+        : await deleteRows(`delete from auth.users where id = any($1::uuid[]) returning 1`, [sisa]);
     if (sisaAkun > 0) {
       console.log(`[storage:test] membersihkan sisa run sebelumnya: ${sisaAkun} akun uji.`);
     }
 
-    /* 1. Dua akun uji sementara + satu kendaraan milik A. Kata sandi acak per run,
-          di-hash pgcrypto; trigger bootstrap membuat profiles otomatis.
-
-          Kolom token sengaja diisi '' (bukan dibiarkan NULL seperti default kolom):
-          GoTrue memindai baris `auth.users` ke struct Go dengan field string biasa, dan
-          satu NULL saja membuat password grant gagal 500 "Database error querying schema"
-          walaupun barisnya terlihat wajar di SQL. GoTrue sendiri selalu menulis ''. */
-    const passwordA = randomBytes(18).toString('base64url');
-    const passwordB = randomBytes(18).toString('base64url');
+    /* 1. Dua identitas anonim + satu kendaraan milik A. Anonymous sign-in adalah
+          jalur yang sama dengan aplikasi, jadi token yang diuji nyata; trigger
+          bootstrap membuat profil, lalu namanya diganti agar run berikutnya bisa
+          menyapu sisa berdasarkan username. */
+    const sesiA = await signInAnonymous('A');
+    const sesiB = await signInAnonymous('B');
+    USER_A_ID = sesiA.id;
+    USER_B_ID = sesiB.id;
+    tokenA = sesiA.token;
+    tokenB = sesiB.token;
 
     await sql(
-      `insert into auth.users (
-         id, instance_id, aud, role, email, encrypted_password, email_confirmed_at,
-         confirmation_token, recovery_token, email_change, email_change_token_new,
-         email_change_token_current, phone_change, phone_change_token,
-         reauthentication_token, raw_app_meta_data, raw_user_meta_data,
-         created_at, updated_at
-       ) values
-         ($1, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated',
-          $3, crypt($4, gen_salt('bf')), now(),
-          '', '', '', '', '', '', '', '',
-          '{"provider":"email","providers":["email"]}', $5::jsonb, now(), now()),
-         ($2, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated',
-          $6, crypt($7, gen_salt('bf')), now(),
-          '', '', '', '', '', '', '', '',
-          '{"provider":"email","providers":["email"]}', $8::jsonb, now(), now())`,
-      [
-        USER_A_ID,
-        USER_B_ID,
-        USER_A_EMAIL,
-        passwordA,
-        JSON.stringify({ username: 'uji_storage_a', display_name: 'Uji Storage A' }),
-        USER_B_EMAIL,
-        passwordB,
-        JSON.stringify({ username: 'uji_storage_b', display_name: 'Uji Storage B' }),
-      ],
+      `update public.profiles set username = $2, display_name = $3, updated_at = now()
+        where id = $1`,
+      [USER_A_ID, USER_A_USERNAME, 'Uji Storage A'],
+    );
+    await sql(
+      `update public.profiles set username = $2, display_name = $3, updated_at = now()
+        where id = $1`,
+      [USER_B_ID, USER_B_USERNAME, 'Uji Storage B'],
     );
 
     const profil = await scalar(
@@ -417,38 +442,14 @@ async function main() {
     );
     ok('kendaraan uji milik A dibuat');
 
-    /* 2. Sign-in lewat password grant GoTrue yang sesungguhnya — JWT untuk semua
-          langkah HTTP berikutnya. */
-    const signIn = async (label, email, password) => {
-      const response = await request(`${apiBase}/auth/v1/token?grant_type=password`, {
-        method: 'POST',
-        headers: { apikey: publishableKey, 'content-type': 'application/json' },
-        body: JSON.stringify({ email, password }),
-      });
-
-      if (response.status !== 200) {
-        throw new UjiGagal(
-          `sign-in ${label} gagal (HTTP ${response.status}) — ${redact(response.text).slice(0, 200)}`,
-        );
-      }
-
-      let payload;
-      try {
-        payload = JSON.parse(response.text);
-      } catch {
-        throw new UjiGagal(`sign-in ${label} mengembalikan respons bukan JSON.`);
-      }
-
-      if (typeof payload?.access_token !== 'string' || payload.access_token.length === 0) {
-        throw new UjiGagal(`sign-in ${label} tidak mengembalikan access_token.`);
-      }
-
-      ok(`sign-in ${label} via GoTrue password grant`);
-      return payload.access_token;
-    };
-
-    tokenA = await signIn('A', USER_A_EMAIL, passwordA);
-    tokenB = await signIn('B', USER_B_EMAIL, passwordB);
+    /* 2. Path objek mengikuti ID yang baru dibuat server. */
+    folderA = `${USER_A_ID}/${MOTOR_ID}`;
+    folderB = `${USER_B_ID}/${MOTOR_ID}`;
+    pathUtama = `${folderA}/${FILE_UTAMA}`;
+    pathDitolak = [...FILE_DITOLAK.map((nama) => `${folderA}/${nama}`), `${folderB}/milik-b.png`];
+    avatarA = `${USER_A_ID}/${FILE_AVATAR}`;
+    avatarDitolak = `${USER_A_ID}/${FILE_AVATAR_DITOLAK}`;
+    avatarAnon = `${USER_A_ID}/anon.png`;
 
     /* 2b. Objek sisa run sebelumnya disapu oleh pemiliknya masing-masing. Policy DELETE
            hanya memeriksa folder pemilik, jadi ID tetap membuat objek lama tetap bisa
