@@ -75,7 +75,7 @@ function isCompletedResult(
 }
 
 /**
- * Meminta server menghapus akun pemanggil.
+ * Meminta server menghapus data pemanggil.
  *
  * Hasil `ok: true` hanya diberikan bila server menyatakan seluruh langkah
  * selesai (termasuk Auth Admin API). Pemanggil boleh `signOut()` setelahnya.
@@ -104,7 +104,7 @@ export async function deleteMyAccount(
       error: {
         code: 'deletion_incomplete',
         message:
-          'Server belum mengonfirmasi bahwa akun benar-benar terhapus. Coba lagi; bila berulang, hubungi dukungan sebelum menganggap akun hilang.',
+          'Server belum mengonfirmasi bahwa data Anda benar-benar terhapus. Coba lagi; bila berulang, hubungi dukungan sebelum menganggap akun hilang.',
         retryable: true,
       },
     };

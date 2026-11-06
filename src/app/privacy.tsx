@@ -30,21 +30,25 @@ export default function PrivacyScreen() {
     >
       <Card>
         <SectionHeader
-          subtitle="Ringkasan Bahasa Indonesia; diperbarui 23 Oktober 2026."
+          subtitle="Ringkasan Bahasa Indonesia; diperbarui 6 November 2026."
           title="Data yang disimpan"
         />
         <View style={styles.list}>
           <AppText variant="callout">
-            • Akun: email (dikelola Supabase Auth), username, nama tampilan, bio, kota, dan foto
-            profil privat.
+            • Identitas perangkat: aplikasi tidak meminta email, nomor HP, atau kata sandi. Saat
+            pertama dibuka, aplikasi membuat satu identitas anonim (ID acak) yang mewakili perangkat
+            ini.
+          </AppText>
+          <AppText variant="callout">
+            • Profil: username, nama tampilan, bio, kota, dan foto profil privat.
           </AppText>
           <AppText variant="callout">
             • Kendaraan: merek, model, tahun, foto, serta nomor polisi dan catatan privat yang hanya
             dapat dibaca pemilik.
           </AppText>
           <AppText variant="callout">
-            • Perjalanan: keanggotaan, posisi terakhir selama Anda mengaktifkan berbagi lokasi,
-            pesan konvoi, dan laporan bahaya yang Anda kirim.
+            • Perjalanan: keanggotaan, posisi terakhir selama Anda sendiri menyalakan berbagi lokasi
+            (opt-in, mati secara bawaan), pesan konvoi, dan laporan bahaya yang Anda kirim.
           </AppText>
           <AppText variant="callout">
             • Perangkat: token notifikasi bila fitur notifikasi diaktifkan. Aplikasi tidak menyimpan
@@ -95,9 +99,11 @@ export default function PrivacyScreen() {
           {SUPPORT_URL}
         </AppText>
         <AppText tone="muted" variant="caption">
-          Anda juga dapat menghapus akun sendiri dari Profil → Hapus akun. Proses dijalankan di
-          server dan baru dinyatakan berhasil setelah seluruh langkah selesai; bila gagal di tengah
-          jalan, permintaan dapat diulang tanpa menghapus data dua kali.
+          Anda juga dapat menghapus data Anda sendiri dari Profil → Hapus data saya. Proses
+          dijalankan di server dan baru dinyatakan berhasil setelah seluruh langkah selesai; bila
+          gagal di tengah jalan, permintaan dapat diulang tanpa menghapus data dua kali. Setelah
+          selesai, aplikasi membuat identitas anonim baru yang belum menjadi anggota klub mana pun,
+          sehingga data lama tidak bisa dipulihkan.
         </AppText>
       </Card>
     </Screen>
