@@ -90,8 +90,9 @@ const authChecklist: readonly ChecklistItem[] = [
     status: 'selesai',
   },
   {
-    label: 'Alur masuk, daftar, lupa sandi, atur sandi baru',
-    detail: 'Validasi, loading, dan pesan error Bahasa Indonesia; teruji unit tanpa backend.',
+    label: 'Identitas perangkat tanpa akun',
+    detail:
+      'Satu layar onboarding (username unik + nama tampilan); tidak ada masuk, daftar, atau sandi. Layar offline dan identitas hilang teruji unit tanpa backend.',
     status: 'selesai',
   },
   {

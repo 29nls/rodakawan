@@ -7,7 +7,7 @@
 3. **Security/RLS:** allow + deny matrix dengan minimal dua user dan role berbeda.
 4. **E2E:** onboarding → klub → ride → tracking → hazard/chat → end ride.
 5. **Device/manual:** background location, GPS, screen lock, battery saver, Bluetooth, low memory, different Android vendors.
-6. **Release smoke:** verifikasi unduhan, install APK, login, critical actions, rollback/error
+6. **Release smoke:** verifikasi unduhan, install APK, onboarding identitas, critical actions, rollback/error
    behavior, privacy/settings.
    Bagian pertamanya sudah otomatis: job `smoke-test` di kedua workflow rilis memasang APK hasil build
    di emulator dan memastikan aplikasinya menyala sebelum rilis dibuat (`docs/SETUP_GUIDE.md` §6.9).
@@ -18,7 +18,7 @@
 ## 2. Test environment
 
 - Development Supabase project dengan data dummy.
-- Minimal dua akun test (host dan participant), serta akun non-member.
+- Minimal dua identitas perangkat uji (host dan participant), serta satu identitas non-member. Setiap identitas dibuat dengan memasang aplikasi di perangkat/emulator terpisah atau menghapus data aplikasi.
 - Android fisik dengan GPS dan data seluler/Wi-Fi; tambahkan perangkat vendor berbeda pada beta.
 - Development build yang sesuai native config; jangan menilai background location hanya dari Expo Go.
 - Seed data menggunakan UUID dan koordinat fiktif; jangan gunakan lokasi rumah pengguna.
@@ -27,20 +27,20 @@
 
 | ID | Skenario | Hasil yang diharapkan |
 |---|---|---|
-| AUTH-01 | Daftar dan login valid | User terautentikasi dan profil dibuat/dapat dilengkapi. |
-| AUTH-02 | Password/token salah | Pesan aman dan jelas; tidak menampilkan detail internal. |
-| AUTH-03 | Logout lalu buka kembali | Session tertutup sesuai desain; private screen tidak terbuka. |
-| AUTH-04 | Daftar dengan email sudah terpakai | Pesan jelas di Bahasa Indonesia; tidak menyebut akun lain ada/hilang secara berlebihan. |
-| AUTH-05 | Daftar dengan username sudah terpakai | Pendaftaran tetap berhasil; profil memakai username sementara `rider_…` dan aplikasi meminta penggantian. |
-| AUTH-06 | Email konfirmasi diperlukan | Aplikasi menyatakan akun menunggu konfirmasi; tidak mengklaim sudah masuk. |
-| AUTH-07 | Tautan konfirmasi dibuka | Postur awal session diperbarui; pengguna diarahkan ke area aplikasi tanpa redirect loop. |
-| AUTH-08 | Tautan kedaluwarsa / sudah dipakai | Pesan jelas dan saran meminta tautan baru; tidak crash. |
-| AUTH-09 | Minta reset password | Pesan sukses tidak membocorkan apakah email terdaftar. |
-| AUTH-10 | Ganti password dari tautan pemulihan | Password lama tidak berlaku; kata sandi baru dapat dipakai login. |
-| AUTH-11 | Kata sandi lemah / konfirmasi tidak sama | Ditolak di aplikasi dengan pesan spesifik sebelum request dikirim. |
-| AUTH-12 | Jaringan gagal saat masuk | Pesan jaringan jelas; tidak mengklaim berhasil; tombol bisa dicoba lagi. |
+| AUTH-01 | Instalasi baru dengan internet | `signInAnonymously()` membuat satu identitas; onboarding username + nama tampilan tampil; profil sementara `rider_…` dibuat server. |
+| AUTH-02 | Instalasi baru tanpa internet | Layar "Butuh internet untuk memulai" + tombol **Coba lagi**; tidak ada spinner tanpa akhir dan tidak ada identitas setengah jadi. |
+| AUTH-03 | Tutup lalu buka ulang aplikasi | Session tersimpan dipulihkan; onboarding tidak muncul lagi; tidak ada identitas kedua. |
+| AUTH-04 | Anonymous sign-ins dimatikan di server | Pesan menyebut pemilik perlu mengaktifkannya (bukan crash); tombol coba lagi tersedia. |
+| AUTH-05 | Username sudah dipakai identitas lain | Pesan `username_taken` jelas; pengguna diminta memilih username lain, bukan diganti diam-diam. |
+| AUTH-06 | Username tidak valid | Validasi di aplikasi menolak sebelum request; pesan spesifik per aturan. |
+| AUTH-07 | Session tersimpan gagal dipulihkan | Layar "Identitas lama tidak bisa dipulihkan"; tidak ada identitas baru tanpa persetujuan pengguna. |
+| AUTH-08 | Tekan "Buat identitas baru" | Identitas baru dibuat, onboarding muncul, dan dijelaskan bahwa keanggotaan lama tidak terbawa. |
+| AUTH-09 | "Mulai identitas baru" dari tab Profil | Dialog konfirmasi destruktif; setelah dikonfirmasi identitas lama dibuang dan onboarding muncul lagi. |
+| AUTH-10 | Rute `/sign-in`, `/sign-up`, `/forgot-password`, `/reset-password` | Semua menghasilkan "Halaman tidak ditemukan"; tidak ada jalur masuk berbasis email. |
+| AUTH-11 | Buka rute privat sebelum identitas siap | Dialihkan ke gerbang; layar privat tidak pernah dirender. |
+| AUTH-12 | Jaringan gagal saat onboarding disimpan | Pesan jaringan jelas; tidak mengklaim berhasil; tombol bisa dicoba lagi. |
 | AUTH-13 | Env Supabase belum diisi | Banner "konfigurasi belum tersedia"; tidak ada request jaringan; aplikasi tidak crash dan tidak menampilkan nilai key. |
-| AUTH-14 | Buka rute privat tanpa session | Dialihkan ke alur masuk; layar privat tidak pernah dirender. |
+| AUTH-14 | Kunci publik + APK dipegang orang asing | Tanpa sesi `authenticated`, semua tabel tetap tertutup; peran `anon` tidak membaca/menulis apa pun (dibuktikan uji RLS). |
 | PROF-01 | User A mengubah profile User B lewat API | Ditolak oleh policy/server. |
 | PROF-02 | User A membaca profil privat User B | Tidak ada baris yang terlihat (bukan pesan error yang membocorkan keberadaan). |
 | PROF-03 | Peran anon membaca `public.profiles` | Nol baris. |
@@ -88,14 +88,14 @@
 | CHAT-01 | Anggota mengirim pesan | Pesan tersimpan dan diterima anggota yang berwenang. |
 | CHAT-02 | Non-member membaca/mengirim melalui API | Ditolak oleh RLS/server. |
 | CHAT-03 | Retry request yang sama | Tidak membuat duplicate bila idempotency tersedia. |
-| ACC-01 | Pemilik menghapus akun dari aplikasi | Server menyelesaikan Storage + database + Auth; profil hilang, identitas login tidak bisa dipakai lagi, pengguna keluar dan diarahkan ke halaman masuk. Sukses hanya tampil setelah server mengonfirmasi. |
+| ACC-01 | Pemilik menghapus data dari aplikasi | Server menyelesaikan Storage + database + Auth; profil hilang, identitas anonim tidak bisa dipakai lagi, pengguna kembali ke gerbang identitas dan mendapat identitas baru. Sukses hanya tampil setelah server mengonfirmasi. |
 | ACC-02 | Panggilan hapus akun diulang | Tidak ada penghapusan kedua dan tidak ada galat: job `completed` dikembalikan idempoten; retry setelah kegagalan melanjutkan langkah yang belum selesai. |
 | ACC-03 | Pengguna B memanggil hapus akun untuk akun A | Tidak mungkin: target selalu `auth.uid()` dari JWT yang diverifikasi server; `anon` ditolak. |
 | ACC-04 | Setelah akun dihapus | Profil dan data pribadi hilang; laporan bahaya/audit tetap ada sebagai tombstone; pesan/postingan diredaksi; kepemilikan klub/perjalanan dialihkan atau perjalanan dibatalkan. |
 | ACC-05 | Storage gagal dihapus/dipindahkan | Server **tidak** menghapus Auth dan layar tidak menampilkan sukses; pengguna bisa mengulang. Logo klub yang masih dipakai tetap dapat diakses anggota lain. |
 | ACC-06 | Buka `/privacy` tanpa sesi | Retensi per jenis data (termasuk yang sengaja dipertahankan), apa yang tidak dibagikan, dan kontak dukungan terbaca; tidak ada data pribadi atau kredensial di halaman. |
-| ACC-07 | Hapus akun dari halaman web tanpa aplikasi | Login web berhasil, konfirmasi `HAPUS AKUN`, server menyelesaikan proses yang sama; kata sandi/token tidak disimpan di browser; login dengan email tidak terdaftar dan kata sandi salah memberi pesan identik. |
-| ACC-08 | JWT lama setelah akun dihapus | Token yang belum kedaluwarsa tidak membaca profil dan tidak bisa membuat kendaraan/token push (ditolak FK); login ulang dengan kredensial lama gagal. |
+| ACC-07 | Hapus akun dari halaman web tanpa aplikasi | **Blocked:** halaman `web/account-deletion` masih memakai alur email + kata sandi (batas yang dicatat ADR-083) dan perlu ditinjau sebelum dipakai publik. |
+| ACC-08 | JWT lama setelah data dihapus | Token yang belum kedaluwarsa tidak membaca profil dan tidak bisa membuat kendaraan/token push (ditolak FK); token refresh identitas lama ditolak. |
 | NOTIF-01 | Device token berubah | Token diperbarui; token lama bisa dibersihkan. |
 | NOTIF-02 | User menolak push permission | App tetap usable; preferensi/state ditangani dengan baik. |
 | VOICE-01 | Non-member meminta token PTT | Backend menolak. (P2) |
@@ -443,7 +443,7 @@ lain.
 
 | ID | Perangkat | Waktu uji | Versi APK | Akun | Langkah | Hasil yang diharapkan | Hasil aktual | Bukti | Status |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| PD-01 |  |  |  | A, B | Daftar + login di dua perangkat; tutup aplikasi; buka lagi; matikan jaringan sesaat lalu buka | Sesi pulih tanpa login ulang; galat jaringan menjelaskan pemulihan, bukan crash |  |  | **Blocked** |
+| PD-01 |  |  |  | A, B | Onboarding username di dua perangkat; tutup aplikasi; buka lagi; instalasi baru tanpa internet lalu sambungkan | Tiap perangkat punya identitas sendiri; sesi pulih tanpa onboarding ulang; layar "Butuh internet untuk memulai" + Coba lagi, bukan crash |  |  | **Blocked** |
 | PD-02 |  |  |  | A (host), B | A membuat perjalanan `planned`, mengundang B, B menerima, A memulai | Kedua layar menampilkan status yang sama setelah tersimpan di server |  |  | **Blocked** |
 | PD-03 |  |  |  | A, B | A & B mengaktifkan berbagi lokasi (consent per perjalanan); keduanya bergerak | Posisi + timestamp satu sama lain diperbarui di layar yang lain; label segar/basi benar |  |  | **Blocked** |
 | PD-04 |  |  |  | A | Tolak izin lokasi OS saat menyalakan berbagi lokasi dan saat "Gunakan lokasi saat ini" di form bahaya | Aplikasi menjelaskan akibatnya; tidak ada koordinat 0,0; perjalanan tetap bisa diikuti |  |  | **Blocked** |
@@ -454,7 +454,7 @@ lain.
 | PD-09 |  |  |  | A, B | Matikan data seluler/Wi-Fi 30–60 detik di tengah chat, lalu nyalakan | Indikator offline jelas; setelah pulih chat/posisi tersambung ulang tanpa data ganda; retry pesan terkirim **sekali** |  |  | **Blocked** |
 | PD-10 |  |  |  | A | Aktifkan battery saver + pembatasan background untuk aplikasi | Catat perilaku vendor (umumnya lokasi berhenti); aplikasi tidak crash dan status tetap jujur |  |  | **Blocked** |
 | PD-11 |  |  |  | A | Force-stop aplikasi dari Pengaturan, lalu buka lagi | Sesi dan state konsisten dari server; tracking tidak nyala sendiri tanpa ride aktif + opt-in |  |  | **Blocked** |
-| PD-12 |  |  |  | A | Reboot perangkat, lalu buka aplikasi | Sesi pulih (atau diminta login dengan jelas); tidak ada tracking diam-diam |  |  | **Blocked** |
+| PD-12 |  |  |  | A | Reboot perangkat, lalu buka aplikasi | Sesi/identitas perangkat pulih tanpa onboarding ulang; bila sesi hilang, aplikasi menjelaskan identitas baru dan keanggotaan lama tidak terjangkau; tidak ada tracking diam-diam |  |  | **Blocked** |
 | PD-13 |  |  |  | A, B | A menonaktifkan berbagi lokasi; B keluar/dikeluarkan host | Lokasi terakhir benar-benar terhapus; yang keluar tidak bisa menerbitkan lokasi baru |  |  | **Blocked** |
 | PD-14 |  |  |  | A, B | A menyelesaikan (dan satu skenario: membatalkan) perjalanan | Status final terlihat di B; tidak bisa dikembalikan ke aktif lewat aplikasi |  |  | **Blocked** |
 | PD-15 |  |  |  | A, B, (C) | Chat realtime A↔B; sunting/hapus dalam 15 menit; kirim saat mode pesawat lalu ulangi (idempoten); gulir muat pesan lama; akun C diblokir A | Pesan tanpa muat ulang; edit/hapus tercermin; retry tidak menduplikasi; riwayat utuh; pesan teks C tidak pernah sampai ke A (disaring server) |  |  | **Blocked** |
@@ -482,15 +482,12 @@ Yang **sudah otomatis** (`npm test`, jaringan dimatikan; client Supabase diganti
 
 | Berkas | Cakupan |
 |---|---|
-| `src/features/auth/__tests__/validation.test.ts` | Email, kata sandi, konfirmasi kata sandi, kebijakan password. |
 | `src/features/profile/__tests__/validation.test.ts` | Username (format, panjang, normalisasi), display name, bio, kota. |
-| `src/features/auth/__tests__/errors.test.ts` | Pemetaan error Supabase → pesan Bahasa Indonesia, termasuk jaringan dan konfigurasi belum ada. |
-| `src/features/auth/__tests__/linkParams.test.ts` | Parser tautan email: `code` di query, `access_token` di fragment, tautan rusak/kedaluwarsa. |
-| `src/features/auth/__tests__/api.test.ts` | Registrasi, login, logout, reset, resend; termasuk penolakan saat konfigurasi kosong. |
+| `src/features/auth/__tests__/errors.test.ts` | Pemetaan error Supabase → pesan Bahasa Indonesia tanpa email/kata sandi, termasuk jaringan, konfigurasi kosong, dan `anonymous_sign_in_disabled`. |
 | `src/features/profile/__tests__/api.test.ts` | Baca dan ubah profil; kasus profil belum ada dan sesi tidak valid. |
-| `src/features/auth/__tests__/session.test.tsx` | State `loading`/`ready`, perubahan session, pembersihan saat logout. |
+| `src/features/auth/__tests__/session.test.tsx` | Empat status `loading`/`ready`/`offline`/`identity_lost`, `signInAnonymously` saat belum ada sesi, retry setelah offline, sesi hilang → identitas baru, dan pembersihan saat keluar. |
 | `src/lib/__tests__/supabaseClient.test.ts` | Konfigurasi auth client (PKCE, persist session, satu instance) dan lifecycle auto-refresh mengikuti `AppState` (aktif, background, perpindahan status, pembersihan listener, promise yang gagal). |
-| `src/__tests__/navigation.test.tsx` | Rute asli: gerbang awal, alur auth, area privat, dan tidak ada redirect loop. |
+| `src/__tests__/navigation.test.tsx` | Rute asli: empat status gerbang identitas (termasuk offline dan identitas hilang), onboarding username, area privat, rute auth lama yang sudah tidak ada, dan tidak ada redirect loop. |
 | `src/features/garage/__tests__/*.test.ts` | Validasi kendaraan (selaras CHECK constraint) dan API garasi: tambah, ubah, jadikan utama, hapus, pemetaan galat. |
 | `src/features/clubs/__tests__/*.test.ts` | Validasi klub, jelajah/buat klub, dan alur keanggotaan lewat RPC (ajukan, batalkan, tinjau, peran, keluarkan, keluar). |
 | `src/features/rides/__tests__/*.test.ts` | Validasi perjalanan/jadwal, kebijakan sampling & kesegaran lokasi, API perjalanan (RPC, konsent, Postgres Changes tanpa `user_id` klien). |

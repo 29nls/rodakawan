@@ -242,7 +242,7 @@ export default function ModerationScreen() {
   const precondition = screenPrecondition(
     backend,
     userId,
-    'Sesi tidak ditemukan di perangkat ini. Masuk kembali untuk membuka dashboard moderasi.',
+    'Identitas perangkat ini tidak aktif. Buka ulang aplikasi untuk membuka dashboard moderasi.',
   );
 
   async function runAction(

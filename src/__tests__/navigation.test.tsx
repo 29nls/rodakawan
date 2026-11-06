@@ -1,7 +1,7 @@
 import type { Session, SupabaseClient } from '@supabase/supabase-js';
 import { act, fireEvent, renderRouter, screen, waitFor } from 'expo-router/testing-library';
+import { Alert } from 'react-native';
 
-import { signInWithEmail } from '@/features/auth/api';
 import { useAuthSession, type AuthSessionValue } from '@/features/auth/session';
 import { fetchOwnProfile } from '@/features/profile/api';
 import type { Database } from '@/lib/supabase/database.types';
@@ -11,14 +11,15 @@ import { buildProfileRow } from '@/test-support/fakeSupabase';
 jest.setTimeout(30_000);
 
 /**
- * Pengujian navigasi nyata: menjalankan rute Expo Router dari `src/app` dengan sesi
- * yang dikendalikan test. Yang diperiksa:
- * - gerbang loading sesi dan pengarahan pengunjung tanpa sesi;
- * - rute privat tidak dapat diakses tanpa sesi;
- * - alur tab dan layar Fondasi & sistem setelah masuk;
- * - tab Profil memuat data profil dan tombol keluar benar-benar memanggil signOut;
- * - validasi form sebelum backend dipanggil;
- * - aturan "tidak ada tombol yang berpura-pura berfungsi".
+ * Pengujian navigasi nyata: menjalankan rute Expo Router dari `src/app` dengan
+ * identitas perangkat yang dikendalikan test. Yang diperiksa:
+ * - gerbang loading, layar "butuh internet", dan layar identitas hilang;
+ * - rute privat tidak dapat diakses sebelum identitas siap;
+ * - onboarding muncul saat profil belum lengkap / masih username sementara;
+ * - alur tab dan layar Fondasi & sistem setelah identitas siap;
+ * - tab Profil memuat data profil dan tombol mulai identitas baru memanggil signOut
+ *   setelah konfirmasi;
+ * - tidak ada lagi rute masuk/daftar.
  *
  * Catatan: modul `@/lib/supabase/client` di-mock karena membutuhkan modul native
  * (expo-sqlite); test ini tidak menguji jaringan, melainkan navigasi dan lapisan UI.
@@ -45,14 +46,8 @@ jest.mock('@/features/profile/api', () => {
   return { ...actual, fetchOwnProfile: jest.fn() };
 });
 
-jest.mock('@/features/auth/api', () => {
-  const actual = jest.requireActual('@/features/auth/api');
-  return { ...actual, signInWithEmail: jest.fn() };
-});
-
 const mockedUseAuthSession = jest.mocked(useAuthSession);
 const mockedFetchOwnProfile = jest.mocked(fetchOwnProfile);
-const mockedSignInWithEmail = jest.mocked(signInWithEmail);
 
 const unavailableBackend = { available: false as const, reason: 'not_configured' as const };
 
@@ -62,7 +57,7 @@ const unavailableBackend = { available: false as const, reason: 'not_configured'
  * Layar Milestone 2 (Komunitas, Garasi) benar-benar memanggil backend, jadi client
  * palsu ini harus bisa dirantai seperti PostgREST: `from(...).select(...).eq(...)`
  * mengembalikan daftar kosong, dan `rpc(...)` mengembalikan status netral. Test ini
- * tidak menguji jaringan, melainkan rute, penjaga sesi, dan judul layar.
+ * tidak menguji jaringan, melainkan rute, penjaga identitas, dan judul layar.
  */
 function createFakeClient(): SupabaseClient<Database> {
   const builder = {
@@ -107,9 +102,11 @@ function sessionValue(overrides: Partial<AuthSessionValue>): AuthSessionValue {
     status: 'ready',
     session: null,
     userId: null,
-    email: null,
-    requestedUsername: null,
+    isAnonymous: true,
     backend: unavailableBackend,
+    startupError: null,
+    retryIdentity: jest.fn(async () => undefined),
+    startFreshIdentity: jest.fn(async () => undefined),
     signOut: createSignOutSpy(),
     ...overrides,
   };
@@ -117,18 +114,12 @@ function sessionValue(overrides: Partial<AuthSessionValue>): AuthSessionValue {
 
 function signedInSession(overrides: Partial<AuthSessionValue> = {}): AuthSessionValue {
   const session = {
-    user: {
-      id: 'user-1',
-      email: 'rider@contoh.com',
-      user_metadata: { username: 'budi_solo' },
-    },
+    user: { id: 'user-1', is_anonymous: true, user_metadata: {} },
   } as unknown as Session;
 
   return sessionValue({
     session,
     userId: 'user-1',
-    email: 'rider@contoh.com',
-    requestedUsername: 'budi_solo',
     backend: { available: true, client: fakeClient },
     ...overrides,
   });
@@ -143,36 +134,88 @@ async function renderApp(initialUrl: string) {
 beforeEach(() => {
   mockedUseAuthSession.mockReset();
   mockedFetchOwnProfile.mockReset();
-  mockedSignInWithEmail.mockReset();
   mockedUseAuthSession.mockReturnValue(sessionValue({}));
-  mockedFetchOwnProfile.mockResolvedValue({ ok: true, data: null });
+  // Profil lengkap secara default supaya gerbang langsung menuju Ringkasan.
+  mockedFetchOwnProfile.mockResolvedValue({
+    ok: true,
+    data: buildProfileRow({ id: 'user-1', username: 'budi_solo', display_name: 'Budi Solo' }),
+  });
 });
 
-/** Sesi tanpa backend siap dipakai layar yang tombolnya harus tetap aktif. */
+/** Sesi siap dengan client palsu, untuk layar yang benar-benar memanggil backend. */
 function sessionWithBackend(): AuthSessionValue {
-  return sessionValue({ backend: { available: true, client: fakeClient } });
+  return signedInSession();
 }
 
-describe('gerbang sesi', () => {
-  it('menampilkan status loading saat sesi masih diperiksa', async () => {
+describe('gerbang identitas', () => {
+  it('menampilkan status loading saat identitas masih disiapkan', async () => {
     mockedUseAuthSession.mockReturnValue(sessionValue({ status: 'loading' }));
 
     const { app } = await renderApp('/');
 
     expect(app.getPathname()).toBe('/');
-    expect(screen.getByText('Memeriksa sesi…')).toBeTruthy();
+    expect(screen.getByText('Menyiapkan identitas perangkat…')).toBeTruthy();
   });
 
-  it('mengarahkan pengunjung tanpa sesi ke layar masuk', async () => {
+  it('menjelaskan bahwa internet dibutuhkan saat identitas pertama belum bisa dibuat', async () => {
+    mockedUseAuthSession.mockReturnValue(
+      sessionValue({
+        status: 'offline',
+        startupError: {
+          code: 'network',
+          message: 'Tidak dapat terhubung ke server.',
+          retryable: true,
+        },
+      }),
+    );
+
+    await renderApp('/');
+
+    expect(screen.getByText('Butuh internet untuk memulai')).toBeTruthy();
+    expect(screen.getByTestId('auth-gate-retry')).toBeTruthy();
+  });
+
+  it('menjelaskan keanggotaan lama tidak terjangkau saat identitas hilang', async () => {
+    mockedUseAuthSession.mockReturnValue(sessionValue({ status: 'identity_lost' }));
+
+    await renderApp('/');
+
+    expect(screen.getByText('Identitas lama tidak bisa dipulihkan')).toBeTruthy();
+    expect(screen.getByText(/keanggotaan klub dan riwayat perjalanan yang lama/)).toBeTruthy();
+    expect(screen.getByTestId('auth-gate-new-identity')).toBeTruthy();
+  });
+});
+
+describe('onboarding', () => {
+  it('mengarahkan ke onboarding ketika profil masih username sementara', async () => {
+    mockedUseAuthSession.mockReturnValue(signedInSession());
+    mockedFetchOwnProfile.mockResolvedValue({
+      ok: true,
+      data: buildProfileRow({ id: 'user-1', username: 'rider_abc1234567' }),
+    });
+
     const { app } = await renderApp('/');
 
-    await waitFor(() => expect(app.getPathname()).toBe('/sign-in'));
-    expect(screen.getByText('Masuk ke RodaKawan')).toBeTruthy();
+    await waitFor(() => expect(app.getPathname()).toBe('/onboarding'));
+    expect(screen.getByText('Kenalan dulu')).toBeTruthy();
+    expect(screen.getByText(/Username sementara/)).toBeTruthy();
+  });
+
+  it('memvalidasi username sebelum memanggil backend', async () => {
+    mockedUseAuthSession.mockReturnValue(sessionWithBackend());
+    mockedFetchOwnProfile.mockResolvedValue({ ok: true, data: null });
+
+    await renderApp('/onboarding');
+
+    await fireEvent.press(screen.getByTestId('onboarding-submit'));
+
+    expect(screen.getByText('Username wajib diisi.')).toBeTruthy();
+    expect(screen.getByText('Nama tampilan wajib diisi.')).toBeTruthy();
   });
 });
 
 describe('rute Milestone 2', () => {
-  it('membuka Garasi setelah masuk dan menampilkan keadaan kosong yang jelas', async () => {
+  it('membuka Garasi setelah identitas siap dan menampilkan keadaan kosong yang jelas', async () => {
     mockedUseAuthSession.mockReturnValue(signedInSession());
 
     const { app } = await renderApp('/garage');
@@ -183,27 +226,40 @@ describe('rute Milestone 2', () => {
     expect(screen.getByText('Nomor polisi tetap privat')).toBeTruthy();
   });
 
-  it('menolak akses langsung ke Garasi tanpa sesi', async () => {
+  it('menolak akses langsung ke Garasi sebelum identitas siap', async () => {
+    mockedUseAuthSession.mockReturnValue(sessionValue({ status: 'offline' }));
+
     const { app } = await renderApp('/garage');
 
-    await waitFor(() => expect(app.getPathname()).toBe('/sign-in'));
-    expect(screen.getByText('Masuk ke RodaKawan')).toBeTruthy();
+    expect(app.getPathname()).not.toBe('/garage');
+    expect(screen.getByText('Butuh internet untuk memulai')).toBeTruthy();
   });
 });
 
 describe('proteksi rute', () => {
-  it('menolak akses langsung ke tab privat tanpa sesi', async () => {
+  it('menolak akses langsung ke tab privat sebelum identitas siap', async () => {
+    mockedUseAuthSession.mockReturnValue(sessionValue({ status: 'offline' }));
+
     const { app } = await renderApp('/ringkasan');
 
-    await waitFor(() => expect(app.getPathname()).toBe('/sign-in'));
-    expect(screen.getByText('Masuk ke RodaKawan')).toBeTruthy();
+    expect(app.getPathname()).not.toBe('/ringkasan');
+    expect(screen.getByText('Butuh internet untuk memulai')).toBeTruthy();
   });
 
-  it('menolak akses langsung ke tab Profil tanpa sesi', async () => {
-    const { app } = await renderApp('/profile');
+  it('menolak akses langsung ke tab Profil sebelum identitas siap', async () => {
+    mockedUseAuthSession.mockReturnValue(sessionValue({ status: 'identity_lost' }));
 
-    await waitFor(() => expect(app.getPathname()).toBe('/sign-in'));
-    expect(screen.queryByText('Akun & pengaturan')).toBeNull();
+    await renderApp('/profile');
+
+    expect(screen.queryByText('Profil & pengaturan')).toBeNull();
+  });
+
+  it('tidak lagi menyediakan rute masuk, daftar, atau lupa kata sandi', async () => {
+    mockedUseAuthSession.mockReturnValue(signedInSession());
+
+    await renderApp('/sign-in');
+
+    expect(screen.getByText('Halaman tidak ditemukan')).toBeTruthy();
   });
 
   it('menampilkan halaman tidak ditemukan untuk rute asing', async () => {
@@ -215,7 +271,7 @@ describe('proteksi rute', () => {
   });
 });
 
-describe('area aplikasi setelah masuk', () => {
+describe('area aplikasi setelah identitas siap', () => {
   beforeEach(() => {
     mockedUseAuthSession.mockReturnValue(signedInSession());
   });
@@ -237,7 +293,6 @@ describe('area aplikasi setelah masuk', () => {
     await fireEvent.press(screen.getByLabelText('Komunitas'));
     expect(app.getPathname()).toBe('/community');
     expect(screen.getByText('Klub & anggota')).toBeTruthy();
-    // Layar Komunitas Milestone 2 benar-benar mengambil data klub, bukan placeholder.
     await waitFor(() => expect(screen.getByText('Jelajahi klub')).toBeTruthy());
     expect(screen.getByText('Belum ada klub publik')).toBeTruthy();
 
@@ -274,24 +329,39 @@ describe('area aplikasi setelah masuk', () => {
     expect(screen.getByText('PKCE')).toBeTruthy();
   });
 
-  it('menampilkan profil milik pengguna dan memanggil signOut saat keluar', async () => {
+  it('menjelaskan identitas perangkat dan meminta konfirmasi sebelum membuangnya', async () => {
     const signOut = createSignOutSpy();
     mockedUseAuthSession.mockReturnValue(signedInSession({ signOut }));
-    mockedFetchOwnProfile.mockResolvedValue({
-      ok: true,
-      data: buildProfileRow({ id: 'user-1', username: 'budi_solo', display_name: 'Budi Solo' }),
-    });
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
 
-    await renderApp('/profile');
+    try {
+      await renderApp('/profile');
 
-    await waitFor(() => expect(screen.getByText('@budi_solo')).toBeTruthy());
-    expect(screen.getByText('Budi Solo')).toBeTruthy();
+      await waitFor(() => expect(screen.getByText('@budi_solo')).toBeTruthy());
+      expect(screen.getByText('Budi Solo')).toBeTruthy();
+      expect(screen.getByText(/terikat pada perangkat/)).toBeTruthy();
+      expect(screen.getByText(/harus diundang ulang/)).toBeTruthy();
 
-    await act(async () => {
-      fireEvent.press(screen.getByTestId('profile-sign-out'));
-    });
+      await act(async () => {
+        fireEvent.press(screen.getByTestId('profile-sign-out'));
+      });
 
-    expect(signOut).toHaveBeenCalledTimes(1);
+      // Konfirmasi destruktif: signOut baru dipanggil setelah pengguna menyetujui.
+      expect(signOut).not.toHaveBeenCalled();
+      expect(alertSpy).toHaveBeenCalledTimes(1);
+
+      const buttons = alertSpy.mock.calls[0]?.[2];
+      const confirm = buttons?.find((button) => button.style === 'destructive');
+      expect(confirm?.text).toBe('Mulai identitas baru');
+
+      await act(async () => {
+        confirm?.onPress?.();
+      });
+
+      expect(signOut).toHaveBeenCalledTimes(1);
+    } finally {
+      alertSpy.mockRestore();
+    }
   });
 
   it('meminta melengkapi profil bila baris profil belum ada', async () => {
@@ -301,48 +371,5 @@ describe('area aplikasi setelah masuk', () => {
 
     await waitFor(() => expect(screen.getByText('Profil belum ada')).toBeTruthy());
     expect(screen.getByRole('button', { name: 'Lengkapi profil' })).toBeTruthy();
-  });
-});
-
-describe('form masuk', () => {
-  it('menampilkan pesan validasi dan tidak memanggil backend saat field kosong', async () => {
-    mockedUseAuthSession.mockReturnValue(sessionWithBackend());
-
-    await renderApp('/sign-in');
-
-    await fireEvent.press(screen.getByTestId('sign-in-submit'));
-
-    expect(screen.getByText('Email wajib diisi.')).toBeTruthy();
-    expect(screen.getByText('Kata sandi wajib diisi.')).toBeTruthy();
-    expect(mockedSignInWithEmail).not.toHaveBeenCalled();
-  });
-
-  it('menolak email dengan format salah sebelum mengirim', async () => {
-    mockedUseAuthSession.mockReturnValue(sessionWithBackend());
-
-    await renderApp('/sign-in');
-
-    await fireEvent.changeText(screen.getByTestId('sign-in-email'), 'bukan-email');
-    await fireEvent.changeText(screen.getByTestId('sign-in-password'), 'rahasia123');
-    await fireEvent.press(screen.getByTestId('sign-in-submit'));
-
-    expect(screen.getByText(/Format email/)).toBeTruthy();
-    expect(mockedSignInWithEmail).not.toHaveBeenCalled();
-  });
-
-  it('menjelaskan backend yang belum siap dan menonaktifkan tombol kirim', async () => {
-    await renderApp('/sign-in');
-
-    expect(screen.getByText('Backend belum siap')).toBeTruthy();
-    expect(screen.getByTestId('sign-in-submit')).toBeDisabled();
-  });
-
-  it('membuka layar pendaftaran dari layar masuk', async () => {
-    const { app } = await renderApp('/sign-in');
-
-    await fireEvent.press(screen.getByRole('button', { name: 'Belum punya akun? Daftar' }));
-
-    await waitFor(() => expect(app.getPathname()).toBe('/sign-up'));
-    expect(screen.getByText('Daftar akun RodaKawan')).toBeTruthy();
   });
 });

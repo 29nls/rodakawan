@@ -109,26 +109,26 @@ npx supabase secrets set WEB_ALLOWED_ORIGINS="https://<owner>.github.io" --proje
 Isi hanya **origin** (skema + host + port), bukan URL berisi path. Aplikasi Android tidak mengirim
 header `Origin` sehingga tetap bekerja tanpa entri apa pun.
 
-## 4. Atur Redirect URLs dan email
+## 4. Aktifkan identitas anonim (menggantikan alur email)
 
-**Authentication → URL Configuration → Redirect Routes**:
+> **Sejak ADR-083 aplikasi tidak punya akun email.** Tidak ada Redirect URL, SMTP, konfirmasi email,
+> atau reset kata sandi yang perlu disiapkan untuk APK baru. Yang wajib hanya dua pengaturan di bawah.
 
-- `rodakawan://auth/callback` — untuk APK dan development build (scheme di `app.json`).
-- `exp://**` — hanya bila menguji lewat Expo Go.
+**Authentication → Sign In / Providers**:
 
-**Authentication → Providers → Email** — putuskan konfirmasi email, dan ketahuilah konsekuensinya:
+1. **Anonymous sign-ins = ON.** Tanpa ini setiap instalasi gagal membuat identitas dan aplikasi
+   berhenti di layar "Butuh internet untuk memulai" dengan pesan `anonymous_sign_in_disabled`.
+2. **Email = OFF** (dan provider lain yang tidak dipakai). Tidak ada layar masuk/daftar di aplikasi,
+   jadi provider email hanya menambah permukaan yang tidak terpakai. Bila dimatikan, autoconfirm
+   menjadi tidak relevan.
 
-- **Confirm email menyala** (disarankan untuk beta): peserta harus mengklik tautan di email dulu.
-  Dengan SMTP bawaan Supabase, kuota email sangat kecil dan sering tertunda berjam-jam — **pasang
-  SMTP kustom** supaya email konfirmasi/reset benar-benar sampai. Caranya: **Authentication →
-  Email → SMTP settings**, isi kredensial penyedia email (SendGrid, Mailgun, Mailjet, dsb.).
-- **Confirm email mati (autoconfirm)**: sesi langsung tersedia tanpa verifikasi. Praktis untuk
-  uji cepat, tetapi berarti siapa pun bisa mendaftar dengan email palsu. Bila memilih ini,
-  **catat keputusannya** — jangan sampai tidak disadari.
+`supabase/config.toml` sudah memuat pengaturan yang sama untuk `supabase start` lokal
+(`enable_anonymous_sign_ins = true`, `enable_signup = false`); project yang sudah berjalan tetap harus
+diubah lewat dashboard. Simpan tangkapan layar pengaturan sebagai bukti, tanpa kredensial.
 
-`npm run beta:preflight` memeriksa autoconfirm di endpoint publik `/auth/v1/settings` dan
-**menandainya GAGAL** bila aktif. Kegagalan itu adalah pengingat untuk mengambil keputusan sadar,
-bukan perintah mematikan buta — lihat bagian 5.
+`npm run beta:preflight` masih memeriksa autoconfirm di `/auth/v1/settings`. Dengan provider Email
+mati, kegagalan pemeriksaan itu **diharapkan** dan bukan alasan mengubah skrip; catat nilainya di
+laporan beta — lihat bagian 5.
 
 ## 5. Jalankan preflight
 
@@ -234,8 +234,10 @@ pembanding. Rencana produksi lengkap ada di [`PRODUCTION_MIGRATION_PLAN.md`](PRO
 - Jangan pernah memindahkan perubahan database beta ke development atau produksi dengan
   menyalin SQL manual; semuanya lewat migration di repo.
 
-**Email/auth bermasalah:** kembalikan ke pengaturan sebelumnya lewat dashboard (Confirm email,
-SMTP) — perubahan itu live, tidak butuh build baru.
+**Identitas perangkat bermasalah:** periksa **Authentication → Sign In / Providers → Anonymous
+sign-ins**. Bila `anonymous_provider_disabled` muncul di aplikasi, sign-in anonim dimatikan di
+project itu. Perubahan dashboard ini live, tidak butuh build baru; build lama langsung memakai
+identitas anonim lagi setelah dinyalakan.
 
 ## 10. Checklist ringkas
 
@@ -243,9 +245,10 @@ SMTP) — perubahan itu live, tidak butuh build baru.
       manager; `.env.local`/`.env.db` diarahkan ke beta.
 - [ ] `npx supabase db push --yes` diterapkan ke database bersih; `migration list` tanpa selisih.
 - [ ] `delete-account` di-deploy; `WEB_ALLOWED_ORIGINS` diisi bila halaman web dipakai.
-- [ ] Redirect URLs memuat `rodakawan://auth/callback`.
-- [ ] Keputusan Confirm email diambil sadar; SMTP kustom dipasang bila konfirmasi menyala.
-- [ ] `npm run beta:preflight` keluar 0 (atau keputusan autoconfirm tercatat).
+- [ ] Anonymous sign-ins aktif; provider Email dimatikan (ADR-083).
+- [ ] `npm run beta:preflight` keluar 0. Pemeriksaan autoconfirm menjadi tidak relevan bila provider
+      Email mati; catat nilainya, jangan mengubah skrip agar tampak lulus.
+- [ ] Uji identitas di dua perangkat: onboarding, restart, mode pesawat pada instalasi baru.
 - [ ] GitHub Environment `beta` memakai `BETA_*` variables/secrets khusus; variables repo development tidak diubah.
 - [ ] Workflow beta selesai sukses termasuk smoke test emulator; APK Actions artifact diverifikasi SHA-256 dan sertifikatnya.
 - [ ] Backup keystore diverifikasi `keytool -list`.

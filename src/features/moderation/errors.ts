@@ -23,7 +23,7 @@ function tagOf(error: unknown): string {
 export const MODERATION_ERROR_TAGS: Record<string, AppError> = {
   report_unauthenticated: {
     code: 'not_authorized',
-    message: 'Masuk dulu untuk melaporkan konten.',
+    message: 'Identitas perangkat ini tidak aktif. Buka ulang aplikasi untuk melaporkan konten.',
     retryable: false,
   },
   report_invalid_target_type: {
@@ -48,7 +48,8 @@ export const MODERATION_ERROR_TAGS: Record<string, AppError> = {
   },
   moderation_unauthenticated: {
     code: 'not_authorized',
-    message: 'Masuk dulu untuk meninjau laporan penyalahgunaan.',
+    message:
+      'Identitas perangkat ini tidak aktif. Buka ulang aplikasi untuk meninjau laporan penyalahgunaan.',
     retryable: false,
   },
   moderation_invalid_action: {

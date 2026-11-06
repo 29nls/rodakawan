@@ -711,19 +711,17 @@ npm run assets:generate
 ```text
 src/
   app/          # rute Expo Router
-    (auth)/     # masuk, daftar, lupa password (hanya untuk pengunjung)
     (tabs)/     # area privat: Ringkasan, Perjalanan, Komunitas, Peringatan, Profil
-    auth/       # callback tautan email (konfirmasi / pemulihan)
     profile/    # ubah profil
-    index.tsx   # gerbang sesi (loading → area privat atau alur masuk)
-    account-delete.tsx  # hapus akun (anonimisasi) dengan konfirmasi ketik username
+    index.tsx   # gerbang identitas (loading / butuh internet / identitas hilang → onboarding atau area privat)
+    onboarding.tsx      # satu layar: username unik + nama tampilan
+    account-delete.tsx  # hapus data saya dengan konfirmasi ketik username
     privacy.tsx         # kebijakan privasi & retensi data
     system.tsx  # pratinjau fondasi & sistem (privat)
-    reset-password.tsx
   components/   # ui/ (primitif), feedback/ (error boundary), foundation/ (pratinjau token)
   constants/    # theme.ts, roadmap.ts, strings.ts
   features/
-    auth/       # api.ts, session.tsx, errors.ts, validation.ts, redirect.ts, linkParams.ts, components/
+    auth/       # api.ts (signInAnonymously), session.tsx (identitas perangkat), errors.ts, components/
     profile/    # api.ts, useProfile.ts, validation.ts, components/
     garage/     # api.ts + validation.ts (CRUD kendaraan, kendaraan utama)
     clubs/      # api.ts + validation.ts (RPC keanggotaan, jelajah klub)
@@ -760,7 +758,13 @@ supabase/
   workflows/    # ci.yml
 ```
 
-## Cara kerja autentikasi dan profil (Milestone 1)
+## Cara kerja identitas perangkat dan profil (tanpa akun)
+
+RodaKawan **tidak punya akun**: tidak ada layar masuk, daftar, lupa kata sandi, atau konfirmasi
+email. Setiap perangkat membuat satu identitas anonim lewat `signInAnonymously()` (ADR-083), lalu
+memilih username unik dan nama tampilan di onboarding. Data tetap dilindungi RLS atas `auth.uid()`;
+peran `anon` tidak mendapat akses apa pun, sehingga APK dan kunci publik yang tersebar tidak membuka
+data grup.
 
 - **Client:** satu instance Supabase di [`src/lib/supabase/client.ts`](src/lib/supabase/client.ts),
   dibuat lazy. Session disimpan lewat `expo-sqlite/localStorage/install` dengan `persistSession`,
@@ -773,12 +777,17 @@ supabase/
 - **PKCE di Hermes:** `expo-crypto` dipasang dan [`src/lib/crypto/webcrypto.ts`](src/lib/crypto/webcrypto.ts)
   menyediakan `crypto.getRandomValues`/`TextEncoder`/`btoa` yang belum ada di Hermes; tanpa itu alur
   PKCE turun ke metode `plain` dan memakai `Math.random` untuk verifier.
+- **Identitas perangkat:** [`src/features/auth/session.tsx`](src/features/auth/session.tsx) memulihkan
+  session tersimpan; bila kosong, ia memanggil `signInAnonymously()`. Empat status yang ditangani
+  eksplisit: `loading`, `ready`, `offline` (identitas pertama butuh internet — layar “Butuh internet
+  untuk memulai” + tombol coba lagi), dan `identity_lost` (session tersimpan gagal dipulihkan;
+  pengguna diberi tahu keanggotaan lama tidak terjangkau lalu memilih membuat identitas baru).
 - **Proteksi rute:** [`src/app/_layout.tsx`](src/app/_layout.tsx) memakai `Stack.Protected` — rute
-  privat hanya terdaftar bila sesi sudah diperiksa dan valid, dan grup `(auth)` hanya bila belum ada
-  sesi. [`src/app/index.tsx`](src/app/index.tsx) adalah gerbang awal: menampilkan loading selama sesi
-  diperiksa, lalu `<Redirect>` ke `/ringkasan` atau `/sign-in`. Tidak ada redirect berbasis
-  `useEffect`, jadi tidak ada redirect loop. Ini hanya lapisan navigasi klien — otorisasi data tetap
-  milik RLS di database.
+  privat hanya terdaftar bila identitas sudah siap. [`src/app/index.tsx`](src/app/index.tsx) adalah
+  gerbang awal: menampilkan loading, layar offline, atau layar identitas hilang, lalu `<Redirect>` ke
+  `/onboarding` (profil belum lengkap) atau `/ringkasan`. Tidak ada redirect berbasis `useEffect`,
+  jadi tidak ada redirect loop. Ini hanya lapisan navigasi klien — otorisasi data tetap milik RLS di
+  database.
 - **Profil:** `public.profiles` dibuat otomatis oleh trigger `on_auth_user_created` yang memanggil
   fungsi `bootstrap_profile()` (migration bootstrap profil), memakai `NEW.id` dari `auth.users` — bukan identitas
   yang dikirim klien. Username dinormalkan (huruf kecil, `_`), divalidasi, dan keunikannya dijaga
@@ -787,17 +796,25 @@ supabase/
 - **Foto profil:** bucket privat `avatars` (`<user_id>/<berkas>`, 2 MB, owner-only) dengan alur
   unggah/ganti/hapus yang sama dengan foto kendaraan; `profiles.avatar_url` menyimpan **path**, bukan
   URL, dan dijaga CHECK `profiles_avatar_path_owner`. Diatur dari tab Profil.
-- **Belum ada:** ubah email/password dari dalam aplikasi.
+- **Tidak bisa dipulihkan:** identitas anonim tidak punya email atau kata sandi. Menghapus data
+  aplikasi, memasang ulang, atau mengganti HP berarti identitas baru dan keanggotaan klub lama harus
+  diundang ulang. Tab Profil menjelaskan ini sebelum tombol “Mulai identitas baru”.
 
-### Uji manual autentikasi (butuh backend + perangkat)
+### Uji manual identitas perangkat (butuh backend + perangkat)
 
-Setelah `.env.local` terisi, jalankan alur ini di perangkat:
+Setelah `.env.local` terisi dan **Anonymous sign-ins** diaktifkan di project dev, jalankan alur ini di
+perangkat:
 
-1. Daftar akun baru → ikuti alur konfirmasi email → masuk.
-2. Masuk, buka tab **Profil**, ubah nama tampilan/username/kota/bio, simpan, lalu muat ulang aplikasi.
-3. Daftarkan username yang sudah dipakai; harus muncul pesan yang jelas, bukan crash.
-4. Keluar; pastikan tab privat tidak bisa dibuka kembali lewat tautan langsung.
-5. Kirim permintaan reset password dari layar **Lupa password** dan selesaikan tautannya.
+1. Pasang aplikasi, buka dengan internet → onboarding muncul (bukan layar masuk) → pilih username +
+   nama tampilan → masuk ke Ringkasan.
+2. Tutup dan buka ulang aplikasi → identitas yang sama dipakai (tidak ada onboarding kedua).
+3. Mode pesawat pada instalasi baru → layar “Butuh internet untuk memulai”; sambungkan internet lalu
+   tekan **Coba lagi** → onboarding muncul.
+4. Pilih username yang sudah dipakai perangkat lain; harus muncul pesan jelas, bukan crash.
+5. Tab **Profil** → “Mulai identitas baru” → konfirmasi → identitas baru dibuat dan onboarding muncul
+   lagi; keanggotaan klub lama tidak terbawa.
+6. Pastikan tidak ada lagi rute `/sign-in`, `/sign-up`, `/forgot-password`, atau `/reset-password`
+   yang bisa dibuka lewat tautan langsung.
 
 ## Aturan branch dan commit
 

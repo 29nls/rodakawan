@@ -13,7 +13,13 @@ type SignOutResult = ApiResult<SignOutOutcome>;
 const storedSession = {
   access_token: 'token',
   refresh_token: 'refresh',
-  user: { id: 'user-1', email: 'rider@contoh.com', user_metadata: { username: 'budi_solo' } },
+  user: { id: 'user-1', is_anonymous: true, user_metadata: {} },
+} as unknown as Session;
+
+const freshSession = {
+  access_token: 'token-2',
+  refresh_token: 'refresh-2',
+  user: { id: 'user-2', is_anonymous: true, user_metadata: {} },
 } as unknown as Session;
 
 function wrapperFor(clientState: SupabaseClientState) {
@@ -23,41 +29,11 @@ function wrapperFor(clientState: SupabaseClientState) {
 }
 
 describe('AuthSessionProvider', () => {
-  it('tetap di status loading sampai pemeriksaan sesi selesai, lalu memulihkan sesi', async () => {
-    type GetSessionResult = { data: { session: Session | null }; error: null };
-    let finishGetSession: (value: GetSessionResult) => void = () => undefined;
-    const pendingGetSession = new Promise<GetSessionResult>((resolve) => {
-      finishGetSession = resolve;
+  it('memulihkan sesi tersimpan tanpa membuat identitas baru', async () => {
+    const auth = createAuthSpies({
+      getSession: jest.fn(async () => ({ data: { session: storedSession }, error: null })),
     });
-
-    const { client } = createAuthClient({
-      getSession: jest.fn(() => pendingGetSession),
-      onAuthStateChange: jest.fn(() => ({
-        data: { subscription: { unsubscribe: jest.fn() } },
-      })),
-    });
-
-    const { result } = await renderHook(() => useAuthSession(), {
-      wrapper: wrapperFor({ available: true, client }),
-    });
-
-    // Selama pemeriksaan belum selesai, aplikasi harus menampilkan loading,
-    // bukan menganggap pengguna belum masuk.
-    expect(result.current.status).toBe('loading');
-    expect(result.current.session).toBeNull();
-
-    await act(async () => {
-      finishGetSession({ data: { session: storedSession }, error: null });
-    });
-
-    expect(result.current.status).toBe('ready');
-    expect(result.current.userId).toBe('user-1');
-    expect(result.current.email).toBe('rider@contoh.com');
-    expect(result.current.requestedUsername).toBe('budi_solo');
-  });
-
-  it('menganggap pengguna belum masuk ketika tidak ada sesi tersimpan', async () => {
-    const { client } = createAuthClient();
+    const { client } = createAuthClient(auth);
 
     const { result } = await renderHook(() => useAuthSession(), {
       wrapper: wrapperFor({ available: true, client }),
@@ -65,31 +41,156 @@ describe('AuthSessionProvider', () => {
 
     await waitFor(() => expect(result.current.status).toBe('ready'));
 
-    expect(result.current.session).toBeNull();
+    expect(result.current.userId).toBe('user-1');
+    expect(result.current.isAnonymous).toBe(true);
+    expect(auth.signInAnonymously).not.toHaveBeenCalled();
+  });
+
+  it('membuat identitas anonim saat perangkat belum punya sesi', async () => {
+    const auth = createAuthSpies({
+      signInAnonymously: jest.fn(async () => ({
+        data: { session: freshSession, user: freshSession.user },
+        error: null,
+      })),
+      // Setelah signInAnonymously, `getSession` mengembalikan sesi baru.
+      getSession: jest
+        .fn()
+        .mockResolvedValueOnce({ data: { session: null }, error: null })
+        .mockResolvedValue({ data: { session: freshSession }, error: null }),
+    });
+
+    const { client } = createAuthClient(auth);
+
+    const { result } = await renderHook(() => useAuthSession(), {
+      wrapper: wrapperFor({ available: true, client }),
+    });
+
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+
+    expect(auth.signInAnonymously).toHaveBeenCalledTimes(1);
+    expect(result.current.userId).toBe('user-2');
+  });
+
+  it('menampilkan status offline saat identitas pertama gagal karena jaringan', async () => {
+    const auth = createAuthSpies({
+      signInAnonymously: jest.fn(async () => ({
+        data: { session: null, user: null },
+        error: { name: 'AuthRetryableFetchError', message: 'Network request failed', status: 0 },
+      })),
+    });
+    const { client } = createAuthClient(auth);
+
+    const { result } = await renderHook(() => useAuthSession(), {
+      wrapper: wrapperFor({ available: true, client }),
+    });
+
+    await waitFor(() => expect(result.current.status).toBe('offline'));
+
+    expect(result.current.startupError?.code).toBe('network');
+    expect(result.current.startupError?.retryable).toBe(true);
+  });
+
+  it('mencoba lagi membuat identitas setelah offline', async () => {
+    const auth = createAuthSpies({
+      signInAnonymously: jest
+        .fn()
+        .mockResolvedValueOnce({
+          data: { session: null, user: null },
+          error: { name: 'AuthRetryableFetchError', message: 'Network request failed', status: 0 },
+        })
+        .mockResolvedValue({
+          data: { session: freshSession, user: freshSession.user },
+          error: null,
+        }),
+      getSession: jest
+        .fn()
+        .mockResolvedValueOnce({ data: { session: null }, error: null })
+        .mockResolvedValue({ data: { session: freshSession }, error: null }),
+    });
+
+    const { client } = createAuthClient(auth);
+
+    const { result } = await renderHook(() => useAuthSession(), {
+      wrapper: wrapperFor({ available: true, client }),
+    });
+
+    await waitFor(() => expect(result.current.status).toBe('offline'));
+
+    await act(async () => {
+      await result.current.retryIdentity();
+    });
+
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    expect(auth.signInAnonymously).toHaveBeenCalledTimes(2);
+  });
+
+  it('menandai identitas hilang ketika sesi tersimpan gagal dipulihkan', async () => {
+    const auth = createAuthSpies({
+      getSession: jest.fn(async () => ({
+        data: { session: null },
+        error: { code: 'refresh_token_not_found', message: 'Invalid Refresh Token', status: 400 },
+      })),
+    });
+    const { client } = createAuthClient(auth);
+
+    const { result } = await renderHook(() => useAuthSession(), {
+      wrapper: wrapperFor({ available: true, client }),
+    });
+
+    await waitFor(() => expect(result.current.status).toBe('identity_lost'));
     expect(result.current.userId).toBeNull();
+  });
+
+  it('membuat identitas baru hanya setelah startFreshIdentity dipanggil', async () => {
+    const auth = createAuthSpies({
+      getSession: jest
+        .fn()
+        .mockResolvedValueOnce({
+          data: { session: null },
+          error: { code: 'refresh_token_not_found', message: 'Invalid Refresh Token', status: 400 },
+        })
+        .mockResolvedValue({ data: { session: freshSession }, error: null }),
+      signInAnonymously: jest.fn(async () => ({
+        data: { session: freshSession, user: freshSession.user },
+        error: null,
+      })),
+    });
+    const { client } = createAuthClient(auth);
+
+    const { result } = await renderHook(() => useAuthSession(), {
+      wrapper: wrapperFor({ available: true, client }),
+    });
+
+    await waitFor(() => expect(result.current.status).toBe('identity_lost'));
+    expect(auth.signInAnonymously).not.toHaveBeenCalled();
+
+    await act(async () => {
+      await result.current.startFreshIdentity();
+    });
+
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    expect(auth.signOut).toHaveBeenCalledTimes(1);
+    expect(result.current.userId).toBe('user-2');
   });
 
   it('mengikuti perubahan sesi dari SDK (masuk lalu keluar)', async () => {
     let notify: AuthStateCallback | undefined;
     const unsubscribe = jest.fn();
 
-    const { client } = createAuthClient({
+    const auth = createAuthSpies({
+      getSession: jest.fn(async () => ({ data: { session: storedSession }, error: null })),
       onAuthStateChange: jest.fn((callback: AuthStateCallback) => {
         notify = callback;
         return { data: { subscription: { unsubscribe } } };
       }),
     });
+    const { client } = createAuthClient(auth);
 
     const { result, unmount } = await renderHook(() => useAuthSession(), {
       wrapper: wrapperFor({ available: true, client }),
     });
 
     await waitFor(() => expect(result.current.status).toBe('ready'));
-
-    await act(async () => {
-      notify?.('SIGNED_IN', storedSession);
-    });
-    expect(result.current.userId).toBe('user-1');
 
     await act(async () => {
       notify?.('SIGNED_OUT', null);
@@ -101,7 +202,7 @@ describe('AuthSessionProvider', () => {
     expect(unsubscribe).toHaveBeenCalled();
   });
 
-  it('memanggil SDK saat keluar dan membersihkan sesi', async () => {
+  it('memanggil SDK saat membuang identitas dan membersihkan sesi', async () => {
     const auth = createAuthSpies({
       getSession: jest.fn(async () => ({ data: { session: storedSession }, error: null })),
     });

@@ -16,15 +16,18 @@ dan masukan Anda sangat berharga. Ikuti panduan singkat di bawah.
    Android bisa menolak pembaruan. Jangan mencopot aplikasi lama tanpa bertanya ke penyelenggara
    dulu — data di dalamnya bisa hilang.
 
-## 2. Daftar dan masuk
+## 2. Mulai memakai aplikasi (tanpa akun)
 
-1. Buka aplikasi → **Daftar** dengan email yang benar-benar aktif.
-2. Bila diminta, cek email (folder spam juga) dan klik tautan konfirmasinya, lalu kembali ke
-   aplikasi.
-3. **Masuk** dengan email dan kata sandi. Lupa kata sandi? Gunakan menu **Lupa password** — kode
-   reset dikirim ke email yang sama.
-4. Setelah masuk, lengkapi profil: username (unik, tidak bisa ganti sembarangan), nama tampilan,
-   kota, dan bio singkat.
+RodaKawan **tidak punya akun, email, atau kata sandi**. Setiap HP membuat satu identitas sendiri.
+
+1. Buka aplikasi dengan internet menyala. Bila belum pernah ada identitas, aplikasi menulis
+   **"Butuh internet untuk memulai"** — sambungkan internet lalu tekan **Coba lagi**.
+2. Isi **username** (unik, huruf kecil/angka/garis bawah) dan **nama tampilan**, lalu simpan.
+   Username yang sudah dipakai orang lain akan ditolak dengan pesan jelas; pilih yang lain.
+3. Setelah itu aplikasi bisa dibuka tanpa internet. Identitas tersimpan di HP ini saja.
+4. **Penting:** menghapus aplikasi/data aplikasi, mengganti HP, atau memilih **Mulai identitas baru**
+   di tab Profil berarti identitas lama tidak bisa dipulihkan. Keanggotaan klub dan riwayat
+   perjalanan tidak terbawa, dan Anda perlu diundang ulang oleh admin klub.
 
 ## 3. Garasi dan klub
 
@@ -78,21 +81,23 @@ masukan penyelenggara beta** (grup obrolan atau email yang diberikan bersama tau
 5. **Tangkapan layar** bila memungkinkan.
 
 Masalah yang paling membantu: aplikasi berhenti sendiri (crash), data tidak muncul padahal harusnya
-ada, chat/posisi realtime tidak sampai antar dua HP, dan email konfirmasi/reset tidak pernah datang.
+ada, chat/posisi realtime tidak sampai antar dua HP, dan aplikasi berhenti di layar "Butuh internet
+untuk memulai" padahal internet menyala.
 
 ## 7. Privasi dalam bahasa singkat
 
 - Lokasi Anda hanya dibagikan saat Anda **sendiri** menyalakannya di sebuah perjalanan aktif.
 - Nomor polisi dan detail kendaraan bersifat privat.
 - Foto kendaraan/logo klub/foto profil hanya terlihat pihak yang berhak.
-- Ingin menghapus akun beserta data pribadinya? Buka tab **Profil → Hapus akun** — penghapusan
+- Ingin menghapus data Anda? Buka tab **Profil → Hapus data saya** — penghapusan
   penuh dijalankan server, sementara laporan bahaya yang berguna untuk keselamatan dipertahankan
   tanpa identitas Anda. Kebijakan lengkapnya ada di menu **Kebijakan privasi** dalam aplikasi.
 
 ## Pertanyaan umum
 
-**Email konfirmasi/reset tidak sampai.** Tunggu beberapa menit, cek spam, lalu minta ulang. Bila
-tetap tidak datang, laporkan — bisa jadi kuota email server yang sedang habis.
+**Saya mengganti HP / memasang ulang aplikasi. Data saya hilang?** Identitas terikat pada perangkat,
+bukan pada email. Setelah pemasangan ulang Anda mendapat identitas baru; minta admin klub mengundang
+ulang. Data lama tidak bisa dipulihkan — itu konsekuensi dari mode tanpa akun.
 
 **Aplikasi meminta izin banyak.** Izin lokasi untuk berbagi posisi konvoi (opsional), izin galeri
 untuk foto kendaraan/logo/profil, izin notifikasi untuk layanan latar belakang Android. Semuanya

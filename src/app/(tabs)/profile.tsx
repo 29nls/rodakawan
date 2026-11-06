@@ -40,7 +40,7 @@ import { useAppStatus } from '@/hooks/useAppStatus';
 export default function ProfileScreen() {
   const router = useRouter();
   const { appInfo, backend: envBackend } = useAppStatus();
-  const { backend, email, requestedUsername, signOut, userId } = useAuthSession();
+  const { backend, signOut, userId } = useAuthSession();
   const { state, reload } = useProfile();
 
   const [signingOut, setSigningOut] = useState(false);
@@ -133,25 +133,40 @@ export default function ProfileScreen() {
     ]);
   }
 
-  async function handleSignOut() {
+  function handleSignOut() {
     if (signingOut) return;
 
-    setSigningOut(true);
-    setSignOutError(null);
-    setSignOutNotice(null);
+    Alert.alert(
+      'Mulai identitas baru?',
+      'Identitas sekarang akan dibuang dan tidak bisa dipulihkan. Anda keluar dari klub dan perjalanan yang terikat padanya, lalu harus diundang ulang. Lanjutkan?',
+      [
+        { text: 'Batal', style: 'cancel' },
+        {
+          text: 'Mulai identitas baru',
+          style: 'destructive',
+          onPress: () => {
+            void (async () => {
+              setSigningOut(true);
+              setSignOutError(null);
+              setSignOutNotice(null);
 
-    const result = await signOut();
-    setSigningOut(false);
+              const result = await signOut();
+              setSigningOut(false);
 
-    if (!result.ok) {
-      setSignOutError(result.error);
-      return;
-    }
-    if (!result.data.revokedRemotely) {
-      setSignOutNotice(
-        'Perangkat ini sudah keluar. Karena server tidak dapat dihubungi, sesi akan dicabut sepenuhnya saat perangkat kembali online.',
-      );
-    }
+              if (!result.ok) {
+                setSignOutError(result.error);
+                return;
+              }
+              if (!result.data.revokedRemotely) {
+                setSignOutNotice(
+                  'Identitas di perangkat ini sudah dibuang. Karena server tidak dapat dihubungi, sesi lama akan dicabut sepenuhnya saat perangkat kembali online.',
+                );
+              }
+            })();
+          },
+        },
+      ],
+    );
   }
 
   return (
@@ -160,17 +175,17 @@ export default function ProfileScreen() {
         <AppText variant="overline" tone="accent">
           Profil
         </AppText>
-        <AppText variant="titleLg">Akun &amp; pengaturan</AppText>
+        <AppText variant="titleLg">Profil &amp; pengaturan</AppText>
       </View>
 
       {backend.available ? null : <BackendUnavailableBanner reason={backend.reason} />}
 
       {signOutError ? (
-        <Banner message={signOutError.message} title="Gagal keluar" tone="danger" />
+        <Banner message={signOutError.message} title="Gagal membuang identitas" tone="danger" />
       ) : null}
 
       {signOutNotice ? (
-        <Banner message={signOutNotice} title="Keluar tanpa koneksi" tone="warning" />
+        <Banner message={signOutNotice} title="Tanpa koneksi" tone="warning" />
       ) : null}
 
       {avatarError ? (
@@ -182,9 +197,9 @@ export default function ProfileScreen() {
       {profile ? (
         <PhotoCard
           busy={avatarBusy}
-          emptyText="Belum ada foto profil. Pilih foto dari galeri untuk akun ini."
+          emptyText="Belum ada foto profil. Pilih foto dari galeri."
           hasPhoto={Boolean(avatarPath)}
-          hint="Foto disimpan di bucket privat dan hanya akun Anda yang dapat membuka atau menghapusnya. Foto tidak pernah menjadi URL publik; pengguna lain tidak dapat melihatnya."
+          hint="Foto disimpan di bucket privat dan hanya bisa dibuka atau dihapus dari identitas ini. Foto tidak pernah menjadi URL publik; pengguna lain tidak dapat melihatnya."
           onPick={() => {
             void handlePickAvatar();
           }}
@@ -218,8 +233,8 @@ export default function ProfileScreen() {
         {state.status === 'ready' && profile === null ? (
           <>
             <AppText tone="secondary" variant="callout">
-              Akun Anda belum memiliki profil. Lengkapi username dan nama tampilan supaya rider lain
-              dapat mengenali Anda dalam perjalanan.
+              Profil belum lengkap. Pilih username dan nama tampilan supaya rider lain mengenali
+              Anda dalam perjalanan.
             </AppText>
             <Badge icon="construct-outline" label="Profil belum ada" />
             <Button
@@ -235,9 +250,7 @@ export default function ProfileScreen() {
             {showGeneratedNotice ? (
               <Banner
                 action="Buka “Edit profil” untuk memilih username baru."
-                message={`Username "${profile.username}" dibuat otomatis karena ${
-                  requestedUsername ? `"${requestedUsername}"` : 'pilihan Anda sebelumnya'
-                } sudah dipakai akun lain atau tidak valid.`}
+                message={`Username "${profile.username}" dibuat otomatis karena username pilihan Anda sudah dipakai atau tidak valid.`}
                 title="Username masih sementara"
                 tone="warning"
               />
@@ -276,25 +289,32 @@ export default function ProfileScreen() {
 
       <Card>
         <SectionHeader
-          subtitle="Sesi disimpan di perangkat, bukan di server RodaKawan."
-          title="Sesi & akun"
+          subtitle="Identitas ini terikat pada perangkat, bukan pada email atau nomor telepon."
+          title="Identitas perangkat"
         />
         <Divider />
-        <InfoRow label="Email" value={email ?? 'Tidak tersedia'} />
         <AppText tone="secondary" variant="callout">
-          Keluar akan menghapus sesi di perangkat ini dan meminta server mencabut token.
+          RodaKawan tidak memakai akun. Identitas dibuat sekali saat aplikasi pertama dibuka dan
+          disimpan di perangkat ini. Tidak ada email, kata sandi, atau cara masuk dari perangkat
+          lain.
+        </AppText>
+        <AppText tone="secondary" variant="callout">
+          Menghapus data aplikasi, mencopot-pasang aplikasi, atau berganti HP berarti identitas ini
+          hilang. Anda akan keluar dari klub dan perjalanan yang sedang berjalan, dan harus diundang
+          ulang oleh admin klub.
         </AppText>
         <Button
           disabled={signingOut}
-          icon="log-out-outline"
-          label={signingOut ? 'Memproses…' : 'Keluar dari akun'}
-          onPress={handleSignOut}
-          variant="secondary"
           fullWidth
+          icon="log-out-outline"
+          label={signingOut ? 'Memproses…' : 'Mulai identitas baru di perangkat ini'}
+          onPress={handleSignOut}
           testID="profile-sign-out"
+          variant="secondary"
         />
         <AppText tone="muted" variant="caption">
-          Penghapusan akun dan pengaturan privasi lanjutan dibangun pada Milestone 5.
+          Tindakan di atas membuang identitas sekarang. Keanggotaan dan riwayat yang terikat padanya
+          tidak dapat dipulihkan; minta undangan baru kepada admin klub.
         </AppText>
       </Card>
 
@@ -353,10 +373,10 @@ export default function ProfileScreen() {
           label="Kebijakan privasi"
         />
         <LinkRow
-          detail="Anonimkan akun dan hapus data pribadi. Tindakan ini tidak bisa dibatalkan."
+          detail="Hapus data pribadi yang tersimpan di server. Tindakan ini tidak bisa dibatalkan."
           href="/account-delete"
           icon="trash-outline"
-          label="Hapus akun"
+          label="Hapus data saya"
         />
       </Card>
 

@@ -290,19 +290,21 @@ belum diaktifkan. Jangan menggantinya dengan `configure-pages` + `enablement: tr
 tidak berwenang membuat Pages site. Jangan menulis URL `github.io` sebagai bukti sampai halaman
 benar-benar terbuka dan diuji; nama/visibilitas repository menentukan URL dan dukungan Pages.
 
-### 4.4 Atur URL konfirmasi email
+### 4.4 Aktifkan identitas anonim (wajib)
 
-Tanpa langkah ini, email konfirmasi/reset akan membuka halaman web dan aplikasi tidak pernah menerima kodenya.
+RodaKawan tidak punya akun (ADR-083): aplikasi membuat satu identitas anonim per perangkat lewat
+`signInAnonymously()`. Tanpa langkah ini aplikasi berhenti di layar "Butuh internet untuk memulai"
+dengan pesan `anonymous_sign_in_disabled`.
 
-1. **Authentication → URL Configuration**.
-2. **Redirect URLs** — tambahkan:
-   - `rodakawan://auth/callback` (development build & APK; `scheme` di `app.json`).
-   - `exp://**` atau URL `exp://<host>:<port>/--/auth/callback` yang ditampilkan Metro bila menguji lewat Expo Go.
-3. **Site URL** boleh tetap nilai default; aplikasi native tidak memakainya.
-4. **Authentication → Providers → Email**: putuskan apakah **Confirm email** menyala.
-   - Menyala: setelah daftar, aplikasi menampilkan instruksi "cek email" dan pengguna harus mengklik tautan.
-   - Mati: sesi langsung tersedia dan aplikasi membawa pengguna masuk tanpa menunggu konfirmasi.
-   Kedua pengaturan didukung kode; yang penting konfigurasinya diketahui saat pengujian manual.
+1. **Authentication → Sign In / Providers → Anonymous sign-ins** → aktifkan.
+2. **Authentication → Sign In / Providers → Email** → nonaktifkan bila tidak dipakai lagi. Aplikasi
+   tidak punya layar masuk/daftar/lupa kata sandi, jadi provider email hanya menambah permukaan yang
+   tidak terpakai.
+3. **Authentication → URL Configuration** tidak lagi membutuhkan `rodakawan://auth/callback`; deep
+   link email sudah dihapus bersama ADR-022. Bila baris lama masih ada, boleh dibiarkan atau dihapus.
+4. Konfigurasi yang sama sudah tercatat di [`supabase/config.toml`](../supabase/config.toml)
+   (`[auth] enable_anonymous_sign_ins = true`, `[auth.email] enable_signup = false`) untuk
+   `supabase start` lokal; project yang sudah berjalan tetap harus diubah lewat dashboard.
 
 ### 4.5 Isi environment lokal
 
@@ -493,14 +495,15 @@ adalah versi yang dipin dan hanya membaca katalog skema — tidak ada data yang 
 `db:types:check` gagal, jalankan `npm run db:types`, tinjau diff-nya, lalu commit hasilnya; berkas
 generated tidak boleh disunting manual.
 
-### 4.8 Uji manual alur autentikasi
+### 4.8 Uji manual identitas perangkat
 
 1. `npx expo start` lalu buka aplikasi di perangkat.
-2. Daftar akun baru → ikuti alur konfirmasi sesuai pengaturan 4.4 → masuk.
-3. Tab **Profil** → ubah nama tampilan/username/kota/bio → simpan → muat ulang aplikasi untuk memastikan perubahan tersimpan.
-4. Daftarkan username yang sudah dipakai; aplikasi harus menampilkan pesan yang jelas, bukan crash.
-5. Logout → pastikan layar privat tidak bisa dibuka kembali.
-6. **Lupa password** → selesaikan tautan reset dari email.
+2. Onboarding muncul (bukan layar masuk) → pilih username + nama tampilan → masuk ke Ringkasan.
+3. Tutup dan buka ulang aplikasi → identitas yang sama dipakai, onboarding tidak muncul lagi.
+4. Tab **Profil** → ubah nama tampilan/username/kota/bio → simpan → muat ulang aplikasi untuk memastikan perubahan tersimpan.
+5. Pilih username yang sudah dipakai perangkat lain; aplikasi harus menampilkan pesan yang jelas, bukan crash.
+6. Mode pesawat pada instalasi baru → layar "Butuh internet untuk memulai" → sambungkan internet → **Coba lagi**.
+7. Tab **Profil** → **Mulai identitas baru** → konfirmasi → onboarding muncul lagi dan keanggotaan lama tidak terbawa.
 
 ### 4.9 Uji Milestone 3 (perjalanan dan lokasi)
 

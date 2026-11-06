@@ -23,7 +23,7 @@ import { formatErrorMessage } from '@/features/state-helper';
  * pengguna lain lewat RLS (`profiles_update_self`).
  */
 export default function ProfileEditScreen() {
-  const { backend, userId, requestedUsername } = useAuthSession();
+  const { backend, userId } = useAuthSession();
   const { state, reload } = useProfile();
 
   // Status layar dibaca dari state profil itu sendiri: `useProfile` sudah
@@ -41,7 +41,7 @@ export default function ProfileEditScreen() {
   const isCreating = state.status === 'ready' && state.profile === null;
 
   const initialValues: ProfileFormValues = {
-    username: profile?.username ?? requestedUsername ?? '',
+    username: profile?.username ?? '',
     displayName: profile?.display_name ?? '',
     bio: profile?.bio ?? '',
     city: profile?.city ?? '',

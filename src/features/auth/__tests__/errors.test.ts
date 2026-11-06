@@ -8,53 +8,45 @@ describe('mapAuthError', () => {
     expect(mapAuthError(new TypeError('Failed to fetch')).code).toBe('network');
   });
 
-  it('memetakan kredensial salah', () => {
-    const error = mapAuthError({ code: 'invalid_credentials', status: 400 });
+  it('memetakan Anonymous sign-ins yang belum diaktifkan ke langkah pemilik project', () => {
+    const error = mapAuthError({ code: 'anonymous_provider_disabled', status: 422 });
 
-    expect(error.code).toBe('invalid_credentials');
+    expect(error.code).toBe('anonymous_sign_in_disabled');
     expect(error.retryable).toBe(false);
-    expect(error.message).toMatch(/Email atau kata sandi/);
+    expect(error.message).toMatch(/Anonymous sign-ins belum diaktifkan/);
+    expect(error.message).toMatch(/enable_anonymous_sign_ins = true/);
   });
 
-  it('memetakan email belum dikonfirmasi', () => {
-    expect(mapAuthError({ code: 'email_not_confirmed' }).code).toBe('email_not_confirmed');
-  });
-
-  it('memetakan email yang sudah terdaftar', () => {
-    expect(mapAuthError({ code: 'user_already_exists' }).code).toBe('email_taken');
-    expect(mapAuthError({ code: 'email_exists' }).code).toBe('email_taken');
-  });
-
-  it('memetakan kata sandi lemah beserta alasannya', () => {
-    const error = mapAuthError({ code: 'weak_password', reasons: ['length', 'pwned'] });
-
-    expect(error.code).toBe('password_weak');
-    expect(error.message).toContain('length, pwned');
-  });
-
-  it('memetakan kata sandi yang sama dengan sebelumnya', () => {
-    expect(mapAuthError({ code: 'same_password' }).code).toBe('same_password');
-  });
-
-  it('memetakan validasi email dari server', () => {
-    expect(mapAuthError({ code: 'validation_failed' }).code).toBe('email_invalid');
+  it('tidak lagi memetakan error khusus email dan kata sandi', () => {
+    // Kode ini tidak mungkin muncul di alur tanpa akun; memetakannya ke pesan
+    // email akan menyesatkan. Semua jatuh ke error umum yang bisa diulang.
+    for (const code of [
+      'invalid_credentials',
+      'email_not_confirmed',
+      'user_already_exists',
+      'email_exists',
+      'weak_password',
+      'same_password',
+      'validation_failed',
+      'otp_expired',
+      'flow_state_expired',
+    ]) {
+      expect(mapAuthError({ code }).code).toBe('unknown');
+    }
   });
 
   it('memetakan rate limit dari kode maupun status', () => {
-    expect(mapAuthError({ code: 'over_email_send_rate_limit' }).code).toBe('rate_limited');
     expect(mapAuthError({ code: 'over_request_rate_limit' }).code).toBe('rate_limited');
     expect(mapAuthError({ status: 429 }).code).toBe('rate_limited');
     expect(mapAuthError({ code: 'over_request_rate_limit' }).retryable).toBe(true);
   });
 
-  it('memetakan tautan kedaluwarsa', () => {
-    expect(mapAuthError({ code: 'otp_expired' }).code).toBe('link_expired');
-    expect(mapAuthError({ code: 'flow_state_expired' }).code).toBe('link_expired');
-    expect(mapAuthError({ code: 'otp_expired' }).message).toMatch(/kedaluwarsa|dipakai/);
-  });
+  it('memetakan sesi yang tidak dapat dipulihkan ke saran identitas baru', () => {
+    const error = mapAuthError({ code: 'refresh_token_not_found' });
 
-  it('memetakan sesi yang berakhir', () => {
-    expect(mapAuthError({ code: 'refresh_token_not_found' }).code).toBe('session_expired');
+    expect(error.code).toBe('session_expired');
+    expect(error.message).toMatch(/identitas baru/i);
+    expect(error.message).toMatch(/tidak akan terbawa/);
     expect(mapAuthError({ code: 'session_not_found' }).code).toBe('session_expired');
   });
 
@@ -89,7 +81,7 @@ describe('mapProfileError', () => {
     const error = mapProfileError({ code: 'PGRST116' });
 
     expect(error.code).toBe('profile_missing');
-    expect(error.message).toMatch(/bukan milik akun Anda/);
+    expect(error.message).toMatch(/bukan milik identitas perangkat ini/);
   });
 
   it('memetakan tabel yang belum ada (migration belum dijalankan)', () => {

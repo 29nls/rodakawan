@@ -66,7 +66,7 @@ export function useProfile(): UseProfileResult {
       ? {
           code: 'session_expired',
           message:
-            'Sesi tidak ditemukan di perangkat ini. Masuk kembali untuk melihat profil Anda.',
+            'Identitas perangkat ini tidak aktif. Buka ulang aplikasi untuk melihat profil Anda.',
           retryable: false,
         }
       : null;

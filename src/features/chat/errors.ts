@@ -20,7 +20,7 @@ function tagOf(error: unknown): string {
 export const CHAT_ERROR_TAGS: Record<string, AppError> = {
   chat_unauthenticated: {
     code: 'not_authorized',
-    message: 'Masuk dulu untuk membuka chat konvoi.',
+    message: 'Identitas perangkat ini tidak aktif. Buka ulang aplikasi untuk membuka chat konvoi.',
     retryable: false,
   },
   chat_invalid_content: {

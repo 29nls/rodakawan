@@ -3,13 +3,8 @@
 export type AppErrorCode =
   | 'backend_not_configured'
   | 'network'
-  | 'invalid_credentials'
-  | 'email_not_confirmed'
-  | 'email_invalid'
-  | 'email_taken'
-  | 'password_weak'
-  | 'same_password'
   | 'rate_limited'
+  | 'anonymous_sign_in_disabled'
   | 'username_taken'
   | 'profile_missing'
   | 'not_authorized'
@@ -18,7 +13,6 @@ export type AppErrorCode =
   | 'not_found'
   | 'table_missing'
   | 'session_expired'
-  | 'link_expired'
   | 'unknown'
   /** Hazard report specific codes. */
   | 'invalid_category'
@@ -106,89 +100,41 @@ export function isFetchFailure(like: ErrorLike): boolean {
   return /network request failed|failed to fetch|network error/i.test(message);
 }
 
-function passwordWeakError(like: ErrorLike): AppError {
-  const reasons = Array.isArray(like.reasons)
-    ? like.reasons
-    : Array.isArray(like.weak_password?.reasons)
-      ? like.weak_password?.reasons
-      : undefined;
-
-  const detail =
-    Array.isArray(reasons) && reasons.length > 0
-      ? ` Alasan dari server: ${reasons.filter((item) => typeof item === 'string').join(', ')}.`
-      : '';
-
-  return {
-    code: 'password_weak',
-    message: `Kata sandi belum memenuhi kebijakan server.${detail}`,
-    retryable: false,
-  };
-}
-
-/** Error dari Supabase Auth (signUp, signIn, reset, updateUser, callback). */
+/**
+ * Error dari Supabase Auth. Hanya alur identitas anonim yang tersisa: pembuatan
+ * identitas, pemulihan session, dan pencabutan session.
+ *
+ * `anonymous_provider_disabled` berarti Anonymous sign-ins belum diaktifkan di
+ * project Supabase; itu kesalahan konfigurasi pemilik project, bukan pengguna,
+ * sehingga pesannya menyebut langkah persisnya.
+ */
 export function mapAuthError(error: unknown): AppError {
   const like = toErrorLike(error);
 
   if (isFetchFailure(like)) return NETWORK_ERROR;
 
   switch (like.code) {
-    case 'invalid_credentials':
+    case 'anonymous_provider_disabled':
       return {
-        code: 'invalid_credentials',
+        code: 'anonymous_sign_in_disabled',
         message:
-          'Email atau kata sandi tidak cocok. Periksa kembali, atau pulihkan kata sandi bila lupa.',
+          'Identitas perangkat belum bisa dibuat karena Anonymous sign-ins belum diaktifkan di project Supabase. Pemilik aplikasi perlu mengaktifkannya di dashboard (Authentication → Sign In / Providers → Anonymous) atau menyetel enable_anonymous_sign_ins = true pada config.toml, lalu mencoba lagi.',
         retryable: false,
       };
-    case 'email_not_confirmed':
-      return {
-        code: 'email_not_confirmed',
-        message:
-          'Email belum dikonfirmasi. Buka tautan konfirmasi di kotak masuk Anda (termasuk folder spam), lalu masuk kembali.',
-        retryable: false,
-      };
-    case 'user_already_exists':
-    case 'email_exists':
-      return {
-        code: 'email_taken',
-        message: 'Email ini sudah terdaftar. Coba masuk, atau pulihkan kata sandi bila lupa.',
-        retryable: false,
-      };
-    case 'weak_password':
-      return passwordWeakError(like);
-    case 'same_password':
-      return {
-        code: 'same_password',
-        message: 'Kata sandi baru harus berbeda dari kata sandi yang sedang dipakai.',
-        retryable: false,
-      };
-    case 'validation_failed':
-      return {
-        code: 'email_invalid',
-        message: 'Email belum bisa dipakai server. Periksa formatnya, misalnya nama@contoh.com.',
-        retryable: false,
-      };
-    case 'over_email_send_rate_limit':
     case 'over_request_rate_limit':
+    case 'over_email_send_rate_limit':
       return {
         code: 'rate_limited',
         message: 'Permintaan terlalu sering dikirim. Tunggu sebentar sebelum mencoba lagi.',
         retryable: true,
-      };
-    case 'otp_expired':
-    case 'flow_state_expired':
-    case 'flow_state_not_found':
-      return {
-        code: 'link_expired',
-        message:
-          'Tautan sudah kedaluwarsa atau sudah pernah dipakai. Minta tautan baru dari aplikasi.',
-        retryable: false,
       };
     case 'session_not_found':
     case 'refresh_token_not_found':
     case 'session_expired':
       return {
         code: 'session_expired',
-        message: 'Sesi Anda sudah berakhir. Masuk kembali untuk melanjutkan.',
+        message:
+          'Identitas perangkat ini tidak dapat dipulihkan lagi. Buat identitas baru untuk melanjutkan; keanggotaan klub dan perjalanan lama tidak akan terbawa.',
         retryable: false,
       };
     default:
@@ -216,7 +162,8 @@ export function mapProfileError(error: unknown): AppError {
     case '23505':
       return {
         code: 'username_taken',
-        message: 'Username sudah dipakai akun lain. Coba username lain, misalnya dengan angka.',
+        message:
+          'Username sudah dipakai identitas lain. Coba username lain, misalnya dengan angka.',
         retryable: false,
       };
     case '23514':
@@ -231,7 +178,7 @@ export function mapProfileError(error: unknown): AppError {
       return {
         code: 'not_authorized',
         message:
-          'Database menolak perubahan ini. Kemungkinan sesi Anda sudah berakhir atau data bukan milik akun Anda; masuk kembali lalu coba lagi.',
+          'Database menolak perubahan ini. Kemungkinan identitas perangkat ini sudah berakhir atau data bukan milik Anda; mulai identitas baru lalu coba lagi.',
         retryable: false,
       };
     case 'PGRST116':
@@ -239,7 +186,7 @@ export function mapProfileError(error: unknown): AppError {
       return {
         code: 'profile_missing',
         message:
-          'Perubahan tidak diterapkan karena profil ini tidak ada atau bukan milik akun Anda. Masuk kembali, lalu muat ulang profil.',
+          'Perubahan tidak diterapkan karena profil ini tidak ada atau bukan milik identitas perangkat ini. Muat ulang profil, lalu coba lagi.',
         retryable: false,
       };
     case 'PGRST205':
@@ -287,7 +234,7 @@ export function mapTableError(error: unknown): AppError {
       return {
         code: 'not_authorized',
         message:
-          'Database menolak perubahan ini. Kemungkinan sesi Anda sudah berakhir atau data bukan milik akun Anda; masuk kembali lalu coba lagi.',
+          'Database menolak perubahan ini. Kemungkinan identitas perangkat ini sudah berakhir atau data bukan milik Anda; mulai identitas baru lalu coba lagi.',
         retryable: false,
       };
     case 'PGRST116':
@@ -295,7 +242,7 @@ export function mapTableError(error: unknown): AppError {
       return {
         code: 'not_found',
         message:
-          'Data tidak ditemukan atau bukan milik akun Anda. Muat ulang halaman, lalu coba lagi.',
+          'Data tidak ditemukan atau bukan milik identitas perangkat ini. Muat ulang halaman, lalu coba lagi.',
         retryable: false,
       };
     case 'P0002':
@@ -362,7 +309,7 @@ export function mapStorageError(error: unknown): AppError {
     return {
       code: 'not_authorized',
       message:
-        'Penyimpanan foto menolak tindakan ini. Pastikan foto ini milik akun Anda (atau Anda admin klub), lalu muat ulang dan coba lagi.',
+        'Penyimpanan foto menolak tindakan ini. Pastikan foto ini milik identitas perangkat ini (atau Anda admin klub), lalu muat ulang dan coba lagi.',
       retryable: false,
     };
   }
@@ -475,6 +422,6 @@ export function mapRpcError(error: unknown): AppError {
 export const ROW_NOT_APPLIED_ERROR: AppError = {
   code: 'not_authorized',
   message:
-    'Perubahan tidak diterapkan: data ini bukan milik akun Anda, atau sesi Anda sudah berakhir. Muat ulang lalu coba lagi.',
+    'Perubahan tidak diterapkan: data ini bukan milik identitas perangkat ini, atau identitasnya sudah berakhir. Muat ulang lalu coba lagi.',
   retryable: false,
 };

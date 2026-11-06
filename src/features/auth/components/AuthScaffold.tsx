@@ -12,14 +12,14 @@ export type AuthScaffoldProps = {
   title: string;
   description: string;
   children: ReactNode;
-  /** Aksi sekunder di luar kartu, mis. tautan "lupa kata sandi". */
+  /** Aksi sekunder di luar kartu, mis. tautan kebijakan privasi. */
   footer?: ReactNode;
   /** Tombol kembali untuk layar yang dibuka dari layar lain. */
   showBack?: boolean;
   testID?: string;
 };
 
-/** Kerangka bersama layar autentikasi supaya jarak dan hierarki teks konsisten. */
+/** Kerangka layar onboarding supaya jarak dan hierarki teks konsisten. */
 export function AuthScaffold({
   title,
   description,

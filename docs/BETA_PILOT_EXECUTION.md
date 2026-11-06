@@ -19,7 +19,7 @@ mengikuti [`BETA_RUNBOOK.md`](BETA_RUNBOOK.md); kasus dan ID PD mengikuti
 - [ ] Pastikan database benar-benar kosong; hitung migration lokal yang akan dipakai, tinjau urutan semua file `supabase/migrations/`, lalu terapkan berurutan sesuai `BETA_RUNBOOK.md`. Jangan mengedit migration lama.
 - [ ] Deploy Edge Function `delete-account` dari commit yang sama dengan APK. Pastikan token wajib diverifikasi melalui Auth; atur `WEB_ALLOWED_ORIGINS` hanya jika account-deletion web akan digunakan.
 - [ ] Storage: verifikasi bucket `avatars`, `vehicle-photos`, `club-logos` ada dan privat; jangan membuat bucket publik.
-- [ ] Auth: Redirect URL `rodakawan://auth/callback`; putuskan konfirmasi email dengan sadar. Bila aktif, pasang/test SMTP untuk konfirmasi dan reset password. Simpan bukti konfigurasi tanpa kredensial.
+- [ ] Auth: aktifkan **Anonymous sign-ins** dan matikan provider Email (ADR-083). Tidak ada Redirect URL email yang dibutuhkan. Simpan tangkapan layar pengaturan tanpa kredensial sebagai bukti.
 - [ ] Jangan mengubah database Auth rate limit dashboard tanpa catatan; periksa pengaturannya dan catat nilai/status yang disetujui.
 - [ ] Jalankan `npm run beta:preflight` hanya terhadap URL + database beta yang diverifikasi; syarat lulus 8 pemeriksaan, tanpa menganggap hasil development sebagai bukti beta. Preflight read-only; runner tulis `db:test`, `storage:test`, dan `e2e:*` khusus development.
 
@@ -61,7 +61,7 @@ Gunakan data sintetis dan lokasi koordinat uji, bukan lokasi rumah atau rute nya
 Sebelum setiap sesi:
 
 1. Pastikan commit/build/hash APK sama di A dan B; catat model, versi Android, patch keamanan bila diketahui, vendor/ROM, status GPS/jaringan, dan waktu lokal beserta zona waktu.
-2. Buat akun uji dengan email yang dapat menerima email konfirmasi/reset. Jangan masukkan alamat email asli ke bukti; gunakan A/B/C.
+2. Siapkan tiga instalasi bersih (A/B/C) agar masing-masing punya identitas anonim sendiri. Jangan memakai ulang data aplikasi atau memindahkan sesi antar HP; catat label A/B/C, bukan data pribadi.
 3. Host A buat klub/perjalanan uji; undang/join B. C tetap non-member. Set consent lokasi hanya setelah peserta setuju dan hanya pada ride uji.
 4. Tutup aplikasi lain yang tidak diperlukan; jangan aktifkan sharing lokasi untuk perjalanan nyata.
 
@@ -71,7 +71,7 @@ Penuhi gerbang sebelum memulai: backend beta preflight lulus, build beta diverif
 
 | Kelompok | ID tetap | Fokus / peran |
 | --- | --- | --- |
-| Akun dan sesi | PD-01 | A/B: daftar, konfirmasi email bila aktif, login, sesi setelah restart, jaringan |
+| Identitas perangkat | PD-01 | A/B: onboarding username unik, sesi setelah restart, mode pesawat pada instalasi baru, identitas hilang |
 | Perjalanan | PD-02, PD-14 | A host membuat/mulai/selesai/batal; B menerima status yang tersimpan |
 | Lokasi dan consent | PD-03…PD-08, PD-10…PD-13, PD-20, PD-22 | A/B: foreground/background, permission ditolak, GPS, battery saver, force-stop/reboot, opt-out, lokasi dibersihkan, vendor kedua, throttle sementara |
 | Chat / jaringan | PD-09, PD-15 | A↔B: realtime, edit/hapus, idempotensi, reconnect; C diblokir sesuai kondisi kasus |
@@ -111,7 +111,7 @@ Jangan unggah token/JWT, password, connection string, publishable key, alamat em
 1. Hentikan langkah yang bisa mengirim lokasi, menghapus akun, atau mengubah keanggotaan; jangan mengulang tindakan destruktif sebelum status server diketahui.
 2. Catat ID kasus, build/hash, perangkat, waktu/zona waktu, langkah minimum, hasil aktual, severity, dan file bukti yang sudah disunting. Laporkan ke kanal privat yang ditetapkan pemilik; gunakan GitHub Security Advisory privat bila ada dugaan kebocoran/akses lintas pengguna.
 3. P0 (data pribadi/kredensial atau penghapusan massal): hentikan pilot, cabut distribusi artifact, amankan bukti, hubungi pemilik/operator Supabase. P1 (akses lintas akun atau sharing lokasi salah): hentikan kasus dan nonaktifkan sharing/ride; jangan lanjutkan pada akun nyata. P2/P3: tandai Fail/Needs retest dan sertakan langkah pemulihan yang dicoba.
-4. Untuk jaringan/email sementara: simpan bukti error, pulihkan jaringan atau minta ulang email sekali, lalu catat percobaan baru; jangan menandai lulus hanya karena retry berhasil.
+4. Untuk jaringan sementara: simpan bukti error, pulihkan jaringan, lalu catat percobaan baru; jangan menandai lulus hanya karena retry berhasil. Bila instalasi pertama gagal mendapat identitas, hapus data aplikasi agar percobaan berikutnya benar-benar dari keadaan awal.
 5. Jika lokasi masih tersimpan setelah opt-out/finalisasi, jangan lanjut ride; minta operator memverifikasi row lewat prosedur backend yang aman dan dokumentasikan pembersihannya. Jangan jalankan SQL manual atau hapus `storage.objects` langsung.
 6. Build yang salah backend/hash: jangan instal/sebar; hapus artifact lokal sesuai prosedur tim, perbaiki Environment `beta`, jalankan preflight/build baru dan cocokkan hash baru.
 7. Setelah perbaikan, gunakan migration aditif dan ulangi gate lokal + development yang relevan; jangan menjalankan runner database tulis ke beta/production. Uji perilaku beta melalui kasus fisik setelah build baru diverifikasi.
@@ -119,7 +119,7 @@ Jangan unggah token/JWT, password, connection string, publishable key, alamat em
 ## 7. Keputusan/tindakan pemilik yang masih diperlukan
 
 - [ ] Buat project Supabase beta kosong dan validasi deployment function/configuration di sana.
-- [ ] Tentukan konfirmasi email (disarankan aktif) dan sediakan SMTP yang diuji.
+- [ ] Aktifkan Anonymous sign-ins di project beta dan matikan provider Email (ADR-083).
 - [ ] Buat GitHub Environment `beta` serta variables/secrets khusus; jangan mengubah values repository development.
 - [ ] Periksa batas signup/rate limit Auth pada Dashboard; repository tidak dapat membuktikannya.
 - [ ] Sahkan rencana operasional/retensi beta yang sesuai keputusan privasi; backup dan proses penghapusan tetap mengikuti runbook.
