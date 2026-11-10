@@ -486,6 +486,21 @@ Sebelum Fase 2, klub `join_policy = 'invite_only'` adalah jalan buntu: `request_
 | Layar undangan di aplikasi | **Blocked** | Menunggu regenerasi tipe di atas; RPC sudah siap dipakai klien |
 | Dua perangkat: undang → bergabung → admin melihat anggota | **Blocked** | Butuh perangkat/emulator dan backend dev |
 
+### 8h. Status verifikasi Fase 3 — "Hapus data saya" (6 November 2026)
+
+| Butir | Status | Bukti |
+|---|---|---|
+| Layar hapus data tanpa email, konfirmasi username, sukses hanya setelah server selesai | **Implemented**; **Passed locally** | `src/__tests__/account-delete.test.tsx` (4 test) |
+| Setelah sukses: keluar dari sesi dan kembali ke onboarding untuk identitas baru | **Implemented**; **Passed locally** | test yang sama (`signOut` + `router.replace('/')`) |
+| Kebijakan privasi menyebut identitas anonim perangkat, lokasi opt-in, dan jalur hapus data | **Implemented**; **Passed locally** | `src/__tests__/privacy.test.tsx` (2 test) |
+| Pesan galat tidak lagi menunjuk layar "Hapus akun" | **Implemented**; **Passed locally** | `src/features/account/errors.ts` |
+| Hapus data ujung-ke-ujung terhadap backend development (pengguna anonim) | **Blocked** — butuh `.env.db` + `.env.local` + Edge Function ter-deploy | `npm run e2e:account-delete -- --yes` |
+| Tekan tombol hapus di perangkat, termasuk jaringan putus di tengah proses | **Blocked** — tidak ada perangkat/emulator | checklist §8f |
+
+Perintah yang dijalankan ulang untuk fase ini: `npm run typecheck` **0**, `npm run lint` **0**,
+`npm run format:check` **0**, `npm test -- --ci` **0** (46 suite / 489 test). Uji di atas membuktikan
+perilaku layar dengan client tiruan, bukan panggilan sungguhan ke Edge Function maupun perangkat.
+
 ## 9. Status otomatisasi dan verifikasi (Milestone 1–3)
 
 Istilah status yang dipakai: **Implemented**, **Passed locally**, **Passed against dev backend**,
