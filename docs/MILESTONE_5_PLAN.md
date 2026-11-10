@@ -1,6 +1,6 @@
 # Rencana Milestone 5 — Push, polish, dan beta
 
-Status: **irisan pertama sudah diimplementasikan dan diuji end-to-end terhadap backend development**
+Status (22–24 Oktober 2026): **irisan pertama sudah diimplementasikan dan diuji end-to-end terhadap backend development**
 (hapus akun penuh + kebijakan privasi + halaman web, 22–23 Oktober 2026); sisa M5 masih rencana. Ditulis 22 Oktober 2026 setelah Milestone 4 dinyatakan **lulus di backend**
 (Database RLS run #19, commit `1aa1480` — 7 berkas uji, 7 lulus) dan **belum lulus di perangkat**
 (lihat `docs/QA_TEST_PLAN.md` bagian 8a dan 8d).
@@ -8,6 +8,18 @@ Status: **irisan pertama sudah diimplementasikan dan diuji end-to-end terhadap b
 Dokumen ini tidak mengulang lingkup lama. Sumber kebenaran produk tetap
 [`docs/PRD.md`](PRD.md) (FR-09, PRD §12) dan urutan milestone tetap di
 [`docs/ROADMAP.md`](ROADMAP.md).
+
+> **Catatan status 7 November 2026 — tabel §1 dan §2 sampai §6 di bawah adalah rekaman 22–24 Oktober
+> 2026, bukan status terkini; §1a merangkum yang benar hari ini.** Sejak itu model identitas berubah lewat **ADR-083**: RodaKawan tidak punya
+> akun, sehingga tidak ada layar masuk, daftar, konfirmasi email, atau reset kata sandi; setiap
+> perangkat memakai identitas anonim dengan peran `authenticated` tetap dan RLS yang sama. Klub
+> `invite_only` kini punya jalur undangan ber-hash (**ADR-084**, migration **belum dieksekusi** ke
+> project development). Istilah di bawah yang menyebut "akun", "login", "daftar", atau "hapus akun"
+> dibiarkan sebagai catatan sejarah dan ditandai di tempatnya; padanan sekarang adalah **identitas
+> anonim**, **"Hapus data saya"**, dan halaman web hapus data yang berisi instruksi tanpa formulir.
+> Angka test di §4a juga angka pada tanggal itu. Status FR-09 terbaru ada di
+> [`docs/PLAN_FR09_PUSH.md`](PLAN_FR09_PUSH.md), bukan di §5 dokumen ini.
+> Lihat juga [`docs/RUNBOOK_TANPA_AKUN.md`](RUNBOOK_TANPA_AKUN.md) untuk operasional mode tanpa akun.
 
 ## 1. Titik awal yang sebenarnya
 
@@ -24,14 +36,33 @@ Dokumen ini tidak mengulang lingkup lama. Sumber kebenaran produk tetap
 Artinya: M5 tidak boleh dimulai dengan menganggap M4 tuntas. Yang boleh dimulai adalah pekerjaan yang
 **tidak** bergantung pada hasil uji perangkat M4.
 
+### 1a. Status terkini (7 November 2026)
+
+Tabel di atas adalah potret 23–24 Oktober 2026 dan **tidak** ikut berubah saat model identitas
+berganti. Yang benar hari ini:
+
+| Bukti | Status sekarang |
+| --- | --- |
+| Identitas pengguna | **Implemented, Passed locally** — anonim per perangkat (ADR-083); layar masuk/daftar/reset/email dihapus, `[auth] enable_anonymous_sign_ins = true`, `[auth.email] enable_signup = false` |
+| Jalur hapus data | **Implemented** dan **Passed locally** — satu jalur Edge Function `delete-account` → `purge_account_data` → Auth Admin API; layar kini berjudul "Hapus data saya" (`src/app/account-delete.tsx`) |
+| Halaman web hapus data | **Implemented** — berisi instruksi tanpa login, tanpa JavaScript, tanpa `config.js`; **belum ter-deploy**, jadi URL publik masih **Blocked** |
+| Undangan klub | Migration + RPC **Implemented** (ADR-084), tetapi **Blocked** — belum diterapkan ke project development, layar undangan menunggu `npm run db:types` |
+| Push notification | **Belum diimplementasikan** — rencana dan batas verifikasinya di `docs/PLAN_FR09_PUSH.md` |
+| `npm run db:test`, `db:types:check`, `storage:test`, `e2e:*` | **Blocked** — `.env.db`/`.env.local` tidak ada di lingkungan kerja ini |
+| Uji perangkat | **Blocked** — tidak ada perangkat maupun `adb` |
+
+Konsekuensinya untuk dokumen ini: setiap pernyataan "belum teruji" di bawah tetap berlaku, tetapi
+sejak ADR-083 **bukan lagi karena alasan "aplikasi berakun"**. Aplikasi tetap menyimpan data pribadi,
+sehingga kewajiban menyediakan jalur hapus data tidak berubah; yang berubah hanya namanya.
+
 ## 2. Urutan prioritas
 
 | Prioritas | Item M5 | Butuh pihak ketiga? | Catatan ketergantungan |
 | --- | --- | --- | --- |
-| P0 | **Hapus akun + kebijakan privasi + kontak dukungan** | Tidak | Wajib untuk aplikasi berakun di Play Store; butuh keputusan produk soal `on delete restrict` (lihat §4) |
+| P0 | **Hapus akun + kebijakan privasi + kontak dukungan** *(historis; kini "Hapus data saya" — ADR-083)* | Tidak | Wajib karena aplikasi menyimpan data pribadi; butuh keputusan produk soal `on delete restrict` (lihat §4) |
 | P0 | **Loading/offline/error/empty state yang konsisten** | Tidak | Bisa dikerjakan per layar tanpa menambah dependency; sebaiknya menunggu temuan uji perangkat M4 |
 | P0 | **Checklist keamanan & rilis beta** | Tidak | Menutup butir yang masih terbuka di `docs/SECURITY_PRIVACY.md` §9 |
-| P1 | **Push notification** (undangan, perubahan status perjalanan, pesan konvoi) | **Ya** — kredensial push (FCM) + `expo-notifications` | Menambah modul native → butuh APK baru; harus diputuskan setelah uji perangkat M4 |
+| P1 | **Push notification** (undangan, perubahan status perjalanan, pesan konvoi) | **Ya** — kredensial push (FCM) + `expo-notifications` | Menambah modul native → butuh APK baru. **Peringkat ini berbeda dari PRD**, yang menaruh push di MVP §5 butir 9; pemilik perlu memilih satu. Rencana kerja: `docs/PLAN_FR09_PUSH.md` |
 | P1 | **Kategori & preferensi notifikasi** | Tidak (mengikuti P1 di atas) | Butuh tabel preferensi + RLS uji sendiri |
 | P1 | **Crash/error monitoring tanpa lokasi presisi** | **Ya** — layanan monitoring | Harus menyaring properti lokasi sebelum dikirim |
 | P2 | **Android device matrix + accessibility pass** | Tidak | Butuh perangkat nyata; jadwalkan bersama uji perangkat M4 |
@@ -58,10 +89,13 @@ dan daftar posisi.
 
 **Hapus akun (permintaan + pelaksanaan) dengan kebijakan retensi yang eksplisit.**
 
+> *Bagian ini historis. Premis identitasnya (akun email) sudah digantikan ADR-083; keputusan retensi
+> dan tombstones di bawah tetap berlaku dan tetap menjadi satu-satunya jalur hapus data.*
+
 Alasan memilih ini, bukan push notification:
 
-1. Ini syarat kebijakan Play Store untuk aplikasi berakun dan syarat rilis beta, sehingga tidak bisa
-   ditunda sampai setelah beta.
+1. Ini syarat kebijakan Play Store untuk aplikasi yang menyimpan data pengguna dan syarat rilis beta,
+   sehingga tidak bisa ditunda sampai setelah beta.
 2. Seluruhnya bisa dikerjakan dengan stack yang sudah ada (RPC + layar + uji SQL), tanpa vendor baru,
    tanpa izin Android baru, dan tanpa APK native tambahan.
 3. Ia menyentuh invarian keamanan yang sudah ada (`security definer`, `search_path = ''`, grant hanya
@@ -85,6 +119,9 @@ Rekomendasi awal: **A**, karena laporan bahaya adalah data keselamatan bersama d
 tidak lagi dipertahankan sebagai tombstone; konten yang wajib dipertahankan dialihkan ke satu
 tombstone bersama, lalu baris profil dan `auth.users` dihapus. Ini menjawab celah yang tidak ditutup
 oleh anonimisasi saja: pengguna masih bisa login dan `auth.uid()` masih cocok dengan profil.
+*(Sejak ADR-083 tidak ada lagi login email; identitas anonim tetap menghasilkan `auth.uid()`, jadi
+alasan dan jalur tombstone di atas tetap berlaku apa adanya — identitas yang sudah dihapus tidak boleh
+bisa dibuat ulang.)*
 
 **Cakupan irisan (kecil dan bisa direview):**
 
@@ -114,6 +151,11 @@ oleh anonimisasi saja: pengguna masih bisa login dan `auth.uid()` masih cocok de
 **Yang belum termasuk irisan ini:** push notification, crash monitoring, dan seluruh M6.
 
 ### 4a. Status implementasi (23–24 Oktober 2026)
+
+> **Catatan 7 November 2026.** Angka dan bukti di §4a adalah hasil 23–24 Oktober 2026. Setelah ADR-083,
+> langkah E2E yang dulu ditulis "login ulang akun yang dihapus gagal" dijalankan sebagai "identitas
+> lama tidak bisa dipulihkan": `scripts/account-deletion-e2e.mjs` kini membuat identitas anonim, bukan
+> akun email. Jumlah test di tabel juga bukan jumlah hari ini.
 
 Irisan ini **selesai dan diuji end-to-end terhadap project development** untuk jalur aplikasi dan web
 (dengan satu blocker deployment web). Reliabilitas orkestrasi ADR-078 sudah **Implemented**, **Passed locally**, dan **Passed against dev backend**: migration diterapkan ke development dan Edge Function di-redeploy pada 24 Oktober 2026.
@@ -153,7 +195,7 @@ tabel notifikasi tidak perlu dibuat.
 | `public.push_tokens` | **Sudah ada** di migration yang sama: `user_id`, `token` unik, `platform` (`android`/`ios`/`other`), `device_label`, `last_seen_at`. RLS penuh untuk pemilik baris (`select/insert/update/delete ... = auth.uid()`), jadi pendaftaran token tidak butuh RPC baru |
 | `public.notification_preferences` | **Belum ada.** Inilah satu-satunya tabel yang benar-benar hilang: tanpa ia, "matikan notifikasi" hanya bisa berarti mencabut token |
 | Pengirim | **Belum ada.** Rencana: Edge Function ber-service-role, karena kunci FCM tidak boleh masuk bundel dan penerima harus diturunkan dari `ride_members`, bukan dari payload klien |
-| Klien | **Belum ada.** `expo-notifications` belum menjadi dependency; menambahkannya berarti modul native baru → APK baru + izin Android |
+| Klien | **Belum ada.** `expo-notifications` belum menjadi dependency; menambahkannya berarti modul native baru → APK baru. Yang **sudah** tersedia: izin `android.permission.POST_NOTIFICATIONS` di `app.json` dan `extra.eas.projectId` (syarat `getExpoPushTokenAsync`) |
 
 Draf badan migration ada di [`supabase/drafts/m5_notification_preferences.sql`](../supabase/drafts/m5_notification_preferences.sql).
 Ia **bukan** migration: tidak dijalankan `npm run db:test`, tidak dibaca `db:types`, dan tidak memicu build
@@ -166,9 +208,15 @@ pengiriman, penanda token mati, dan zona waktu jam tenang. Keputusan strateginya
 Edge Function pengirim + token nyata (butuh kredensial FCM) → pengujian dua perangkat dengan
 `expo-notifications` di development build, karena Expo Go tidak mendukung push penuh.
 
+Urutan itu masih berlaku sebagai arah, tetapi rincian teknisnya sudah dipecah per fase di
+[`docs/PLAN_FR09_PUSH.md`](PLAN_FR09_PUSH.md) (preferensi, peristiwa domain, klien, pengirim,
+penjadwalan) beserta batas apa yang bisa dibuktikan tanpa perangkat. ADR-075 tetap berstatus
+**Proposed**; rencana itu tidak menaikkannya.
+
 ## 6. Definisi "M5 selesai"
 
 M5 baru boleh ditutup bila seluruh butir P0 di §2 selesai **dan** M4 sudah punya bukti perangkat
-(QA_TEST_PLAN 8d), **dan** job Database RLS tetap hijau dengan berkas uji baru. Status yang dipakai
-tetap empat tingkat yang sama: **Passed locally**, **Passed against dev backend**,
-**Tested on physical device**, **Blocked** — jangan ada yang digabung.
+(QA_TEST_PLAN 8d), **dan** job Database RLS tetap hijau dengan berkas uji baru. Istilah "hapus akun"
+di sini kini berarti "Hapus data saya" (ADR-083). Status yang dipakai tetap empat tingkat yang sama:
+**Passed locally**, **Passed against dev backend**, **Tested on physical device**, **Blocked** —
+jangan ada yang digabung.
