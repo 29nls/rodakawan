@@ -77,7 +77,7 @@ Tidak ada perubahan kode aplikasi (`src/**`), dependency, `app.json`, maupun wor
 | --- | --- | --- |
 | Aktifkan/tolak konfirmasi email + SMTP (AUD-26) | Pemilik | Preflight beta gagal pada satu-satunya pemeriksaan ini |
 | Buat Environment `beta` GitHub + variabel `BETA_*` + backend beta | Pemilik | Build APK beta tidak bisa dijalankan |
-| Aktifkan GitHub Pages dan arahkan `web/account-deletion/config.js` ke backend rilis (AUD-20/27/28) | Pemilik | Syarat Play Console dan uji halaman |
+| Aktifkan GitHub Pages dan verifikasi halaman `web/` (kini tanpa JavaScript, formulir, atau config) (AUD-20/27/28) | Pemilik | Syarat Play Console dan uji halaman |
 | Project produksi + backup + rehearsal (AUD-21) | Pemilik + engineering | Rilis publik tidak boleh di development |
 | Sahkan retensi data (AUD-23) | Produk + legal | Cleanup otomatis dan kebijakan publik |
 | Verifikasi cadangan keystore (AUD-22) | Pemilik | Kunci hilang = APK tidak bisa diperbarui |

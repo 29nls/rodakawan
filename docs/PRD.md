@@ -4,9 +4,9 @@
 
 | Metadata | Nilai |
 |---|---|
-| Versi | 1.0 |
-| Tanggal | 12 Oktober 2026 |
-| Status | Draft untuk validasi |
+| Versi | 1.1 |
+| Tanggal | 12 Oktober 2026 (revisi status: 7 November 2026) |
+| Status | Draft untuk validasi — status implementasi diverifikasi ulang 7 November 2026 |
 | Platform rilis pertama | Android |
 | Platform aplikasi | React Native + Expo + TypeScript |
 | Backend awal | Supabase |
@@ -18,7 +18,9 @@ RodaKawan adalah aplikasi pendamping perjalanan kelompok untuk komunitas motor, 
 
 Nilai utama produk bukan sekadar peta atau media sosial. RodaKawan harus membantu rombongan **berkumpul, berangkat, tetap terhubung, mengetahui kondisi jalan, dan menutup perjalanan dengan jelas**, dengan pengaturan berbagi lokasi yang transparan dan interaksi yang meminimalkan gangguan ketika kendaraan bergerak.
 
-PRD ini menyusun fitur menjadi fase yang dapat diuji. MVP yang disarankan berfokus pada akun, klub, perjalanan/konvoi, live location, laporan bahaya, dan chat. Voice PTT dan musik lokal masuk fase lanjutan karena integrasi audio native, background service, kompatibilitas headset, baterai, dan jaringan menambah kompleksitas.
+PRD ini menyusun fitur menjadi fase yang dapat diuji. MVP yang disarankan berfokus pada identitas pengguna, klub, perjalanan/konvoi, live location, laporan bahaya, dan chat. Voice PTT dan musik lokal masuk fase lanjutan karena integrasi audio native, background service, kompatibilitas headset, baterai, dan jaringan menambah kompleksitas.
+
+**Revisi 1.1 (7 November 2026).** Dokumen ini sebelumnya menyebut feed sosial, push notification, voice PTT, dan pemutar musik seolah bagian dari produk yang ada. Kenyataannya tidak: FR-08 sampai FR-11 **belum diimplementasikan** dan sekarang ditandai demikian di §6.0 dan §6. Penomoran requirement tidak berubah agar rujukan lama tetap sah. Dua penyesuaian lain mengikuti keputusan yang sudah diambil: identitas pengguna kini anonim per perangkat (ADR-083), sehingga FR-01 tidak lagi memuat daftar, login, atau pemulihan email; dan §12 sekarang memisahkan syarat wajib beta, butir P0/P1 yang **ditunda resmi**, serta status bukti setiap syarat. Istilah status mengikuti AGENTS.md: Implemented, Passed locally, Passed against dev backend, Tested on physical device, Blocked.
 
 ## 2. Masalah dan peluang
 
@@ -62,7 +64,7 @@ Menjadi pendamping digital yang membantu komunitas berkendara melakukan perjalan
 | Kebocoran lokasi | Akses oleh non-anggota pada pengujian RLS | 0 akses yang tidak berwenang |
 | Pelaporan bahaya | Laporan valid bisa dibuat dan dilihat peserta berwenang | ≥ 95% pada pengujian aplikasi |
 | Crash-free sessions | Sesi tanpa crash pada beta | ≥ 99% sebagai target awal setelah tersedia sampel memadai |
-| Keberhasilan onboarding | Pengguna uji menyelesaikan daftar/masuk dan membuat profil | ≥ 80% dari peserta pengujian terarah |
+| Keberhasilan onboarding | Pengguna uji menyelesaikan onboarding, membuat profil, dan masuk ke klub pertamanya | ≥ 80% dari peserta pengujian terarah |
 
 Metrik ditinjau kembali setelah pilot. Jangan gunakan metrik ini sebagai klaim pemasaran sebelum memiliki data produksi.
 
@@ -101,7 +103,7 @@ Metrik ditinjau kembali setelah pilot. Jangan gunakan metrik ini sebagai klaim p
 
 ### MVP yang direkomendasikan (P0)
 
-1. Registrasi/login dan profil pengguna.
+1. Identitas anonim per perangkat (tanpa daftar/login/email) dan profil pengguna — ADR-083.
 2. Garasi kendaraan dengan informasi publik yang terpisah dari data sensitif.
 3. Klub: buat/temukan klub, permintaan bergabung, anggota, dan peran.
 4. Perjalanan/konvoi: buat perjalanan, atur titik kumpul/tujuan, gabung, peserta dan status perjalanan.
@@ -109,7 +111,7 @@ Metrik ditinjau kembali setelah pilot. Jangan gunakan metrik ini sebagai klaim p
 6. Peta dengan marker posisi, waktu update terakhir, dan status koneksi.
 7. Laporan kondisi jalan: lubang, kecelakaan, kemacetan, cuaca/bahaya, hambatan/operasi lalu lintas, serta kategori lain yang dapat dikonfigurasi. Semua laporan memiliki masa berlaku dan mekanisme laporan penyalahgunaan.
 8. Chat teks per perjalanan.
-9. Push notification minimum untuk undangan perjalanan dan perubahan status penting.
+9. Push notification minimum untuk undangan perjalanan dan perubahan status penting — **belum diimplementasikan**; beta berjalan tanpa push (§12.2).
 10. Privasi, blokir/lapor pengguna dasar, dan kontrol berbagi lokasi.
 
 ### Fase berikutnya (P1)
@@ -139,12 +141,30 @@ Metrik ditinjau kembali setelah pilot. Jangan gunakan metrik ini sebagai klaim p
 
 Prioritas: **P0** wajib MVP, **P1** fase berikutnya, **P2** lanjutan.
 
+### 6.0 Status implementasi (7 November 2026)
+
+Tabel ini menjawab satu pertanyaan: apa yang benar-benar ada di repositori hari ini. Tidak ada requirement yang sudah **Passed against dev backend** atau **Tested on physical device**, karena lingkungan pengembangan tidak memiliki akses database maupun perangkat.
+
+| Req | Status | Catatan bukti |
+|---|---|---|
+| FR-01 akun/autentikasi | Implemented, Passed locally | Layar daftar/login/reset/email dihapus; identitas anonim per perangkat; peran `anon` tidak punya akses apa pun dan ujinya dipertahankan. Nama requirement dipertahankan agar rujukan lama tetap sah. |
+| FR-02 garasi kendaraan | Implemented, Passed locally | CRUD kendaraan, bucket `vehicle-photos`, plat di ruang privat; uji RLS baru jalan setelah `.env.db` tersedia. |
+| FR-03 klub dan keanggotaan | Implemented, Passed locally | Klub, peran, audit; undangan lewat RPC hash `club_invites` (ADR-084). Migration undangan belum dieksekusi ke project dev. |
+| FR-04 perjalanan/konvoi | Implemented, Passed locally | Status `planned/active/completed/cancelled`, peserta, aturan bergabung. |
+| FR-05 live location | Implemented, Passed locally | Sharing event-driven, marker stale, indikator koneksi. Perilaku background belum diuji perangkat. |
+| FR-06 laporan bahaya | Implemented, Passed locally | Kategori, `expires_at` per kategori, pelaporan penyalahgunaan. |
+| FR-07 chat konvoi | Implemented, Passed locally | Postgres Changes + RLS; status kirim dan pesan sistem. |
+| FR-08 feed, like, komentar, follow | **Belum diimplementasikan** | Hanya skema awal di `20261013022938_initial_schema.sql` (`club_posts`, `post_comments`, `post_reactions`, `follows`, `user_blocks`). Tidak ada layar, aksi, atau uji; tabel hanya muncul di tipe generated. |
+| FR-09 push notification | **Belum diimplementasikan** | `expo-notifications` tidak ada di `package.json`; belum ada token perangkat, pengaturan kategori, atau pengiriman. |
+| FR-10 voice room / PTT | **Belum diimplementasikan** | Tidak ada modul audio/WebRTC maupun penerbitan token room; penyedia belum dipilih (§13). |
+| FR-11 pemutar musik lokal | **Belum diimplementasikan** | Tidak ada modul audio lokal, kontrol media, atau penanganan audio focus. |
+
 ### FR-01 — Akun dan autentikasi (P0)
 
-- Pengguna dapat membuat akun, masuk, keluar, dan memulihkan akses sesuai metode yang dipilih.
+- Identitas dibuat anonim per perangkat saat aplikasi pertama dibuka; tidak ada layar daftar, login, reset, atau email (ADR-083). Tidak ada pemulihan identitas: data hanya dapat dilihat kembali dari perangkat yang sama.
 - Profil menampilkan nama, username unik, avatar opsional, bio opsional, dan kota opsional.
 - Sistem mencegah user tanpa sesi mengakses data privat.
-- Acceptance: sesi tetap valid setelah aplikasi dibuka ulang sesuai konfigurasi; logout membersihkan sesi lokal; kesalahan login tampil dalam bahasa yang mudah dipahami.
+- Acceptance: sesi anonim tetap valid setelah aplikasi dibuka ulang; menghapus data aplikasi berarti identitas dan datanya hilang dan hal itu dijelaskan sebelum pengguna menghapus; pesan galat menyebut tindakan pemulihan, bukan detail internal.
 
 ### FR-02 — Garasi kendaraan (P0)
 
@@ -194,11 +214,15 @@ Prioritas: **P0** wajib MVP, **P1** fase berikutnya, **P2** lanjutan.
 
 ### FR-08 — Feed, like, komentar, follow (P1)
 
+**Status: belum diimplementasikan (7 November 2026).** Baris di bawah adalah rencana, bukan perilaku aplikasi. Skema tabelnya sudah ada di migration awal, tetapi tidak ada layar, pemanggilan API, atau uji di `src/`.
+
 - Member klub bisa membuat posting teks/foto sesuai izin klub; pengguna bisa memberi like, komentar, dan follow.
 - Pengguna dapat memblokir akun dan melaporkan post/komentar.
 - Acceptance: operasi like idempotent; pencegahan duplicate reaction; konten terblokir tidak ditampilkan kepada pengguna yang memblokir.
 
 ### FR-09 — Push notifications (P0/P1)
+
+**Status: belum diimplementasikan (7 November 2026).** Tidak ada dependency notifikasi di `package.json`, sehingga tidak ada token perangkat yang bisa didaftarkan. Beta berjalan tanpa push (§12.2).
 
 - MVP: undangan, permintaan bergabung, perjalanan akan dimulai/perubahan status yang penting.
 - P1: like, komentar, follow, follow-back, agenda.
@@ -206,6 +230,8 @@ Prioritas: **P0** wajib MVP, **P1** fase berikutnya, **P2** lanjutan.
 - Acceptance: token perangkat dapat diperbarui/dihapus; notifikasi duplikat diminimalkan; gagal kirim tidak menggagalkan transaksi utama.
 
 ### FR-10 — Voice room / PTT (P2)
+
+**Status: belum diimplementasikan (7 November 2026).** Tidak ada modul audio/WebRTC dan penyedia belum dipilih (§13 butir 6).
 
 - Anggota yang berwenang dapat masuk ke voice room perjalanan dan menekan/tahan tombol PTT untuk berbicara; indikator jelas saat mic aktif.
 - Token room diterbitkan backend terautentikasi dan dibatasi ke ride/role yang sah; tidak boleh dibuat dengan secret di client.
@@ -215,6 +241,8 @@ Prioritas: **P0** wajib MVP, **P1** fase berikutnya, **P2** lanjutan.
 
 ### FR-11 — Pemutar musik lokal (P2)
 
+**Status: belum diimplementasikan (7 November 2026).** Tidak ada modul audio lokal maupun penanganan audio focus.
+
 - Pengguna dapat memilih dan memutar file lokal yang memang dapat diakses melalui API media Android.
 - Playback mempunyai kontrol play/pause/next bila didukung, menghormati audio focus, dan tidak otomatis mengalahkan audio PTT.
 - Acceptance: permission media dijelaskan, tidak mengunggah file tanpa tindakan eksplisit, dan playback/background service diuji pada build produksi.
@@ -223,7 +251,7 @@ Prioritas: **P0** wajib MVP, **P1** fase berikutnya, **P2** lanjutan.
 
 ### Alur A — Membuat dan menjalankan touring
 
-1. Login → buat profil.
+1. Buka aplikasi — identitas anonim dibuat otomatis, lalu buat profil.
 2. Buat klub atau pilih klub yang diikuti.
 3. Buat perjalanan → tentukan titik kumpul dan tujuan → bagikan undangan/kode.
 4. Anggota bergabung dan membaca aturan perjalanan.
@@ -266,14 +294,14 @@ Prioritas: **P0** wajib MVP, **P1** fase berikutnya, **P2** lanjutan.
 ## 9. Keselamatan, privasi, dan batasan
 
 - Sebelum minta izin lokasi, jelaskan alasan, kapan lokasi dibagikan, siapa yang bisa melihat, dan cara menghentikan.
-- Sharing dimulai oleh peserta, tidak aktif diam-diam saat instalasi atau login.
+- Sharing dimulai oleh peserta, tidak aktif diam-diam saat instalasi, saat aplikasi pertama dibuka, atau saat identitas anonim dibuat.
 - Tampilkan indikator tracking aktif persisten di layar perjalanan dan notifikasi foreground service bila platform mewajibkan.
 - Saat peserta keluar/ride berakhir, hentikan update dan cabut akses channel.
 - Tidak menyimpan sejarah rute secara default. Fitur histori masa depan harus opt-in dengan periode retensi yang jelas.
 - Pisahkan nomor polisi atau atribut kendaraan privat dari data publik.
 - Laporan kondisi jalan adalah informasi komunitas, bukan jaminan kebenaran. Sediakan timestamp, expiry, konfirmasi, pelaporan konten, dan moderasi.
 - Jangan mendesain interaksi yang mengharuskan rider mengetik saat kendaraan melaju. Gunakan voice/hardware control hanya setelah uji kompatibilitas.
-- Sediakan cara menghapus akun dan menghapus/menganonimkan data sesuai kebijakan yang ditetapkan sebelum peluncuran.
+- Sediakan cara menghapus seluruh data pengguna beserta medianya (Profil → Hapus data saya) dan jelaskan apa yang tetap dipertahankan, sesuai ADR-076/ADR-083.
 
 ## 10. Dependensi dan risiko
 
@@ -290,24 +318,55 @@ Prioritas: **P0** wajib MVP, **P1** fase berikutnya, **P2** lanjutan.
 
 ## 11. Analytics dan event produk
 
-Event disarankan: `signup_completed`, `profile_completed`, `club_created`, `club_join_requested`, `ride_created`, `ride_joined`, `ride_started`, `location_sharing_started`, `location_permission_denied`, `location_update_stale`, `hazard_report_created`, `chat_message_sent`, `ride_ended`, `location_sharing_stopped`, `ptt_room_joined` (fase P2).
+Event disarankan (pendaftaran tidak ada lagi, jadi `signup_completed` diganti `identity_created`): `identity_created`, `profile_completed`, `club_created`, `club_join_requested`, `ride_created`, `ride_joined`, `ride_started`, `location_sharing_started`, `location_permission_denied`, `location_update_stale`, `hazard_report_created`, `chat_message_sent`, `ride_ended`, `location_sharing_stopped`, `ptt_room_joined` (fase P2).
 
 Jangan memasukkan lintang/bujur presisi, plat nomor, isi pesan, atau rekaman audio ke analytics. Terapkan persetujuan dan aturan privasi untuk analytics sebelum instrumentasi produksi.
 
 ## 12. Acceptance criteria rilis beta
 
-Rilis beta MVP hanya dapat dilanjutkan apabila:
+Revisi 1.1 memisahkan tiga hal yang sebelumnya bercampur: syarat yang **wajib** dipenuhi, butir P0/P1 yang **ditunda resmi**, dan **status bukti** setiap syarat pada 7 November 2026. Butir yang ditunda tetap tercantum di §5 dan §6 sebagai rencana; menundanya berarti PRD, CHANGELOG, dan materi rilis tidak boleh menyebutnya sebagai fitur beta.
 
-- Alur akun, profil, klub, buat/gabung/perjalanan berfungsi pada perangkat target.
-- Live location berhasil diuji pada foreground dan skenario background yang didukung, termasuk izin ditolak, GPS mati, jaringan hilang, dan app dihentikan.
+### 12.1 Syarat wajib
+
+Rilis beta MVP hanya dapat dilanjutkan apabila semua butir berikut terpenuhi:
+
+- Alur identitas anonim, profil, klub, buat/gabung/undangan perjalanan berfungsi pada perangkat target.
+- Live location diuji pada foreground dan skenario background yang didukung, termasuk izin ditolak, GPS mati, jaringan hilang, dan app dihentikan.
 - Semua marker menunjukkan waktu update; posisi lama tidak tampak live.
 - Pengujian memastikan non-anggota tidak dapat membaca lokasi atau chat melalui API/Realtime.
+- Pemegang APK dan kunci publik tidak dapat membaca atau mengubah data klub yang bukan miliknya; undangan hanya dapat ditukar lewat RPC ber-hash dan tidak ada policy baca pada `club_invites`.
 - Road report kedaluwarsa sesuai aturan dan dapat dilaporkan sebagai penyalahgunaan.
 - Chat membatasi akses berdasarkan anggota perjalanan.
 - Kunci service role tidak ada di bundle aplikasi; secrets dikelola backend.
 - Crash/permission/network errors ditangani dengan pesan yang bisa dimengerti.
-- Kebijakan privasi, proses penghapusan akun, dan kontak pelaporan tersedia.
+- Kebijakan privasi, halaman hapus data, dan kontak pelaporan tersedia.
 - Tidak ada blocker severity tinggi pada test plan.
+
+### 12.2 Butir yang ditunda resmi
+
+| Butir | Alasan | Syarat masuk kembali |
+|---|---|---|
+| Push notification (FR-09, §5 butir 9) | `expo-notifications` belum dipasang; belum ada token, pengaturan kategori, atau pengiriman | Dependency + penyimpanan token + uji pada build produksi |
+| Feed, like, komentar, follow, blokir (FR-08) | Tidak ada layar atau aksi; hanya skema awal di migration | Implementasi + uji RLS dan moderasi |
+| Voice PTT (FR-10) | Tidak ada modul audio/WebRTC; penyedia belum dipilih | Proof-of-concept + uji headset, layar kunci, audio focus |
+| Pemutar musik lokal (FR-11) | Tidak ada modul audio lokal | Implementasi + uji audio focus dan background |
+
+### 12.3 Status bukti per 7 November 2026
+
+| Syarat | Status | Bukti / yang masih kurang |
+|---|---|---|
+| Alur identitas anonim, profil, klub, undangan, perjalanan | Implemented, Passed locally | Jest 489 test hijau; menunggu `db:test` dan uji perangkat |
+| Live location foreground dan background | Implemented, Passed locally | Perilaku background belum diuji: tidak ada perangkat/`adb` (Blocked) |
+| Marker stale tidak tampak live | Implemented, Passed locally | Uji perangkat |
+| Non-anggota gagal membaca lokasi dan chat | Implemented, Blocked | Uji SQL belum pernah dieksekusi: `.env.db` tidak ada |
+| APK + kunci publik tidak membuka data klub lain | Implemented, Blocked | Uji RLS undangan klub menunggu DB dev dan migration diterapkan |
+| Road report kedaluwarsa dan dapat dilaporkan | Implemented, Passed locally | Uji perangkat |
+| Chat per peserta perjalanan | Implemented, Passed locally | Uji perangkat |
+| Tidak ada service role key di bundle | Implemented, Passed locally | `deps:check` + uji statis `web/` |
+| Kebijakan privasi dan halaman hapus data | Implemented | Halaman web belum ter-deploy (milik pemilik) |
+| Tidak ada blocker severity tinggi | Blocked | Test plan perangkat belum dijalankan |
+
+Beta tidak boleh dinyatakan siap selama masih ada baris berstatus Blocked. Setiap perubahan status harus disertai artefak: keluaran `db:test` untuk baris backend, catatan per kasus untuk baris perangkat, sesuai `docs/QA_TEST_PLAN.md`.
 
 ## 13. Keputusan yang masih harus divalidasi
 

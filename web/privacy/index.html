@@ -12,7 +12,7 @@
       <p class="eyebrow">RodaKawan</p>
       <h1 id="judul">Kebijakan privasi</h1>
       <p class="small">
-        Berlaku untuk aplikasi Android RodaKawan. Terakhir diperbarui: 23 Oktober 2026.
+        Berlaku untuk aplikasi Android RodaKawan. Terakhir diperbarui: 6 November 2026.
       </p>
 
       <p class="lead">
@@ -24,8 +24,12 @@
       <h2>1. Data yang kami simpan</h2>
       <ul>
         <li>
-          <strong>Akun:</strong> email (dikelola Supabase Auth), username, nama tampilan, bio, kota,
-          dan foto profil privat.
+          <strong>Identitas perangkat:</strong> aplikasi tidak meminta email, nomor HP, atau kata
+          sandi. Saat pertama dibuka, aplikasi membuat satu identitas anonim (ID acak) yang mewakili
+          perangkat ini.
+        </li>
+        <li>
+          <strong>Profil:</strong> username, nama tampilan, bio, kota, dan foto profil privat.
         </li>
         <li>
           <strong>Kendaraan:</strong> merek, model, tahun, foto, serta nomor polisi dan catatan
@@ -34,7 +38,7 @@
         <li><strong>Klub:</strong> keanggotaan, peran, dan logo klub yang Anda unggah.</li>
         <li>
           <strong>Perjalanan:</strong> keanggotaan, pesan konvoi, laporan bahaya, dan posisi
-          terakhir selama Anda mengaktifkan berbagi lokasi.
+          terakhir selama Anda sendiri menyalakan berbagi lokasi (opt-in, mati secara bawaan).
         </li>
         <li>
           <strong>Keselamatan dan moderasi:</strong> laporan bahaya, konfirmasi “masih ada”, laporan
@@ -108,7 +112,7 @@
         </li>
         <li>
           Setelah penghapusan akun: profil, kendaraan, nomor polisi, catatan privat, foto, token
-          notifikasi, lokasi terakhir, follow, blokir, dan identitas login dihapus.
+          notifikasi, lokasi terakhir, follow, blokir, dan identitas anonim perangkat ini dihapus.
         </li>
         <li>
           Laporan bahaya tetap ada tanpa identitas untuk keselamatan pengguna lain. Pesan konvoi
@@ -129,19 +133,22 @@
         ikut terhapus. Konten tersebut tidak lagi menunjuk identitas Anda.
       </p>
 
-      <h2>6. Menghapus akun</h2>
+      <h2>6. Menghapus data</h2>
       <p>
-        Anda dapat menghapus akun dari aplikasi melalui <strong>Profil → Hapus akun</strong>, atau
-        dari halaman web <a href="../account-deletion/">Hapus akun RodaKawan</a> tanpa memasang
-        aplikasi. Kedua jalur meminta Anda masuk untuk membuktikan kepemilikan akun, lalu
-        menjalankan proses yang sama di server. Penghapusan tidak dapat dibatalkan.
+        Data dihapus dari dalam aplikasi melalui <strong>Profil → Hapus data saya</strong>: ketik
+        username Anda untuk mengonfirmasi, lalu tunggu sampai server menyatakan selesai. Karena
+        tidak ada email atau kata sandi, tidak ada jalur penghapusan dari browser — identitas anonim
+        hanya ada di perangkat Anda. Langkah lengkapnya ada di halaman
+        <a href="../account-deletion/">cara menghapus data</a>. Penghapusan tidak dapat dibatalkan.
       </p>
 
       <h2>7. Keamanan</h2>
       <p>
-        Data disimpan dengan Row Level Security, bucket privat, dan akses server yang dibatasi. Kata
-        sandi dikelola Supabase Auth dan tidak pernah disimpan oleh aplikasi. Bila Anda menemukan
-        masalah keamanan, laporkan lewat halaman dukungan tanpa menyertakan kata sandi atau token.
+        Data disimpan dengan Row Level Security, bucket privat, dan akses server yang dibatasi.
+        Aplikasi tidak menyimpan kata sandi karena tidak ada kata sandi yang dibuat; identitas
+        dipegang sesi anonim di perangkat dan dapat berakhir bila data aplikasi dibersihkan. Bila
+        Anda menemukan masalah keamanan, laporkan lewat halaman dukungan tanpa menyertakan token
+        sesi atau data pribadi orang lain.
       </p>
 
       <h2>8. Kontak</h2>
@@ -151,7 +158,9 @@
         pernah mengirim kata sandi, token sesi, atau data pribadi orang lain ke issue publik.
       </p>
 
-      <p class="small"><a href="../account-deletion/">Hapus akun</a> · <a href="../">Beranda</a></p>
+      <p class="small">
+        <a href="../account-deletion/">Cara menghapus data</a> · <a href="../">Beranda</a>
+      </p>
     </main>
   </body>
 </html>

@@ -4,92 +4,66 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="referrer" content="no-referrer" />
-    <title>Hapus akun RodaKawan</title>
+    <title>Hapus data RodaKawan</title>
     <link rel="stylesheet" href="../styles.css" />
   </head>
   <body>
-    <main class="card" aria-labelledby="judul">
+    <main class="card document" aria-labelledby="judul">
       <p class="eyebrow">RodaKawan</p>
-      <h1 id="judul">Hapus akun Anda</h1>
+      <h1 id="judul">Hapus data RodaKawan</h1>
       <p class="lead">
-        Halaman ini menghapus akun RodaKawan tanpa perlu memasang aplikasi. Anda harus masuk
-        terlebih dahulu agar kami yakin permintaan ini datang dari pemilik akun.
+        RodaKawan tidak memakai akun, email, atau kata sandi. Data Anda terikat pada satu identitas
+        anonim di perangkat yang Anda pakai, jadi penghapusan dilakukan dari dalam aplikasi — di
+        tempat identitas itu berada — bukan dari halaman ini.
       </p>
 
+      <h2>1. Cara menghapus data Anda</h2>
+      <ol>
+        <li>Buka aplikasi RodaKawan di perangkat yang biasa Anda pakai.</li>
+        <li>Masuk ke tab <strong>Profil → Hapus data saya</strong>.</li>
+        <li>Ketik username Anda persis seperti yang tampil di profil, lalu tekan tombol hapus.</li>
+        <li>
+          Tunggu sampai layar menyatakan server selesai. Aplikasi lalu membuat identitas anonim baru
+          yang belum menjadi anggota klub mana pun.
+        </li>
+      </ol>
+
       <section class="notice" aria-labelledby="konsekuensi">
-        <h2 id="konsekuensi">Yang terjadi setelah akun dihapus</h2>
+        <h2 id="konsekuensi">2. Yang terjadi setelah data dihapus</h2>
         <ul>
           <li>
-            Identitas login, profil, foto profil, kendaraan, nomor polisi, catatan privat, token
-            notifikasi, lokasi terakhir, follow, dan blokir dihapus.
+            Identitas anonim perangkat ini dihapus, bersama profil, foto profil, kendaraan, nomor
+            polisi, catatan privat, token notifikasi, lokasi terakhir, relasi follow, dan blokir.
           </li>
           <li>
-            Anda tidak bisa masuk lagi dengan akun ini. Sesi di perangkat lain berakhir setelah
-            tokennya kedaluwarsa; data akun sudah tidak dapat diakses.
+            Anda keluar dari klub dan perjalanan. Kepemilikan klub/perjalanan dialihkan ke pengelola
+            lain; perjalanan tanpa penerus dibatalkan. Perjalanan tetap ada untuk peserta lain.
           </li>
           <li>
-            Laporan bahaya yang pernah Anda kirim tetap tersimpan untuk keselamatan peserta lain,
-            tanpa identitas Anda.
+            Laporan bahaya tetap tersimpan untuk keselamatan peserta lain, tanpa identitas Anda.
           </li>
           <li>
-            Pesan konvoi serta postingan/komentar Anda diredaksi dan diatribusikan ke “Akun
-            dihapus”. Jejak audit moderasi tetap ada tanpa identitas Anda.
+            Pesan konvoi serta postingan/komentar diredaksi dan diatribusikan ke “Pengguna dihapus”.
+            Jejak audit moderasi tetap ada tanpa identitas Anda.
           </li>
-          <li>
-            Kepemilikan klub/perjalanan dialihkan ke pengelola lain. Perjalanan tanpa penerus
-            dibatalkan.
-          </li>
-          <li>Penghapusan tidak bisa dibatalkan.</li>
+          <li>Penghapusan tidak bisa dibatalkan dan data lama tidak dapat dipulihkan.</li>
         </ul>
       </section>
 
-      <p class="small">
-        Rincian retensi ada di <a id="tautan-privasi" href="../privacy/">Kebijakan privasi</a>.
-        Butuh bantuan?
-        <a id="tautan-dukungan" href="https://github.com/29nls/rodakawan/issues">Halaman dukungan</a
-        >.
+      <h2>3. Bila aplikasi tidak dapat dibuka</h2>
+      <p>
+        Identitas anonim hanya ada di perangkat itu dan tidak bisa dipulihkan dari luar, termasuk
+        lewat halaman ini: tidak ada email atau kata sandi untuk membuktikan kepemilikan. Bila
+        perangkat hilang atau aplikasi tidak bisa dijalankan, hubungi
+        <a href="https://github.com/29nls/rodakawan/issues">halaman dukungan</a> dan jelaskan
+        kendalanya — jangan mengirim token, tangkapan layar berisi data pribadi orang lain, atau
+        koordinat lokasi.
       </p>
 
-      <div id="belum-dikonfigurasi" class="error" hidden>
-        Halaman ini belum dikonfigurasi untuk project Supabase. Hubungi pengelola aplikasi.
-      </div>
-
-      <form id="form-hapus" novalidate>
-        <label for="email">Email akun</label>
-        <input id="email" name="email" type="email" autocomplete="username" required />
-
-        <label for="kata-sandi">Kata sandi</label>
-        <input
-          id="kata-sandi"
-          name="password"
-          type="password"
-          autocomplete="current-password"
-          required
-        />
-
-        <label for="konfirmasi">Ketik <strong>HAPUS AKUN</strong> untuk mengonfirmasi</label>
-        <input
-          id="konfirmasi"
-          name="confirmation"
-          type="text"
-          inputmode="text"
-          autocomplete="off"
-          autocapitalize="characters"
-          required
-        />
-
-        <button id="tombol-hapus" type="submit">Hapus akun saya</button>
-      </form>
-
-      <p id="status" class="status" role="status" aria-live="polite"></p>
-      <p id="galat" class="error" role="alert" hidden></p>
-
-      <noscript>
-        <p class="error">Halaman ini memerlukan JavaScript untuk masuk dan menghapus akun.</p>
-      </noscript>
+      <p class="small">
+        Rincian retensi ada di <a href="../privacy/">Kebijakan privasi</a>. Halaman ini tidak
+        memerlukan JavaScript dan tidak mengirim data apa pun ke server.
+      </p>
     </main>
-
-    <script src="./config.js"></script>
-    <script src="./app.js"></script>
   </body>
 </html>

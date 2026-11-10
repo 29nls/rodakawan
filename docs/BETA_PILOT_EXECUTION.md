@@ -17,7 +17,7 @@ mengikuti [`BETA_RUNBOOK.md`](BETA_RUNBOOK.md); kasus dan ID PD mengikuti
 - [ ] Buat project Supabase beta **terpisah dan kosong**; jangan memakai development `xvmcpfkkveeaevfcvfug` atau production.
 - [ ] Catat ref, region, URL API, publishable key, dan database password di password manager. Jangan taruh database password atau service-role/secret key dalam APK, repository, issue publik, atau chat.
 - [ ] Pastikan database benar-benar kosong; hitung migration lokal yang akan dipakai, tinjau urutan semua file `supabase/migrations/`, lalu terapkan berurutan sesuai `BETA_RUNBOOK.md`. Jangan mengedit migration lama.
-- [ ] Deploy Edge Function `delete-account` dari commit yang sama dengan APK. Pastikan token wajib diverifikasi melalui Auth; atur `WEB_ALLOWED_ORIGINS` hanya jika account-deletion web akan digunakan.
+- [ ] Deploy Edge Function `delete-account` dari commit yang sama dengan APK. Pastikan token wajib diverifikasi melalui Auth; halaman web hapus data kini hanya memuat instruksi (tanpa JavaScript), jadi `WEB_ALLOWED_ORIGINS` hanya perlu bila ada klien browser lain yang memanggil fungsi ini.
 - [ ] Storage: verifikasi bucket `avatars`, `vehicle-photos`, `club-logos` ada dan privat; jangan membuat bucket publik.
 - [ ] Auth: aktifkan **Anonymous sign-ins** dan matikan provider Email (ADR-083). Tidak ada Redirect URL email yang dibutuhkan. Simpan tangkapan layar pengaturan tanpa kredensial sebagai bukti.
 - [ ] Jangan mengubah database Auth rate limit dashboard tanpa catatan; periksa pengaturannya dan catat nilai/status yang disetujui.
